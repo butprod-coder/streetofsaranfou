@@ -1,0 +1,144 @@
+import { playableBoss, GUSTAVAX_BOSS, KARONUX_BOSS } from './bosses.js';
+import { LEVEL1_LAYERS, LEVEL2_LAYERS } from './levelLayers.js';
+
+/** Niveau sandbox : les 6 nouveaux ennemis, un par vague. */
+export const TEST_ENEMIES_LEVEL = {
+  name: 'SANDBOX — TEST ENNEMIS',
+  testArena: true,
+  noBoss: true,
+  layers: LEVEL1_LAYERS,
+  decor: ['obj_poubelle', 'obj_baril', 'obj_caisse'],
+  skyTop: 0x1a2838,
+  skyBot: 0x3a5a78,
+  ground: 0x1c1a28,
+  neon: 0x88ffcc,
+  stages: [
+    {
+      waves: [
+        ['charlingals'],
+        ['orelsan'],
+        ['papy_jala'],
+        ['remy'],
+        ['triso'],
+        ['guylux'],
+      ],
+    },
+  ],
+};
+
+export const CAMPAIGN_LEVELS = [
+  {
+    name: 'LE CHENE BATARD',
+    layers: LEVEL1_LAYERS,
+    decor: ['obj_poubelle', 'obj_baril', 'obj_caisse'],
+    skyTop: 0x1a2048,
+    skyBot: 0x3a4a78,
+    ground: 0x1c1a28,
+    neon: 0x7ab0ff,
+    stages: [
+      { waves: [['grunt', 'grunt']] },
+      { waves: [['runner', 'grunt']] },
+      { waves: [['grunt', 'runner'], ['heavy']] },
+      { waves: [['runner', 'runner'], ['grunt', 'heavy']] },
+      { waves: [['grunt', 'grunt', 'runner'], ['kikor_e', 'charlingals']] },
+      { bossOnly: true },
+    ],
+    boss: KARONUX_BOSS,
+  },
+  {
+    name: 'CHATEAU DE L\'ETANG',
+    layers: LEVEL2_LAYERS,
+    decor: ['obj_benne', 'obj_poubelle', 'obj_baril'],
+    skyTop: 0x4a1830,
+    skyBot: 0x8a2848,
+    ground: 0x281820,
+    neon: 0xff6a9a,
+    stages: [
+      { waves: [['grunt', 'heavy'], ['heavy', 'grunt']] },
+      { waves: [['heavy', 'grunt'], ['runner', 'grunt']] },
+      { waves: [['heavy', 'grunt'], ['kikor_e', 'orelsan']] },
+      { waves: [['runner', 'runner'], ['heavy', 'grunt']] },
+      { waves: [['heavy', 'runner', 'grunt'], ['kikor_e', 'guylux']] },
+      { bossOnly: true },
+    ],
+    boss: playableBoss('jualos', 1, { tint: 0xffaaaa, scale: 1.42, enrageBanner: 'JUALOS DEVIENT FOU !' }),
+  },
+  {
+    name: 'COLLEGE MONTJOIE',
+    bgImg: null,
+    decor: ['obj_baril', 'obj_brasero', 'obj_poubelle'],
+    skyTop: 0x281838,
+    skyBot: 0x5a2868,
+    ground: 0x221828,
+    neon: 0xcc66ff,
+    stages: [
+      { waves: [['runner', 'runner'], ['grunt', 'runner']] },
+      { waves: [['kikor_e', 'runner'], ['papy_jala', 'grunt']] },
+      { waves: [['kikor_e', 'runner', 'grunt'], ['runner', 'remy']] },
+    ],
+    boss: playableBoss('yanu', 2, { tint: 0xccccff, speed: 118, enrageBanner: 'YANU SE TRANSFORME !' }),
+  },
+  {
+    name: 'ALLEE DE LA GUIGNACE',
+    bgImg: 'level_bg_0',
+    decor: ['obj_poubelle', 'obj_benne', 'obj_baril'],
+    skyTop: 0x241445,
+    skyBot: 0x4a2c6e,
+    ground: 0x241f31,
+    neon: 0xff5fa2,
+    stages: [
+      { waves: [['grunt', 'grunt'], ['kikor_e', 'grunt'], ['runner', 'grunt']] },
+      { waves: [['grunt', 'heavy'], ['triso', 'kikor_e'], ['heavy', 'runner']] },
+      { waves: [['kikor_e', 'runner', 'grunt'], ['charlingals', 'orelsan'], ['heavy']] },
+    ],
+    boss: playableBoss('lorenzo', 3, { tint: 0xff8f7a, scale: 1.48, enrageBanner: 'LORENZO S\'ÉNERVE !' }),
+  },
+  {
+    name: 'ORME AU COIN',
+    bgImg: null,
+    decor: ['obj_caisse', 'obj_baril', 'obj_brasero'],
+    skyTop: 0x3a2810,
+    skyBot: 0x6a4820,
+    ground: 0x2a2018,
+    neon: 0xffcc44,
+    stages: [
+      { waves: [['runner', 'runner', 'grunt'], ['kikor_e', 'remy']] },
+      { waves: [['runner', 'heavy'], ['guylux', 'heavy']] },
+      { waves: [['runner', 'runner', 'heavy'], ['papy_jala', 'kikor_e', 'grunt']] },
+    ],
+    boss: playableBoss('jo', 4, { tint: 0xffeeaa, speed: 105, enrageBanner: 'JO DÉCHAÎNE LE TOURBILLON !' }),
+  },
+  {
+    name: 'LAC DE LA MEDECINERIE',
+    bgImg: 'level_bg_1',
+    decor: ['obj_baril', 'obj_poubelle', 'obj_caisse'],
+    skyTop: 0x1a3040,
+    skyBot: 0x3a5a6a,
+    ground: 0x1a2830,
+    neon: 0x66ddff,
+    stages: [
+      { waves: [['kikor_e', 'grunt'], ['triso', 'runner']] },
+      { waves: [['makouille'], ['heavy', 'orelsan'], ['kikor_e', 'grunt']] },
+      { waves: [['kikor_e', 'kikor_e', 'runner'], ['makouille', 'charlingals']] },
+    ],
+    boss: playableBoss('kikor', 5, { tint: 0xaaddff, enrageBanner: 'KIKOR ROULE À TOUT VA !' }),
+  },
+  {
+    name: 'LES CHIMOUTONS',
+    bgImg: 'level_bg_1',
+    decor: ['obj_baril', 'obj_benne', 'obj_poubelle'],
+    skyTop: 0x3a0d18,
+    skyBot: 0x731a2a,
+    ground: 0x2a161c,
+    neon: 0xffb24a,
+    stages: [
+      { waves: [['makouille'], ['heavy', 'guylux'], ['kikor_e', 'kikor_e']] },
+      { waves: [['makouille', 'makouille'], ['remy', 'heavy'], ['runner', 'papy_jala']] },
+      { waves: [['triso', 'kikor_e', 'makouille', 'heavy'], ['makouille', 'orelsan', 'heavy']] },
+    ],
+    boss: GUSTAVAX_BOSS,
+  },
+];
+
+export const TEST_LEVEL_INDEX = CAMPAIGN_LEVELS.length;
+export const LEVELS = [...CAMPAIGN_LEVELS, TEST_ENEMIES_LEVEL];
