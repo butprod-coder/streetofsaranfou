@@ -32,10 +32,19 @@ export const hudMixin = {
       .setScrollFactor(0)
       .setDepth(8001);
     this.comboT = this.add
-      .text(W / 2, 40, '', F(0, { fontSize: '14px', color: COL.cyan }))
+      .text(W / 2 - (this.coop ? 90 : 0), 40, '', F(0, { fontSize: '20px', fontStyle: 'bold', color: COL.cyan }))
       .setOrigin(0.5, 0)
       .setScrollFactor(0)
-      .setDepth(8001);
+      .setDepth(8001)
+      .setStroke('#000', 4);
+    if (this.coop) {
+      this.comboT2 = this.add
+        .text(W / 2 + 90, 40, '', F(0, { fontSize: '20px', fontStyle: 'bold', color: COL.gold }))
+        .setOrigin(0.5, 0)
+        .setScrollFactor(0)
+        .setDepth(8001)
+        .setStroke('#000', 4);
+    }
 
     this.livesT = this.add
       .text(290, 34, '', F(0, { fontSize: '16px', color: COL.cream }))
@@ -93,10 +102,6 @@ export const hudMixin = {
       if (this.livesT2) this.livesT2.setText('♥ x' + Math.max(0, this.lives2));
     }
     this.scoreT.setText('SCORE ' + this.score);
-    const comboTxt = [];
-    if (this.combo > 1) comboTxt.push('J1 x' + this.combo);
-    if (this.coop && this.combo2 > 1) comboTxt.push('J2 x' + this.combo2);
-    this.comboT.setText(comboTxt.join('  '));
     if (this.livesT) {
       this.livesT.setText(this.coop ? 'J1 ♥' + Math.max(0, this.lives) : '♥ x' + Math.max(0, this.lives));
     }
@@ -107,6 +112,21 @@ export const hudMixin = {
       const maxW = this.bossBarMaxW ?? 500;
       this.bossBar.width = maxW * Phaser.Math.Clamp(this.boss.hp / this.boss.hpMax, 0, 1);
     }
+  },
+
+  /** Compteur de chaîne de coups (combat.js) — pop animé à chaque coup au but. */
+  _updateComboHud(slot, n) {
+    const t = slot === 0 ? this.comboT : this.comboT2;
+    if (!t || !t.scene) return;
+    if (n < 2) {
+      t.setText('');
+      return;
+    }
+    const label = this.coop ? `J${slot + 1} COMBO x${n}` : `COMBO x${n}`;
+    t.setText(label);
+    t.setScale(1.35);
+    this.tweens.killTweensOf(t);
+    this.tweens.add({ targets: t, scale: 1, duration: 140, ease: 'Quad.easeOut' });
   },
 
   updateWeaponHUD(slot = 0) {

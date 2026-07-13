@@ -13,9 +13,12 @@ import { TestBossScene } from './scenes/TestBossScene.js';
 import { CoopInputScene } from './scenes/CoopInputScene.js';
 import { LevelEditorScene } from './scenes/LevelEditorScene.js';
 import { GameScene } from './scenes/GameScene.js';
+import { initGfx, getGfx, applyGfxToGame } from './config/graphics.js';
 
 initDebugPanel();
 
+initGfx(new URLSearchParams(location.search).get('gfx') || undefined);
+const gfx = getGfx();
 const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'game',
@@ -24,9 +27,20 @@ const game = new Phaser.Game({
   backgroundColor: '#0a0712',
   pixelArt: true,
   roundPixels: true,
+  render: {
+    powerPreference: 'high-performance',
+    antialias: false,
+    desynchronized: true,
+    batchSize: 4096,
+  },
+  fps: {
+    target: 60,
+    smoothStep: false,
+  },
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
+    resolution: gfx.resolution,
   },
   input: { gamepad: true },
   physics: {
@@ -49,3 +63,6 @@ const game = new Phaser.Game({
 });
 
 initGamepadBridge(game);
+window.__SOSF_GAME__ = game;
+window.__SOSF_GFX__ = gfx;
+applyGfxToGame(game);

@@ -15,6 +15,7 @@ import {
   makePoliceItem,
   makeProps,
   makeEnemyFx,
+  bakeFullStageTextures,
 } from '../graphics/proceduralTextures.js';
 import { registerProceduralSounds } from '../audio/registerSounds.js';
 import { ensureGamepadPatch } from '../input/gamepadPatch.js';
@@ -25,7 +26,13 @@ import { TRISO_SPIT_FRAMES, TRISO_SPIT_ANIM } from '../config/trisoSlime.js';
 import { PAPY_SMOKE_FRAMES, PAPY_SMOKE_ANIM } from '../config/papyJalaFx.js';
 import { GUYLUX_CARD_KEY } from '../config/guyluxCards.js';
 import { KARONUX_BOSS_FILES, karonuxBossTexKey, karonuxBossTexPath, createKaronuxBossAnims } from '../config/bossKaronux.js';
-import { LEVEL1_TEXTURE_KEYS, LEVEL2_TEXTURE_KEYS, getLayerTextureKeys } from '../config/levelLayers.js';
+import {
+  LEVEL1_TEXTURE_KEYS,
+  LEVEL1_STAGE_PARTS,
+  LEVEL2_TEXTURE_KEYS,
+  LEVEL2_STAGE_PARTS,
+  getLayerTextureKeys,
+} from '../config/levelLayers.js';
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -261,6 +268,7 @@ export class BootScene extends Phaser.Scene {
       repeat: -1,
     });
     registerProceduralSounds(this);
+    bakeFullStageTextures(this, [...LEVEL1_STAGE_PARTS, ...LEVEL2_STAGE_PARTS]);
     createKaronuxBossAnims(this);
     ensureGamepadPatch(this.game);
     ensureGamepadReady(this);

@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { W, H, COL, F } from '../config/gameConfig.js';
 import { CONFIG, DIFFS, DIFF } from '../config/difficulty.js';
+import { cycleGfxKey, getGfx, applyGfxToGame } from '../config/graphics.js';
 import { padMenu, beginMenuPadGrace } from '../input/gamepad.js';
 import { playMusic, stopMusic, sfx } from '../audio/globalAudio.js';
 
@@ -56,12 +57,23 @@ export class OptionsScene extends Phaser.Scene {
           CONFIG.shake = !CONFIG.shake;
         },
       },
+      {
+        get: () => {
+          const g = getGfx();
+          return 'Qualité graphique :  ' + g.label + ' (' + Math.round(g.resolution * 100) + '%)';
+        },
+        act: () => {
+          const g = cycleGfxKey();
+          applyGfxToGame(window.__SOSF_GAME__);
+          window.__SOSF_GFX__ = g;
+        },
+      },
       { get: () => 'RETOUR', act: () => this.scene.start('Title') },
     ];
     this.oi = 0;
     this.rows = this.entries.map((e, i) =>
       this.add
-        .text(W / 2, 200 + i * 54, '', F(0, { fontSize: '24px', color: COL.cream }))
+        .text(W / 2, 200 + i * 48, '', F(0, { fontSize: '22px', color: COL.cream }))
         .setOrigin(0.5)
         .setStroke('#000', 4)
         .setInteractive()
@@ -74,13 +86,13 @@ export class OptionsScene extends Phaser.Scene {
     this.add
       .text(
         W / 2,
-        400,
-        'Manette : Stick déplacer · ○ attaque · ✕ saut · □ spécial · △ police · Options pause',
-        F(0, { fontSize: '15px', color: COL.grey })
+        448,
+        'Qualité perf = moins de pixels · poussière · lecture manette',
+        F(0, { fontSize: '13px', color: COL.grey })
       )
       .setOrigin(0.5);
     this.add
-      .text(W / 2, 470, '↑ ↓ choisir   ✕ valider   ○ retour', F(0, { fontSize: '14px', color: COL.grey }))
+      .text(W / 2, 478, '↑ ↓ choisir   ✕ valider   ○ retour', F(0, { fontSize: '14px', color: COL.grey }))
       .setOrigin(0.5);
     playMusic(this, 'music_title');
     beginMenuPadGrace(this);

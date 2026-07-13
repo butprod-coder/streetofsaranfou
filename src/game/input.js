@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { padForPlayer, PAD } from '../input/gamepad.js';
+import { padForPlayer, PAD, padConfirm, anyPadStart } from '../input/gamepad.js';
 import { COL } from '../config/gameConfig.js';
 import { CONFIG } from '../config/difficulty.js';
 import { WEAPONS, POLICE_ITEM } from '../config/weapons.js';
@@ -9,6 +9,11 @@ import { dbgLog } from '../debug/crashOverlay.js';
 export const inputMixin = {
   update(time) {
     try {
+      if (this._hitStopTick?.()) return;
+      this._updateBannerSkip?.();
+      if (this.phase === 'fight' || this.phase === 'boss' || this.phase === 'advance') {
+        this.game?.loop?.wake?.();
+      }
       if (this._kx && (this._kx.phase === 'car' || this._kx.phase === 'intro' || this._kx.phase === 'transition')) {
         this.updateKaronuxBoss(time);
       }
@@ -21,7 +26,7 @@ export const inputMixin = {
         return;
       }
       if (this.phase === 'advance') {
-        this.updateStageScrollPlayers();
+        this.updateStageScroll();
         for (const p of this.allPlayers()) {
           if (p?.active) this.clamp(p);
         }
@@ -46,14 +51,21 @@ export const inputMixin = {
         }
       }
 
-      if (this.phase === 'go_wait') this.updateGoExit();
+      if (this.phase === 'go_wait') {
+        this.game?.loop?.wake?.();
+        this.updateGoExit();
+      }
 
+      this._aiDirector?.(time);
       if (this.enemies.getChildren) {
-        this.enemies.getChildren().forEach((e) => {
-          if (!e?.active || e.hp <= 0) return;
+        const enemies = this.enemies.getChildren();
+        for (const e of enemies) {
+          if (!e?.active || e.hp <= 0) continue;
           this.ai(e, time);
           this.clamp(e);
-        });
+          if (!e.bossDef) this.pushOut(e);
+          this._syncEnemyHpBar?.(e);
+        }
       }
       for (const p of this.allPlayers()) {
         if (p && p.active) {
@@ -61,16 +73,16 @@ export const inputMixin = {
           this.pushOut(p);
         }
       }
-      if (this.enemies.getChildren) {
-        this.enemies.getChildren().forEach((e) => {
-          if (e?.active && e.hp > 0 && !e.bossDef) this.pushOut(e);
-        });
-      }
+      this.updateGrabs?.();
+      this._tickComboChains?.();
       this.updateBullets(time);
       this.updatePickups();
       this.updateFires(time);
       this.updateHazards(time);
-      this.syncAllWeaponVisuals();
+      if ((this.game.loop.frame & 1) === 0) this.syncAllWeaponVisuals();
+      if (this.game.loop.frame % 45 === 0) {
+        this._levelHygiene?.();
+      }
     } catch (e) {
       dbgLog('update ERREUR (' + this.phase + '): ' + (e && e.message));
     }
@@ -115,19 +127,52 @@ export const inputMixin = {
     });
   },
 
+  /** Passe la bannière en cours (banner de stage.js) sur bouton confirm, après 350ms. */
+  _updateBannerSkip() {
+    const b = this._bannerSkip;
+    if (!b || this.time.now < b.minT) return;
+    if (!this._endPadConfirm() && !this._endKeyConfirm()) return;
+    try {
+      b.ev?.remove();
+    } catch (_) {}
+    b.finish();
+  },
+
+  _ensureEndKeys() {
+    if (this._endKeys || !this.input.keyboard) return;
+    const kb = this.input.keyboard;
+    this._endKeys = {
+      space: kb.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
+      enter: kb.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER),
+      x: kb.addKey(Phaser.Input.Keyboard.KeyCodes.X),
+    };
+  },
+
+  _endKeyConfirm() {
+    this._ensureEndKeys();
+    if (!this._endKeys) return false;
+    return (
+      Phaser.Input.Keyboard.JustDown(this._endKeys.space) ||
+      Phaser.Input.Keyboard.JustDown(this._endKeys.enter) ||
+      Phaser.Input.Keyboard.JustDown(this._endKeys.x)
+    );
+  },
+
+  _endPadConfirm() {
+    return padConfirm(this, 0) || padConfirm(this, 1) || anyPadStart(this);
+  },
+
   padEndScreen() {
-    const pad = padForPlayer(this, 0);
-    if (!pad) return;
-    const pressed =
-      (pad.buttons[PAD.CROIX] && pad.buttons[PAD.CROIX].pressed) ||
-      (pad.buttons[PAD.OPTIONS] && pad.buttons[PAD.OPTIONS].pressed);
-    if (pressed && !this._endPrev && this._endAction) {
-      this._endPrev = true;
-      this.time.removeAllEvents();
-      this.tweens.killAll();
+    const confirm = this._endPadConfirm() || this._endKeyConfirm();
+
+    if (this._endShowDetails && !this._endScreenReady && confirm) {
+      this._endShowDetails();
+      return;
+    }
+
+    if (confirm && this._endAction) {
       this._endAction();
     }
-    if (!pressed) this._endPrev = false;
   },
 
   padActions(slot = 0) {
@@ -145,10 +190,17 @@ export const inputMixin = {
       prev[idx] = now;
       return now && !was;
     };
-    if (edge(PAD.CROIX)) this.jump(slot);
-    if (edge(PAD.ROND)) this.attack(slot);
-    if (edge(PAD.CARRE)) this.special(slot);
-    if (edge(PAD.TRIANGLE)) this.callPolice();
+    const grabbing = !!this._grabOf?.(p);
+    if (edge(PAD.CROIX)) {
+      if (grabbing) this._releaseGrab(p);
+      else this.jump(slot);
+    }
+    if (edge(PAD.ROND)) {
+      if (grabbing) this.grabKnee(slot);
+      else this.attack(slot);
+    }
+    if (edge(PAD.CARRE) && !grabbing) this.special(slot);
+    if (edge(PAD.TRIANGLE) && !grabbing) this.callPolice();
   },
 
   movePlayer(slot = 0) {
@@ -156,6 +208,10 @@ export const inputMixin = {
     const p = this.playerAt(slot);
     if (!p) return;
     if (this.isPlayerStunned(p)) {
+      p.setVelocity(0, 0);
+      return;
+    }
+    if (this._grabOf?.(p)) {
       p.setVelocity(0, 0);
       return;
     }
@@ -201,6 +257,7 @@ export const inputMixin = {
       if (vx || vy) {
         p.state2 = 'walk';
         this.locomoteAnim(p, vx, vy);
+        this.tryAutoGrab?.(p);
       } else {
         p.state2 = 'idle';
         this.anim(p, 'idle');

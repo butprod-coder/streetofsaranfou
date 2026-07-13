@@ -3,7 +3,7 @@ const DEBUG_LOG = [];
 export function dbgLog(msg) {
   const line = '[' + (performance.now() | 0) + 'ms] ' + msg;
   DEBUG_LOG.push(line);
-  if (DEBUG_LOG.length > 40) DEBUG_LOG.shift();
+  if (DEBUG_LOG.length > 80) DEBUG_LOG.shift();
   console.log('[SoSF] ' + msg);
   const p = document.getElementById('dbgPanel');
   if (p) p.textContent = DEBUG_LOG.slice(-18).join('\n');
@@ -46,5 +46,6 @@ export function initDebugPanel() {
         p.style.display = p.style.display === 'none' ? 'block' : 'none';
       }
     });
+    p.title = 'Log debug (D pour afficher/masquer).';
   });
 }

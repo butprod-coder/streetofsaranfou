@@ -46,7 +46,7 @@ export const ALL_LEVEL_TEXTURE_KEYS = [...LEVEL1_TEXTURE_KEYS, ...LEVEL2_TEXTURE
 export const LEVEL1_LAYERS = {
   fullStage: true,
   stageParts: LEVEL1_STAGE_PARTS,
-  ambient: { type: 'dust', count: 3 },
+  ambient: { type: 'dust', count: 2 },
   roadRatio: 0.55,
   walkInsetTop: 0.12,
   walkInsetBottom: 10,
@@ -58,7 +58,7 @@ export const LEVEL1_LAYERS = {
 export const LEVEL2_LAYERS = {
   fullStage: true,
   stageParts: LEVEL2_STAGE_PARTS,
-  ambient: { type: 'leaves', count: 3 },
+  ambient: { type: 'leaves', count: 2 },
   roadRatio: 0.55,
   walkInsetTop: 0.12,
   walkInsetBottom: 10,

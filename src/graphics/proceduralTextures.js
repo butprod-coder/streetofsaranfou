@@ -158,3 +158,30 @@ export function makeProps(scene) {
     g.destroy();
   }
 }
+
+/** Pré-scale les fonds plein écran (1774×887) → W×H au boot (remplace la texture, pas de doublon mémoire). */
+export function bakeFullStageTextures(scene, keys) {
+  for (const key of keys) {
+    if (!scene.textures.exists(key)) continue;
+    const legacy = `${key}_lg`;
+    if (scene.textures.exists(legacy)) scene.textures.remove(legacy);
+
+    const img = scene.make.image({ key, x: 0, y: 0, add: false });
+    if (img.width === W && img.height === H) {
+      img.destroy();
+      continue;
+    }
+    const scaleX = W / img.width;
+    const scaleY = H / img.height;
+    const rt = scene.add.renderTexture(0, 0, W, H).setVisible(false);
+    img.setOrigin(0.5, 0);
+    img.setPosition(W / 2, 0);
+    img.setScale(scaleX, scaleY);
+    rt.draw(img);
+    img.destroy();
+    scene.textures.remove(key);
+    rt.saveTexture(key);
+    rt.destroy();
+    scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
+  }
+}

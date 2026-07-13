@@ -15,6 +15,10 @@ import {
   makeKoBuffer,
   makeTitleMusicBuffer,
   makeFightMusicBuffer,
+  makeFightMusic2Buffer,
+  makeFightMusic3Buffer,
+  makeFightMusic4Buffer,
+  makeBossMusicBuffer,
 } from './proceduralSounds.js';
 
 const SFX = [
@@ -37,6 +41,10 @@ const SFX = [
 const MUSIC = [
   ['music_title', makeTitleMusicBuffer],
   ['music_fight', makeFightMusicBuffer],
+  ['music_fight2', makeFightMusic2Buffer],
+  ['music_fight3', makeFightMusic3Buffer],
+  ['music_fight4', makeFightMusic4Buffer],
+  ['music_boss', makeBossMusicBuffer],
 ];
 
 /** Enregistre tous les sons dans le cache Phaser (BootScene.create). */

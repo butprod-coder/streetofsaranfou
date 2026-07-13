@@ -23,6 +23,29 @@ const STICK_DEADZONE = 0.3;
 const BTN_THRESHOLD = 0.15;
 /** Délai après ouverture d'un menu — évite de valider 2 écrans d'un coup. */
 const MENU_PAD_GRACE_MS = 420;
+let lastWakeAt = 0;
+const DEFAULT_WAKE_MS = 80;
+let padCacheFrame = -1;
+let padCacheResult = [];
+
+function invalidatePadCache() {
+  padCacheFrame = -1;
+  padCacheResult = [];
+}
+
+function padWakeMs() {
+  return window.__SOSF_GFX__?.padWakeMs ?? DEFAULT_WAKE_MS;
+}
+
+function wakeGamepads(force = false) {
+  const wakeMs = padWakeMs();
+  const now = performance.now();
+  if (!force && now - lastWakeAt < wakeMs) return;
+  lastWakeAt = now;
+  invalidatePadCache();
+  readNativeGamepads();
+}
+
 const rawPadCache = new Map();
 let lastDebugHint = '';
 let lastIgnoredDevices = [];
@@ -299,7 +322,12 @@ export function ensureGamepadReady(scene) {
   const gp = scene.input?.gamepad;
   if (gp) {
     ensureGamepadPatch(scene.game);
-    if (typeof gp.start === 'function') {
+    // Ne relance start() que si le plugin ne tourne pas déjà : chaque start()
+    // empile un listener UPDATE dupliqué (Phaser 3.80) → refreshPads() exécuté
+    // N fois par frame, N grandissant à chaque appel → chute de FPS progressive.
+    const ev = gp.sceneInputPlugin?.pluginEvents;
+    const running = ev?.listeners?.('update')?.includes?.(gp.update);
+    if (!running && typeof gp.start === 'function') {
       try {
         gp.start();
       } catch (_) {
@@ -313,9 +341,7 @@ export function initGamepadBridge(game) {
   if (!game || game._gamepadBridge) return;
   game._gamepadBridge = true;
 
-  const wake = () => {
-    readNativeGamepads();
-  };
+  const wake = (force = false) => wakeGamepads(force);
 
   window.addEventListener('gamepadconnected', (e) => {
     const gp = e.gamepad;
@@ -324,17 +350,18 @@ export function initGamepadBridge(game) {
     } else {
       lastDebugHint = `Connectée : ${gp?.id || 'manette'}`;
     }
-    wake();
+    wake(true);
   });
   window.addEventListener('gamepaddisconnected', () => {
     rawPadCache.clear();
+    invalidatePadCache();
     lastDebugHint = 'Manette déconnectée';
-    wake();
+    wake(true);
   });
-  window.addEventListener('pointerdown', wake, { passive: true });
-  window.addEventListener('focus', wake);
+  window.addEventListener('pointerdown', () => wake(true), { passive: true });
+  window.addEventListener('focus', () => wake(true));
 
-  game.events.on('step', wake);
+  game.events.on('step', () => wake(false));
 
   const setupCanvas = () => {
     const canvas = game.canvas;
@@ -363,6 +390,9 @@ export function initGamepadBridge(game) {
 export function connectedPads(scene) {
   if (scene) ensureGamepadReady(scene);
 
+  const frame = scene?.game?.loop?.frame ?? -1;
+  if (frame >= 0 && padCacheFrame === frame) return padCacheResult;
+
   const out = [];
   const ids = new Set();
   const add = (pad, idx) => {
@@ -381,6 +411,10 @@ export function connectedPads(scene) {
 
   out.sort((a, b) => padSortRank(a) - padSortRank(b));
 
+  if (frame >= 0) {
+    padCacheFrame = frame;
+    padCacheResult = out;
+  }
   return out;
 }
 

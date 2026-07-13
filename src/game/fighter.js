@@ -121,6 +121,69 @@ export const fighterMixin = {
     return f;
   },
 
+  /* ---- Mini barre de vie au-dessus des ennemis (créée au premier dégât) ---- */
+
+  _ensureEnemyHpBar(e) {
+    if (!e || e._hpBg || e.isPlayer || e.bossDef || !e.scene) return;
+    e._hpBg = this.add.rectangle(e.x, e.y, 46, 6, 0x000000, 0.55).setDepth(8900);
+    e._hpFill = this.add.rectangle(e.x - 21, e.y, 42, 4, 0xff5555).setOrigin(0, 0.5).setDepth(8901);
+    this._syncEnemyHpBar(e);
+  },
+
+  _syncEnemyHpBar(e) {
+    if (!e?._hpBg) return;
+    if (!e.active || e.hp <= 0 || e.dying) {
+      this._destroyEnemyHpBar(e);
+      return;
+    }
+    const topY = e.y - e.displayHeight * 0.94 - 10;
+    e._hpBg.setPosition(e.x, topY);
+    e._hpFill.setPosition(e.x - 21, topY);
+    const r = Phaser.Math.Clamp(e.hp / e.hpMax, 0, 1);
+    e._hpFill.width = 42 * r;
+    e._hpFill.fillColor = r > 0.5 ? 0xff5555 : r > 0.25 ? 0xffaa33 : 0xffe066;
+  },
+
+  _destroyEnemyHpBar(e) {
+    for (const k of ['_hpBg', '_hpFill']) {
+      if (e[k]) {
+        try {
+          e[k].destroy();
+        } catch (_) {}
+        e[k] = null;
+      }
+    }
+  },
+
+  /** Timers différés liés à un combattant — annulés à la mort / purge. */
+  _fighterLater(f, delay, fn) {
+    if (!f) return null;
+    if (!f._fighterCalls) f._fighterCalls = [];
+    const ev = this.time.delayedCall(delay, () => {
+      if (f._fighterCalls) f._fighterCalls = f._fighterCalls.filter((x) => x !== ev);
+      if (!f?.scene) return;
+      fn();
+    });
+    f._fighterCalls.push(ev);
+    return ev;
+  },
+
+  _purgeFighter(f) {
+    if (!f) return;
+    this._destroyEnemyHpBar?.(f);
+    try {
+      this.tweens.killTweensOf(f);
+    } catch (_) {}
+    if (f._fighterCalls?.length) {
+      for (const ev of f._fighterCalls) {
+        try {
+          ev?.remove?.();
+        } catch (_) {}
+      }
+      f._fighterCalls = [];
+    }
+  },
+
   _playSheetAnimOnFrameSprite(f, name, ignore) {
     const fa = FRAME_ANIM_CHARS[f.frameSheet ?? f.sheet];
     if (!fa || !this.textures.exists(f.sheet)) return;
@@ -185,6 +248,9 @@ export const fighterMixin = {
       if (hasFrameClip(frameKey, name)) {
         const animKey = frameKey + '_' + name;
         if (this.anims.exists(animKey)) {
+          if (ignore && f.anims.isPlaying && f.anims.currentAnim?.key === animKey) {
+            return;
+          }
           const strike = name === 'attack' || name === 'punch' || name === 'kick';
           if (strike && !ignore) {
             f.once('animationcomplete', (anim) => {
@@ -308,8 +374,13 @@ export const fighterMixin = {
     }
     const spd = Math.hypot(vx, vy);
     const max = f.speedV || spd || 1;
-    const useRun = spd >= max * (fa.runSpeedRatio || 0.7);
-    this.anim(f, useRun ? 'run' : 'walk');
+    const clip = spd >= max * (fa.runSpeedRatio || 0.7) ? 'run' : 'walk';
+    if (f._locoClip === clip) {
+      const animKey = (f.frameSheet ?? f.sheet) + '_' + clip;
+      if (f.anims.isPlaying && f.anims.currentAnim?.key === animKey) return;
+    }
+    f._locoClip = clip;
+    this.anim(f, clip);
   },
 
   pose(f, frame) {

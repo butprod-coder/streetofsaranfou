@@ -29,6 +29,7 @@ export const TEST_ENEMIES_LEVEL = {
 export const CAMPAIGN_LEVELS = [
   {
     name: 'LE CHENE BATARD',
+    music: 'music_fight',
     layers: LEVEL1_LAYERS,
     decor: ['obj_poubelle', 'obj_baril', 'obj_caisse'],
     skyTop: 0x1a2048,
@@ -36,7 +37,7 @@ export const CAMPAIGN_LEVELS = [
     ground: 0x1c1a28,
     neon: 0x7ab0ff,
     stages: [
-      { waves: [['grunt', 'grunt']] },
+      { waves: [['grunt'], ['grunt', 'grunt'], ['runner', 'grunt'], ['grunt', 'grunt', 'runner']] },
       { waves: [['runner', 'grunt']] },
       { waves: [['grunt', 'runner'], ['heavy']] },
       { waves: [['runner', 'runner'], ['grunt', 'heavy']] },
@@ -47,6 +48,7 @@ export const CAMPAIGN_LEVELS = [
   },
   {
     name: 'CHATEAU DE L\'ETANG',
+    music: 'music_fight2',
     layers: LEVEL2_LAYERS,
     decor: ['obj_benne', 'obj_poubelle', 'obj_baril'],
     skyTop: 0x4a1830,
@@ -65,6 +67,7 @@ export const CAMPAIGN_LEVELS = [
   },
   {
     name: 'COLLEGE MONTJOIE',
+    music: 'music_fight3',
     bgImg: null,
     decor: ['obj_baril', 'obj_brasero', 'obj_poubelle'],
     skyTop: 0x281838,
@@ -80,6 +83,7 @@ export const CAMPAIGN_LEVELS = [
   },
   {
     name: 'ALLEE DE LA GUIGNACE',
+    music: 'music_fight4',
     bgImg: 'level_bg_0',
     decor: ['obj_poubelle', 'obj_benne', 'obj_baril'],
     skyTop: 0x241445,
@@ -95,6 +99,7 @@ export const CAMPAIGN_LEVELS = [
   },
   {
     name: 'ORME AU COIN',
+    music: 'music_fight2',
     bgImg: null,
     decor: ['obj_caisse', 'obj_baril', 'obj_brasero'],
     skyTop: 0x3a2810,
@@ -110,6 +115,7 @@ export const CAMPAIGN_LEVELS = [
   },
   {
     name: 'LAC DE LA MEDECINERIE',
+    music: 'music_fight3',
     bgImg: 'level_bg_1',
     decor: ['obj_baril', 'obj_poubelle', 'obj_caisse'],
     skyTop: 0x1a3040,
@@ -125,6 +131,7 @@ export const CAMPAIGN_LEVELS = [
   },
   {
     name: 'LES CHIMOUTONS',
+    music: 'music_fight4',
     bgImg: 'level_bg_1',
     decor: ['obj_baril', 'obj_benne', 'obj_poubelle'],
     skyTop: 0x3a0d18,

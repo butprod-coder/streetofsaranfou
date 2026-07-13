@@ -18,6 +18,7 @@ import { inputMixin } from '../game/input.js';
 import { audioMixin } from '../game/audio.js';
 import { specialsMixin } from '../game/specials.js';
 import { pauseMixin } from '../game/pause.js';
+import { grabMixin } from '../game/grab.js';
 import { karonuxBossMixin } from '../game/bosses/karonuxBoss.js';
 import { playersMixin } from '../game/players.js';
 
@@ -79,7 +80,9 @@ export class GameScene extends Phaser.Scene {
     this.hazards = this.add.group();
 
     if (lv.layers) {
-      this.add.rectangle(W / 2, H / 2, W, H, lv.skyTop || 0x1a2048).setDepth(0);
+      if (!lv.layers.fullStage) {
+        this.add.rectangle(W / 2, H / 2, W, H, lv.skyTop || 0x1a2048).setDepth(0);
+      }
       const decorStage = this.testBoss ? Math.max(0, lv.stages.length - 1) : 0;
       this.spawnDecor({
         stageIdx: decorStage,
@@ -118,9 +121,21 @@ export class GameScene extends Phaser.Scene {
       this.banner('NIVEAU ' + (this.levelIdx + 1) + '\n' + lv.name, () => this.startStage(true));
     }
     this.setupPauseInput();
+    if (this._wakeLoop && this.input) {
+      this.input.off('pointerdown', this._wakeLoop);
+    }
+    this._wakeLoop = () => this.game?.loop?.wake?.();
+    this.input?.on('pointerdown', this._wakeLoop);
     this.events.once('shutdown', () => {
+      if (this.input && this._wakeLoop) this.input.off('pointerdown', this._wakeLoop);
       this.time.removeAllEvents();
       this.tweens.killAll();
+      this._purgeSceneSounds?.();
+      // Si un hit-stop était en cours, ne pas laisser l'AnimationManager global en pause
+      if (this._hitStopUntil) {
+        this._hitStopUntil = 0;
+        this.anims.resumeAll();
+      }
     });
     this.startFightMusic();
   }
@@ -139,6 +154,7 @@ Object.assign(
   decorMixin,
   audioMixin,
   pauseMixin,
+  grabMixin,
   karonuxBossMixin,
   aiMixin,
   enemyAttacksMixin,

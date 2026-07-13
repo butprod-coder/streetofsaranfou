@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { W } from '../config/gameConfig.js';
+import { W, COL } from '../config/gameConfig.js';
 import { CONFIG } from '../config/difficulty.js';
 import { WEAPON_KEYS, POLICE_ITEM, WEAPONS } from '../config/weapons.js';
 import { FRAME_ANIM_CHARS, hasAttackCombo, hasFrameClip } from '../config/frameAnims.js';
@@ -7,6 +7,78 @@ import { dbgLog, showCrash } from '../debug/crashOverlay.js';
 
 /** GameScene mixin: combat.js */
 export const combatMixin = {
+  /** Gel d'impact : fige physique/anims/tweens/horloge quelques ms pour donner du poids aux coups. */
+  hitStop(ms = 45) {
+    if (this.phase === 'pause' || this.phase === 'win' || this.phase === 'over') return;
+    if (this._hitStopUntil) return;
+    this._hitStopUntil = this.game.loop.time + ms;
+    try {
+      this.physics.world.pause();
+    } catch (_) {}
+    this.anims.pauseAll();
+    this.tweens.pauseAll();
+    this.time.paused = true;
+  },
+
+  /** Appelé en tête d'update : true tant que le gel est actif. */
+  _hitStopTick() {
+    if (!this._hitStopUntil) return false;
+    if (this.game.loop.time < this._hitStopUntil) return true;
+    this._hitStopUntil = 0;
+    this.anims.resumeAll();
+    this.tweens.resumeAll();
+    this.time.paused = false;
+    if (this.phase !== 'pause' && this.phase !== 'win' && this.phase !== 'over') {
+      try {
+        this.physics.world.resume();
+      } catch (_) {}
+    }
+    return false;
+  },
+
+  /* ---- Chaîne de combo (coups au but sans être touché) ---- */
+
+  _chainAt(slot) {
+    if (!this._chain) this._chain = [{ n: 0, last: 0 }, { n: 0, last: 0 }];
+    return this._chain[slot] ?? null;
+  },
+
+  _registerComboHit(slot) {
+    const c = this._chainAt(slot);
+    if (!c) return;
+    c.n++;
+    c.last = this.time.now;
+    this._updateComboHud?.(slot, c.n);
+  },
+
+  /** Fin de chaîne : payout=true (timeout) verse le bonus, payout=false (joueur touché) le perd. */
+  _breakComboChain(slot, payout) {
+    const c = this._chainAt(slot);
+    if (!c || !c.n) return;
+    const n = c.n;
+    c.n = 0;
+    const p = this.playerAt(slot);
+    if (n >= 4) {
+      if (payout) {
+        const bonus = n * 15;
+        this.score += bonus;
+        if (p?.active) this.floatText(p.x, p.y - 78, 'COMBO x' + n + '  +' + bonus, COL.gold);
+      } else if (p?.active) {
+        this.floatText(p.x, p.y - 78, 'COMBO BRISÉ !', COL.grey);
+      }
+    }
+    this._updateComboHud?.(slot, 0);
+    this.updateHUD();
+  },
+
+  _tickComboChains() {
+    if (!this._chain) return;
+    for (let s = 0; s < this._chain.length; s++) {
+      const c = this._chain[s];
+      if (c.n && this.time.now - c.last > 2200) this._breakComboChain(s, true);
+    }
+  },
+
   _lastAttackAt(slot) {
     return slot === 0 ? this.lastAttack : this.lastAttack2;
   },
@@ -159,7 +231,7 @@ export const combatMixin = {
         this.time.delayedCall(i * 70, () => {
           if (p.active) {
             const mz = this._weaponMuzzle(p);
-            this.spawnBullet(mz.x, mz.y, p.facing, wpn.dmg, true);
+            this.spawnBullet(mz.x, mz.y, p.facing, wpn.dmg, true, slot);
           }
         });
       }
@@ -421,11 +493,12 @@ export const combatMixin = {
     }
   },
 
-  spawnBullet(x, y, dir, dmg, fromPlayer) {
+  spawnBullet(x, y, dir, dmg, fromPlayer, ownerSlot = 0) {
     const b = this.physics.add.image(x, y, 'bullet').setDepth(99990);
     b.dir = dir;
     b.dmg = dmg;
     b.fromPlayer = fromPlayer;
+    b.ownerSlot = ownerSlot;
     b.born = this.time.now;
     b.prevX = x;
     b.setFlipX(dir < 0);
@@ -433,6 +506,16 @@ export const combatMixin = {
     b.body.setVelocityX(dir * 560);
     this.bullets.add(b);
     this.spawnSpark(x, y);
+  },
+
+  _destroyBullet(b) {
+    if (!b) return;
+    try {
+      this.tweens.killTweensOf(b);
+    } catch (_) {}
+    try {
+      if (b.active) b.destroy();
+    } catch (_) {}
   },
 
   updateBullets(time) {
@@ -443,14 +526,14 @@ export const combatMixin = {
       if (b.isTennis) {
         if (this._updateTennisBall) this._updateTennisBall(b, time);
         if (time - b.born > 4500 || b.x < -60 || b.x > W + 60) {
-          b.destroy();
+          this._destroyBullet(b);
           return;
         }
         for (const p of this.activePlayers()) {
           if (!p.active || p.hp <= 0) continue;
           if (Math.abs(p.x - b.x) < 28 && Math.abs(p.y - b.y) < 34) {
             this.hurt(p, b.dmg, p.x < b.x ? -1 : 1, b.x);
-            b.destroy();
+            this._destroyBullet(b);
             break;
           }
         }
@@ -459,9 +542,12 @@ export const combatMixin = {
 
       const prevX = b.prevX ?? b.x - (b.dir || 1) * 18;
       b.prevX = b.x;
+      if (b.isCard && b.spinSpeed) {
+        b.angle += b.spinSpeed * (this.game.loop.delta / 1000);
+      }
 
       if (b.x < -40 || b.x > W + 40 || time - b.born > (b.isBill ? 3200 : b.isCard ? 2800 : 1700)) {
-        b.destroy();
+        this._destroyBullet(b);
         return;
       }
       if (b.fromPlayer) {
@@ -469,7 +555,7 @@ export const combatMixin = {
           const car = this._kx.car;
           if (Math.abs(car.x - b.x) < car.displayWidth * 0.42 && Math.abs(car.y - b.y) < 58) {
             this.karonuxBossCarHit(b.dmg, b.x);
-            b.destroy();
+            this._destroyBullet(b);
             return;
           }
         }
@@ -481,8 +567,8 @@ export const combatMixin = {
               jumpZ: e.jumpZ,
             })
           ) {
-            this.hurt(e, b.dmg, b.dir, b.x);
-            b.destroy();
+            this.hurt(e, b.dmg, b.dir, b.x, null, { fromPlayer: true, ownerSlot: b.ownerSlot ?? 0 });
+            this._destroyBullet(b);
           }
         });
       } else {
@@ -500,7 +586,7 @@ export const combatMixin = {
               const knockdown = !!b.isBoard;
               this.hurt(p, b.dmg, b.dir || (p.x < b.x ? -1 : 1), b.x, null, { knockdown });
             }
-            b.destroy();
+            this._destroyBullet(b);
             break;
           }
         }
@@ -539,11 +625,26 @@ export const combatMixin = {
       t._airKickHeld = false;
     }
     t.hp -= dmg;
+    if (!t.isPlayer && !t.bossDef) this._ensureEnemyHpBar?.(t);
+    const fromPlayerHit = !!(attacker?.isPlayer || opts.fromPlayer);
+    if (t.isPlayer || fromPlayerHit) {
+      this.hitStop(t.hp <= 0 ? 90 : opts.knockdown ? 70 : 45);
+    }
+    if (!t.isPlayer && fromPlayerHit) {
+      this._registerComboHit(attacker?.playerSlot ?? opts.ownerSlot ?? 0);
+    }
+    if (t.isPlayer) {
+      this._breakComboChain(t.playerSlot ?? 0, false);
+      if (t._grabbing) this._releaseGrab?.(t);
+    }
     this.flash(t, 0xffffff);
     this.spawnSpark(t.x - (dir || 0) * 10, t.y - 50);
     this.shake(90, 0.006);
     this.sfx(t.isPlayer ? 'hurt' : 'hit', { vol: t.isPlayer ? 1 : 0.85 });
     const kb = opts.knockback ?? attacker?._lastHitKnockback ?? 16;
+    try {
+      this.tweens.killTweensOf(t);
+    } catch (_) {}
     this.tweens.add({ targets: t, x: t.x + (dir || 1) * kb, duration: kb > 20 ? 120 : 90 });
     if (attacker?._lastHitKnockback) attacker._lastHitKnockback = null;
     if (t.hp > 0) {
@@ -583,8 +684,8 @@ export const combatMixin = {
             if (this._kxRecoverBossHurt) this._kxRecoverBossHurt(t);
           } else {
             this.anim(t, 'hurt', false);
-            this.time.delayedCall(280, () => {
-              if (t.active && t.state2 === 'hurt') t.state2 = 'idle';
+            this._fighterLater(t, 280, () => {
+              if (t.active && t.state2 === 'hurt' && !t.dying) t.state2 = 'idle';
             });
           }
         }
@@ -612,7 +713,7 @@ export const combatMixin = {
     this.anim(t, 'ko', false);
     if (!t.isPlayer) this.sfx('ko', { vol: 0.7 });
     const koMs = this._dieAnimDuration(t, 'ko') || 550;
-    this.time.delayedCall(koMs, () => this._dieFinish(t, dir));
+    this._fighterLater(t, koMs, () => this._dieFinish(t, dir));
   },
 
   _dieFinish(t, dir) {
@@ -626,6 +727,7 @@ export const combatMixin = {
     }
     if (t.bossDef) {
       if (t.bossDef.custom === 'jualos' || t.sheet === 'jualos') this._cancelJualosCharge(t);
+      this._clearBossHud?.();
       dbgLog('die: BOSS mort -> phase=win, victory dans 700ms');
       this.phase = 'win';
       this.time.delayedCall(700, () => {
@@ -639,27 +741,27 @@ export const combatMixin = {
     }
     this.score += t.score || 100;
     this.updateHUD();
-    this.time.delayedCall(450, () =>
-      this.tweens.add({
-        targets: t,
-        alpha: 0,
-        duration: 350,
-        onComplete: () => {
-          try {
-            t.destroy();
-          } catch (_) {}
-          this.checkClear();
-        },
-      })
-    );
+    if (!t.isPlayer && !t.bossDef) {
+      this._purgeFighter(t);
+      try {
+        t.destroy();
+      } catch (_) {}
+      this.checkClear();
+      return;
+    }
   },
 
   die(t, dir) {
     if (t.type2 === 'triso' && this._stopTrisoSpit) this._stopTrisoSpit(t);
     if (t.dying) return;
+    if (t._grabbedBy) this._releaseGrab?.(t._grabbedBy);
+    if (t.isPlayer && t._grabbing) this._releaseGrab?.(t);
+    this._purgeFighter(t);
+    if (t.bossDef?.custom === 'jo' || t.sheet === 'jo') this._cancelJoSpin?.(t);
     if (t.bossCustom === 'karonux_boss' && !t._kxDeathStarted) {
       t._kxDeathStarted = true;
       t.dying = true;
+      t._dyingSince = this.time.now;
       t.hp = 0;
       t.invuln = Number.MAX_SAFE_INTEGER;
       t.setVelocity(0, 0);
@@ -675,6 +777,7 @@ export const combatMixin = {
       return;
     }
     t.dying = true;
+    t._dyingSince = this.time.now;
     t.hp = 0;
     t.invuln = Number.MAX_SAFE_INTEGER;
     t.setVelocity(0, 0);
@@ -716,7 +819,7 @@ export const combatMixin = {
           if (anim.key === fallKey) goKo();
         });
       }
-      this.time.delayedCall(fallMs, goKo);
+      this._fighterLater(t, fallMs, goKo);
       return;
     }
 
@@ -726,7 +829,7 @@ export const combatMixin = {
   flash(t, c) {
     if (!t || !t.scene || !t.active) return;
     t.setTintFill(c);
-    this.time.delayedCall(70, () => {
+    this._fighterLater(t, 70, () => {
       if (!t || !t.scene || !t.active) return;
       t.clearTint();
       if (t.baseTint) t.setTint(t.baseTint);
@@ -747,18 +850,39 @@ export const combatMixin = {
 
   spawnSpark(x, y) {
     if (!this.sys || !this.sys.isActive()) return;
+    const sparkMax = window.__SOSF_GFX__?.sparkMax ?? 14;
+    this._sparkCount = (this._sparkCount || 0) + 1;
+    if (this._sparkCount > sparkMax) {
+      this._sparkCount--;
+      return;
+    }
     const s = this.add.image(x, y, 'spark').setDepth(99999);
     this.tweens.add({
       targets: s,
       scale: 1.7,
       alpha: 0,
-      duration: 200,
+      duration: 180,
       onComplete: () => {
+        this._sparkCount = Math.max(0, (this._sparkCount || 1) - 1);
         try {
           s.destroy();
         } catch (e) {}
       },
     });
+  },
+
+  _pruneDeadTweens() {
+    try {
+      const list = this.tweens.getAllTweens?.() ?? this.tweens.tweens ?? [];
+      for (const tw of list) {
+        if (!tw || !tw.isPlaying?.()) continue;
+        const targets = tw.getTargets?.() ?? tw.targets ?? [];
+        if (!targets.length) continue;
+        if (targets.every((t) => !t || !t.scene || !t.active)) {
+          tw.remove?.();
+        }
+      }
+    } catch (_) {}
   },
 
   airKick(slot = 0) {
@@ -818,13 +942,13 @@ export const combatMixin = {
     e.state2 = 'attack';
     this.anim(e, 'attack', false);
     this.time.delayedCall(260, () => {
-      if (e.active && e.state2 === 'attack') {
+      if (e.active && e.state2 === 'attack' && !e.dying) {
         e.state2 = 'idle';
         this.anim(e, 'idle');
       }
     });
-    this.time.delayedCall(230, () => {
-      if (!e.active || p.hp <= 0) return;
+    this._fighterLater(e, 230, () => {
+      if (!e.active || e.dying || p.hp <= 0) return;
       if (Math.abs(p.x - e.x) < e.reach + 6 && Math.abs(p.y - e.y) < 48) {
         this.hurt(p, e.damage, p.x < e.x ? -1 : 1);
       }

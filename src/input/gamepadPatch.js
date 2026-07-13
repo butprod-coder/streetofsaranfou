@@ -38,6 +38,7 @@ function patchGamepadPrototype(gp) {
 
 /** Applique le correctif dès qu'une instance GamepadPlugin est disponible. */
 export function ensureGamepadPatch(game) {
+  if (prototypePatched) return true;
   if (!game) return false;
   for (const scene of game.scene.scenes) {
     const gp = scene.input && scene.input.gamepad;

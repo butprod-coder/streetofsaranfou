@@ -57,7 +57,7 @@ export const specialsMixin = {
     this.flash(p, 0xffffff);
     this.pose(p, GUST.gun);
     this.time.delayedCall(120, () => {
-      if (p.active) this.spawnBullet(p.x + p.facing * 46, p.y - 46, p.facing, c.damage + 8, true);
+      if (p.active) this.spawnBullet(p.x + p.facing * 46, p.y - 46, p.facing, c.damage + 8, true, p.playerSlot ?? 0);
     });
     this.time.delayedCall(400, () => this._specialEnd(p));
   },
@@ -76,6 +76,8 @@ export const specialsMixin = {
   _specialStart(p) {
     const slot = p.playerSlot ?? 0;
     if (this._specialActive[slot]) return false;
+    this._specialCancelPending();
+    this._clearSpecialFx();
     this._specialActive[slot] = true;
     this._specialSprites = [];
     p.state2 = 'special';
@@ -85,6 +87,7 @@ export const specialsMixin = {
 
   _specialEnd(p) {
     const slot = p?.playerSlot ?? 0;
+    this._specialCancelPending();
     if (!p || !p.scene) {
       this._specialActive[slot] = false;
       this._clearSpecialFx();
@@ -107,17 +110,47 @@ export const specialsMixin = {
     this._syncFighterBody(p);
   },
 
+  _specialCancelPending() {
+    this._specialTimers?.forEach((t) => t?.remove?.());
+    this._specialTimers = [];
+    this._specialCalls?.forEach((c) => c?.remove?.());
+    this._specialCalls = [];
+  },
+
+  _specialTrackCall(call) {
+    if (!call) return call;
+    if (!this._specialCalls) this._specialCalls = [];
+    this._specialCalls.push(call);
+    return call;
+  },
+
+  _specialTrackTimer(evt) {
+    if (!evt) return evt;
+    if (!this._specialTimers) this._specialTimers = [];
+    this._specialTimers.push(evt);
+    return evt;
+  },
+
   _syncFighterBody(p) {
     if (p?.body) p.body.reset(p.x, p.y);
   },
 
+  _safeDestroyFx(spr) {
+    if (!spr?.scene) return;
+    spr.setVisible(false);
+    this.time.delayedCall(0, () => {
+      try {
+        if (spr?.active) spr.destroy();
+      } catch (_) {}
+    });
+  },
+
   _clearSpecialFx() {
-    if (this._specialSprites) {
-      this._specialSprites.forEach((s) => {
-        try { s.destroy(); } catch (_) {}
-      });
-    }
+    const list = [...(this._specialSprites || [])];
     this._specialSprites = [];
+    for (const s of list) {
+      this._safeDestroyFx(s);
+    }
   },
 
   _showFx(key, x, y, opts = {}) {
@@ -131,8 +164,10 @@ export const specialsMixin = {
     else if (opts.targetH) spr.setScale(opts.targetH / spr.height);
     else spr.setScale(110 / spr.height);
     if (opts.alpha != null) spr.setAlpha(opts.alpha);
-    if (!this._specialSprites) this._specialSprites = [];
-    this._specialSprites.push(spr);
+    if (opts.trackSpecial !== false) {
+      if (!this._specialSprites) this._specialSprites = [];
+      this._specialSprites.push(spr);
+    }
     return spr;
   },
 
@@ -149,11 +184,9 @@ export const specialsMixin = {
     });
   },
 
-  _screenFlash(color, alpha, ms) {
-    const f = this.add.rectangle(W / 2, H / 2, W, H, color, alpha)
-      .setScrollFactor(0).setDepth(98000);
-    this._specialSprites.push(f);
-    this.tweens.add({ targets: f, alpha: 0, duration: ms, onComplete: () => f.destroy() });
+  _screenFlash(color, _alpha, ms) {
+    const c = Phaser.Display.Color.IntegerToRGB(color);
+    this.cameras.main.flash(ms, c.r, c.g, c.b);
   },
 
   _hurtAllEnemies(dmg) {
@@ -229,43 +262,65 @@ export const specialsMixin = {
     });
   },
 
-  _launchFlameCig(x, y, dir, dmg, delay = 0) {
-    this.time.delayedCall(delay, () => {
-      if (!this.sys?.isActive()) return;
-      const tex = this.textures.exists('sp_lorenzo_cig3') ? 'sp_lorenzo_cig3' : 'sp_lorenzo_cig2';
-      const cig = this.add.image(x, y - 42, tex).setDepth(99990).setScale(0.55);
-      cig.setFlipX(dir < 0);
-      this._specialSprites.push(cig);
-      let ticks = 0;
-      const timer = this.time.addEvent({
-        delay: 45,
-        repeat: 55,
-        callback: () => {
-          if (!cig.active) {
-            timer.remove();
-            return;
-          }
-          cig.x += dir * 16;
-          ticks++;
-          if (ticks % 2 === 0) {
-            const f = this.add.image(cig.x, cig.y - 6, 'spark')
-              .setScale(0.45).setTint(0xff6600).setDepth(99989).setAlpha(0.85);
-            this.tweens.add({ targets: f, alpha: 0, y: f.y - 18, duration: 280, onComplete: () => f.destroy() });
-          }
-          this.enemies.getChildren().forEach((e) => {
-            if (e?.active && Math.abs(e.x - cig.x) < 38 && Math.abs(e.y - cig.y) < 44) {
-              this.hurt(e, dmg, dir, cig.x);
-              cig.destroy();
-              timer.remove();
-            }
-          });
-          if (cig.x < -60 || cig.x > W + 60) {
-            cig.destroy();
-            timer.remove();
-          }
-        },
-      });
+  _lorenzoCigSpark(x, y) {
+    const f = this.add.image(x, y - 6, 'spark')
+      .setScale(0.4)
+      .setTint(0xff6600)
+      .setDepth(99989)
+      .setAlpha(0.75);
+    this._specialSprites.push(f);
+    this.tweens.add({
+      targets: f,
+      alpha: 0,
+      y: f.y - 14,
+      duration: 200,
+      onComplete: () => {
+        if (f?.active) f.destroy();
+      },
     });
+  },
+
+  _launchFlameCig(x, y, dir, dmg, delay = 0) {
+    this._specialTrackCall(
+      this.time.delayedCall(delay, () => {
+        if (!this.sys?.isActive()) return;
+        const tex = this.textures.exists('sp_lorenzo_cig3') ? 'sp_lorenzo_cig3' : 'sp_lorenzo_cig2';
+        const cig = this.add.image(x, y - 42, tex).setDepth(99990).setScale(0.55);
+        cig.setFlipX(dir < 0);
+        this._specialSprites.push(cig);
+
+        const endX = dir > 0 ? W + 36 : -36;
+        let lastSpark = 0;
+        let hit = false;
+
+        this.tweens.add({
+          targets: cig,
+          x: endX,
+          duration: 480,
+          ease: 'Linear',
+          onUpdate: () => {
+            if (hit || !cig.active) return;
+            const now = this.time.now;
+            if (now - lastSpark > 130) {
+              lastSpark = now;
+              this._lorenzoCigSpark(cig.x, cig.y);
+            }
+            for (const e of this.enemies.getChildren()) {
+              if (!e?.active || e.hp <= 0) continue;
+              if (Math.abs(e.x - cig.x) < 34 && Math.abs(e.y - cig.y) < 40) {
+                this.hurt(e, dmg, dir, cig.x);
+                hit = true;
+                cig.setVisible(false);
+                return;
+              }
+            }
+          },
+          onComplete: () => {
+            if (cig?.active) cig.destroy();
+          },
+        });
+      })
+    );
   },
 
   /** KARONUX — préparation, explosion sur place, s'endort. */
@@ -539,16 +594,21 @@ export const specialsMixin = {
       flipX: dir < 0,
     });
 
-    this.time.delayedCall(500, () => {
-      if (cigLight) cigLight.destroy();
-      p.visible = true;
-      this.anim(p, 'attack', false);
-      this._launchFlameCig(p.x, p.y, dir, dmg, 0);
-      this._launchFlameCig(p.x, p.y, dir, dmg, 180);
-      this._launchFlameCig(p.x, p.y, dir, dmg, 360);
-      this._launchFlameCig(p.x, p.y, dir, dmg, 540);
-      this.time.delayedCall(1200, () => this._specialEnd(p));
-    });
+    this._specialTrackCall(
+      this.time.delayedCall(280, () => {
+        if (cigLight?.active) cigLight.destroy();
+        if (!p.active) {
+          this._specialEnd(p);
+          return;
+        }
+        p.visible = true;
+        this.anim(p, 'punch', false);
+        this._launchFlameCig(p.x, p.y, dir, dmg, 0);
+        this._launchFlameCig(p.x + dir * 10, p.y, dir, dmg, 120);
+        this._launchFlameCig(p.x + dir * 20, p.y, dir, dmg, 240);
+        this._specialTrackCall(this.time.delayedCall(620, () => this._specialEnd(p)));
+      })
+    );
   },
 
   _joTornadoPull(tx, ty, dir, dmg, pullR = 210, hurtR = 95) {

@@ -1,7 +1,107 @@
 import Phaser from 'phaser';
 import { W, FLOOR_TOP, FLOOR_BOTTOM } from '../config/gameConfig.js';
 import { CONFIG } from '../config/difficulty.js';
+
+/** Rayon de l'anneau d'attente autour du joueur (px). */
+const AI_RING_DIST = 190;
+
 export const aiMixin = {
+  /** Nombre max d'ennemis autorisés à engager en même temps. */
+  _aiMaxAttackers() {
+    return CONFIG.diff === 'facile' ? 1 : CONFIG.diff === 'difficile' ? 3 : 2;
+  },
+
+  /**
+   * Directeur d'IA (appelé chaque frame, ré-évalue les rôles ~5x/s) :
+   * les N plus proches attaquent, les autres tiennent un anneau et temporisent.
+   */
+  _aiDirector(time) {
+    if (time < (this._aiDirNext || 0)) return;
+    this._aiDirNext = time + 220;
+    if (!this.enemies?.getChildren) return;
+    const list = [];
+    for (const e of this.enemies.getChildren()) {
+      if (!e?.active || e.hp <= 0 || e.dying || e.bossDef || e._grabbedBy || e._thrown) continue;
+      const p = this.nearestPlayerTo(e.x, e.y);
+      e._aiDist = Math.hypot(p.x - e.x, p.y - e.y);
+      // Hystérésis : un attaquant en place garde la priorité ; les rôdeurs foncent plus volontiers
+      e._aiScore = e._aiDist - (e._role === 'attack' ? 70 : 0) - (e.type2 === 'runner' ? 45 : 0);
+      list.push(e);
+    }
+    if (!list.length) return;
+    list.sort((a, b) => a._aiScore - b._aiScore);
+    const maxAtk = this._aiMaxAttackers();
+    let flank = Math.random() < 0.5 ? 1 : -1;
+    list.forEach((e, i) => {
+      if (i < maxAtk) {
+        e._role = 'attack';
+        e._flank = flank;
+        flank = -flank;
+      } else if (e._role !== 'wait') {
+        e._role = 'wait';
+        e._waitRepick = 0;
+      }
+    });
+  },
+
+  /** Rôdeur : tient ses distances, se répartit sur la hauteur, harcèle du regard. */
+  _aiWaitBehavior(e, time, p, dx) {
+    if (!e._waitRepick || time > e._waitRepick) {
+      e._waitRepick = time + Phaser.Math.Between(900, 1900);
+      e._waitY = Phaser.Math.Between(this.walkTop() + 6, this.walkBottom() - 6);
+      e._waitR = AI_RING_DIST + Phaser.Math.Between(-35, 45);
+    }
+    const side = Math.sign(e.x - p.x) || (Math.random() < 0.5 ? 1 : -1);
+    const tx = Phaser.Math.Clamp(p.x + side * e._waitR, 30, W - 30);
+    const ddx = tx - e.x;
+    const ddy = e._waitY - e.y;
+    const dd = Math.hypot(ddx, ddy);
+    this._enemyFaceTarget(e, dx);
+    if (dd > 14) {
+      const a = Math.atan2(ddy, ddx);
+      const sp = e.speedV * 0.55;
+      e.setVelocity(Math.cos(a) * sp, Math.sin(a) * sp);
+      this._enemyLocomote(e);
+    } else {
+      e.setVelocity(0, 0);
+      if (e.state2 !== 'idle') {
+        e.state2 = 'idle';
+        this.anim(e, 'idle');
+      }
+    }
+  },
+
+  /** Attaquant : approche par le flanc assigné, frappe à cadence variable, replis occasionnels. */
+  _aiAttackApproach(e, time, p, dx, dy, d) {
+    if (e._retreatUntil && time < e._retreatUntil) {
+      const away = Math.sign(e.x - p.x) || -e.facing;
+      e.setVelocity(away * e.speedV * 0.7, 0);
+      this._enemyFaceTarget(e, dx);
+      this._enemyLocomote(e);
+      return;
+    }
+    if (d <= e.reach - 8 && Math.abs(dy) < 42) {
+      e.setVelocity(0, 0);
+      this._enemyFaceTarget(e, dx);
+      if (e.state2 !== 'idle') {
+        e.state2 = 'idle';
+        this.anim(e, 'idle');
+      }
+      if (time > e.nextAttack) {
+        e.nextAttack = time + e.attackCd * Phaser.Math.FloatBetween(0.85, 1.35);
+        this.strike(e);
+        if (Math.random() < 0.35) e._retreatUntil = time + Phaser.Math.Between(300, 550);
+      }
+      return;
+    }
+    const flank = e._flank || Math.sign(e.x - p.x) || 1;
+    const gx = Phaser.Math.Clamp(p.x + flank * Math.max(30, e.reach - 14), 26, W - 26);
+    const a = Math.atan2(p.y - e.y, gx - e.x);
+    e.setVelocity(Math.cos(a) * e.speedV, Math.sin(a) * e.speedV);
+    this._enemyFaceTarget(e, dx);
+    this._enemyLocomote(e);
+  },
+
   _enemyLocomote(e) {
     const vx = e.body?.velocity?.x ?? 0;
     const vy = e.body?.velocity?.y ?? 0;
@@ -17,6 +117,7 @@ export const aiMixin = {
   ai(e, time) {
     if (!e || !e.scene || !e.active) return;
     if (e.state2 === 'ko' || e.dying) return;
+    if (e._grabbedBy || e._thrown) return;
     if (e.bossDef) {
       this.bossCombatAI(e, time);
       return;
@@ -34,16 +135,10 @@ export const aiMixin = {
     const dx = p.x - e.x;
     const dy = p.y - e.y;
     const d = Math.hypot(dx, dy);
-    if (d > e.reach - 8) {
-      const a = Math.atan2(dy, dx);
-      e.setVelocity(Math.cos(a) * e.speedV, Math.sin(a) * e.speedV);
-      e.facing = dx < 0 ? -1 : 1;
-      e.setFlipX(e.facing < 0);
-      this._enemyLocomote(e);
+    if (e._role === 'wait') {
+      this._aiWaitBehavior(e, time, p, dx);
     } else {
-      e.setVelocity(0, 0);
-      if (e.state2 !== 'idle') { e.state2 = 'idle'; this.anim(e, 'idle'); }
-      if (time > e.nextAttack) { e.nextAttack = time + e.attackCd; this.strike(e); }
+      this._aiAttackApproach(e, time, p, dx, dy, d);
     }
     this.clampBand(e);
   },
@@ -69,18 +164,10 @@ export const aiMixin = {
       return;
     }
 
-    if (d > e.reach - 8) {
-      const a = Math.atan2(dy, dx);
-      e.setVelocity(Math.cos(a) * e.speedV, Math.sin(a) * e.speedV);
-      if (e.state2 !== 'walk' && e.state2 !== 'run') e.state2 = 'walk';
-      this._enemyLocomote(e);
+    if (e._role === 'wait') {
+      this._aiWaitBehavior(e, time, p, dx);
     } else {
-      e.setVelocity(0, 0);
-      if (e.state2 !== 'idle') { e.state2 = 'idle'; this.anim(e, 'idle'); }
-      if (time > e.nextAttack) {
-        e.nextAttack = time + e.attackCd;
-        this.strike(e);
-      }
+      this._aiAttackApproach(e, time, p, dx, dy, d);
     }
     this.clampBand(e);
   },
@@ -121,15 +208,18 @@ export const aiMixin = {
     const d = Math.hypot(dx, dy);
     e.facing = dx < 0 ? -1 : 1;
     e.setFlipX(e.facing < 0);
+    if (e._role === 'wait') {
+      this._aiWaitBehavior(e, time, p, dx);
+      this.clampBand(e);
+      return;
+    }
     if (d > e.reach - 8) {
-      const a = Math.atan2(dy, dx);
-      e.setVelocity(Math.cos(a) * e.speedV, Math.sin(a) * e.speedV);
-      this._enemyLocomote(e);
+      this._aiAttackApproach(e, time, p, dx, dy, d);
     } else {
       e.setVelocity(0, 0);
       if (e.state2 !== 'idle') { e.state2 = 'idle'; this.anim(e, 'idle'); }
       if (time > e.nextAttack) {
-        e.nextAttack = time + e.attackCd;
+        e.nextAttack = time + e.attackCd * Phaser.Math.FloatBetween(0.85, 1.3);
         Math.random() < 0.55 ? this.makouCharge(e) : this.strike(e);
       }
     }

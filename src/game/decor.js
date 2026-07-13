@@ -206,6 +206,21 @@ export const decorMixin = {
     return img;
   },
 
+  /** Place un objet décor ; pendant le scroll de stage, pas de tween (position pilotée par update). */
+  _decorPlaceObject(o, fx, { enter = false, slideDuration = 900, slideEase = 'Quad.easeOut' } = {}) {
+    o.finalX = fx;
+    if (enter) {
+      o.x = fx + W;
+      if (this._stageScrollEnterHook) {
+        this._stageScrollEnterHook(o, fx + W, fx);
+      } else {
+        this.tweens.add({ targets: o, x: fx, duration: slideDuration, ease: slideEase });
+      }
+    } else {
+      o.x = fx;
+    }
+  },
+
   _spawnLevelSegment(centerX, opts = {}) {
     const layers = this.lv.layers;
     if (!layers) return;
@@ -218,15 +233,8 @@ export const decorMixin = {
     const slideDuration = opts.slideDuration ?? 900;
     const slideEase = opts.slideEase ?? 'Quad.easeOut';
 
-    const place = (o, fx) => {
-      o.finalX = fx;
-      if (enter) {
-        o.x = fx + W;
-        this.tweens.add({ targets: o, x: fx, duration: slideDuration, ease: slideEase });
-      } else {
-        o.x = fx;
-      }
-    };
+    const place = (o, fx) =>
+      this._decorPlaceObject(o, fx, { enter, slideDuration, slideEase });
 
     const metrics = this._layerMetrics(layers, mainKey);
     this._applyWalkBand(metrics);
@@ -332,10 +340,14 @@ export const decorMixin = {
   },
 
   _destroyScrollObject(g, o) {
-    if (!o) return;
-    this.tweens.killTweensOf(o);
-    if (g?.contains?.(o)) g.remove(o, true);
-    else if (o.destroy) o.destroy();
+    if (!o?.scene) return;
+    try {
+      this.tweens.killTweensOf(o);
+    } catch (_) {}
+    try {
+      if (g?.contains?.(o)) g.remove(o, true);
+      else if (o.active) o.destroy();
+    } catch (_) {}
   },
 
   /** Retire les calques hors écran et ne garde qu'un fond principal centré. */
@@ -368,9 +380,15 @@ export const decorMixin = {
 
   _spawnAmbient(centerX, place, ambient, skyBottom = FLOOR_TOP) {
     if (!ambient || ambient.type === 'none') return;
-    const maxTotal = 8;
+    const ambientMul = window.__SOSF_GFX__?.ambientMul ?? 1;
+    if (ambientMul <= 0) return;
+    const maxTotal = 4;
     const active = this.bgAmbientGroup?.countActive?.(true) ?? 0;
-    const count = Math.min(ambient.count ?? 8, Math.max(0, maxTotal - active));
+    const baseCount = ambient.count ?? 4;
+    const count = Math.min(
+      Math.max(0, Math.round(baseCount * ambientMul)),
+      Math.max(0, maxTotal - active)
+    );
     if (count <= 0) return;
     const left = centerX - W / 2;
 
@@ -403,14 +421,16 @@ export const decorMixin = {
 
       this.tweens.add({
         targets: o,
-        y: o.y + Phaser.Math.Between(12, 36),
-        x: o.x + Phaser.Math.Between(-18, 18),
+        y: o.y + Phaser.Math.Between(10, 22),
         alpha: 0,
-        duration: Phaser.Math.Between(2200, 4200),
-        yoyo: true,
-        repeat: 2,
-        ease: 'Sine.easeInOut',
-        delay: Phaser.Math.Between(0, 800),
+        duration: Phaser.Math.Between(1800, 2800),
+        ease: 'Sine.easeOut',
+        delay: Phaser.Math.Between(0, 400),
+        onComplete: () => {
+          try {
+            o.destroy();
+          } catch (_) {}
+        },
       });
     }
   },
@@ -503,15 +523,8 @@ export const decorMixin = {
       this.pickups.clear(true, true);
     }
 
-    const place = (o, fx) => {
-      o.finalX = fx;
-      if (enter) {
-        o.x = fx + W;
-        this.tweens.add({ targets: o, x: fx, duration: slideDuration, ease: slideEase });
-      } else {
-        o.x = fx;
-      }
-    };
+    const place = (o, fx) =>
+      this._decorPlaceObject(o, fx, { enter, slideDuration, slideEase });
 
     const stagePlacements = getStagePlacements(this.levelIdx ?? 0, stageIdx);
     const useAuthored =

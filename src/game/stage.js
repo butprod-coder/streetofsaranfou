@@ -4,6 +4,7 @@ import { ENEMY_TYPES } from '../config/enemies.js';
 import { LEVELS } from '../config/levels.js';
 import { CONFIG, PROGRESS } from '../config/difficulty.js';
 import { dbgLog, showCrash } from '../debug/crashOverlay.js';
+import { beginMenuPadGrace } from '../input/gamepad.js';
 
 /** Durée du défilement entre sous-stages (ms). */
 const STAGE_SCROLL_MS = 2500;
@@ -94,6 +95,7 @@ export const stageMixin = {
     if (this.lv?.layers) {
       this._pruneScrolledLayers();
     }
+    this.startBossMusic?.();
     if (this.lv.boss?.custom === 'karonux_boss') {
       this.spawnKaronuxBoss();
       return;
@@ -119,7 +121,8 @@ export const stageMixin = {
       this.boss = boss;
       const { barY, left, barW, centerX } = this._bossHudLayout();
       this.bossBarMaxW = barW;
-      this.add
+      this._clearBossHud();
+      const frame = this.add
         .rectangle(centerX, barY, barW + 6, 22, 0x000000, 0)
         .setStrokeStyle(2, 0xffffff, 0.6)
         .setScrollFactor(0)
@@ -129,11 +132,12 @@ export const stageMixin = {
         .setOrigin(0, 0.5)
         .setScrollFactor(0)
         .setDepth(9001);
-      this.add
+      const nameT = this.add
         .text(centerX, barY + 18, b.name, F(0, { fontSize: '13px', color: COL.cream }))
         .setOrigin(0.5, 0)
         .setScrollFactor(0)
         .setDepth(9001);
+      this._bossHud = [frame, this.bossBar, nameT];
     });
   },
 
@@ -142,10 +146,154 @@ export const stageMixin = {
     return this.enemies.getChildren().filter((e) => e && e.scene && e.hp > 0).length;
   },
 
+  _compactBattlefield() {
+    if (this.enemies?.getChildren) {
+      for (const e of [...this.enemies.getChildren()]) {
+        if (e && (!e.active || e.hp <= 0) && !e.bossDef) {
+          const dyingStale =
+            e.dying && e._dyingSince && this.time.now - e._dyingSince > 1400;
+          if (!e.dying || dyingStale) {
+            try {
+              this._purgeFighter?.(e);
+              this.tweens.killTweensOf(e);
+              e.destroy();
+            } catch (_) {}
+          }
+        }
+      }
+    }
+    const trim = (g) => {
+      if (!g?.getChildren) return;
+      for (const o of [...g.getChildren()]) {
+        if (o && (!o.active || !o.scene)) {
+          try {
+            this.tweens.killTweensOf(o);
+            o.destroy();
+          } catch (_) {}
+        }
+      }
+    };
+    trim(this.bullets);
+    trim(this.pickups);
+    trim(this.fires);
+    trim(this.hazards);
+  },
+
+  _clearBossHud() {
+    if (!this._bossHud?.length) {
+      this.bossBar = null;
+      return;
+    }
+    for (const o of this._bossHud) {
+      try {
+        this.tweens.killTweensOf(o);
+        o?.destroy?.();
+      } catch (_) {}
+    }
+    this._bossHud = null;
+    this.bossBar = null;
+  },
+
+  /** Nettoyage léger entre vagues/stages — même esprit qu'un redémarrage de GameScene. */
+  _levelHygiene() {
+    this._compactBattlefield();
+    this._pruneScrolledLayers?.();
+    this._trimStaleAmbient?.();
+    this._pruneDeadTweens?.();
+    this._purgeSceneSounds?.();
+  },
+
+  _levelHygieneFull() {
+    this._levelHygiene();
+    this._clearBossHud();
+    this.cancelGoExit?.();
+  },
+
+  _purgeSceneObjects() {
+    const clear = (g) => {
+      try {
+        g?.clear?.(true, true);
+      } catch (_) {}
+    };
+    clear(this.enemies);
+    clear(this.bullets);
+    clear(this.props);
+    clear(this.pickups);
+    clear(this.fires);
+    clear(this.hazards);
+    clear(this.decorGroup);
+    clear(this.bgFarGroup);
+    clear(this.bgMainGroup);
+    clear(this.bgRoadGroup);
+    clear(this.bgAmbientGroup);
+  },
+
+  _setupEndScreen({ title, col, onLeave, buildLines }) {
+    this._endLeaving = false;
+    this._endScreenReady = false;
+    this._endUi = [];
+
+    const leave = () => {
+      if (this._endLeaving) return;
+      this._endLeaving = true;
+      if (this._endBannerEv) {
+        try {
+          this._endBannerEv.remove();
+        } catch (_) {}
+        this._endBannerEv = null;
+      }
+      this.stopFightMusic?.();
+      this.tweens.killAll();
+      this._levelHygieneFull?.();
+      this._purgeSceneObjects();
+      onLeave();
+    };
+    this._endAction = leave;
+
+    const dim = this.add
+      .rectangle(W / 2, H / 2, W, H, 0x000000, 0.6)
+      .setScrollFactor(0)
+      .setDepth(9500);
+    const titleT = this.add
+      .text(W / 2, H / 2, title, F(0, { fontSize: '36px', fontStyle: 'bold', color: col || COL.gold, align: 'center', lineSpacing: 8 }))
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(9501)
+      .setStroke('#000', 6);
+    this._endUi.push(dim, titleT);
+
+    this._endShowDetails = () => {
+      if (this._endScreenReady) return;
+      this._endScreenReady = true;
+      if (this._endBannerEv) {
+        try {
+          this._endBannerEv.remove();
+        } catch (_) {}
+        this._endBannerEv = null;
+      }
+      try {
+        titleT.destroy();
+      } catch (_) {}
+      for (const line of buildLines?.() ?? []) {
+        this._endUi.push(
+          this.add
+            .text(W / 2, line.y, line.text, F(0, { fontSize: line.fontSize || '18px', color: line.color || COL.cream }))
+            .setOrigin(0.5)
+            .setScrollFactor(0)
+            .setDepth(9600)
+        );
+      }
+      beginMenuPadGrace(this, 280);
+    };
+
+    this._endBannerEv = this.time.delayedCall(700, () => this._endShowDetails());
+  },
+
   checkClear() {
     if (this.phase === 'boss' || this.phase === 'go_wait' || this.phase === 'advance') return;
     if (this._pendingWaveSpawn) return;
     if (this._livingEnemies() > 0) return;
+    this._levelHygiene();
     const st = this.lv.stages[this.stageIdx];
     if (this.waveIdx < st.waves.length - 1) {
       this.waveIdx++;
@@ -171,7 +319,6 @@ export const stageMixin = {
 
   cancelGoExit() {
     if (this.goExitLabel) {
-      this.tweens.killTweensOf(this.goExitLabel);
       this.goExitLabel.destroy();
       this.goExitLabel = null;
     }
@@ -180,6 +327,7 @@ export const stageMixin = {
   showGoExit() {
     if (this.phase === 'go_wait' || this.phase === 'advance') return;
     if (this._pendingWaveSpawn || this._livingEnemies() > 0) return;
+    this._levelHygiene();
     this.phase = 'go_wait';
     const goY = FLOOR_TOP - 26;
     this.goExitLabel = this.add
@@ -188,17 +336,14 @@ export const stageMixin = {
       .setScrollFactor(0)
       .setDepth(9000)
       .setStroke('#000', 5);
-    this.tweens.add({
-      targets: this.goExitLabel,
-      alpha: 0.25,
-      duration: 500,
-      yoyo: true,
-      repeat: -1,
-    });
   },
 
   updateGoExit() {
     if (this.phase !== 'go_wait') return;
+    if (this.goExitLabel?.active) {
+      const pulse = 0.5 + 0.5 * Math.sin(this.time.now * 0.009);
+      this.goExitLabel.setAlpha(0.3 + pulse * 0.7);
+    }
     if (this._livingEnemies() > 0) {
       this.cancelGoExit();
       this.phase = 'fight';
@@ -212,6 +357,51 @@ export const stageMixin = {
 
   _scrollTargetX(slot) {
     return slot === 0 ? W * 0.22 : W * 0.38;
+  },
+
+  _registerStageScrollExisting(g) {
+    if (!g) return;
+    for (const o of g.getChildren()) {
+      if (!o?.active) continue;
+      if (o.x < -W * 0.35) continue;
+      this._scrollObjects.push({ o, x0: o.x, x1: o.x - W });
+    }
+  },
+
+  /** Scroll décor + joueurs sans tweens par objet (évite l'accumulation au fil des stages). */
+  updateStageScroll() {
+    if (this.phase !== 'advance') return;
+
+    const now = this.time.now;
+    const endsAt = this._scrollEndsAt ?? now;
+    const tLeft = Math.max(0, endsAt - now);
+    const dur = this._scrollDurMs ?? STAGE_SCROLL_MS;
+    const t = Phaser.Math.Clamp(1 - tLeft / dur, 0, 1);
+
+    if (this._scrollObjects) {
+      for (const { o, x0, x1 } of this._scrollObjects) {
+        if (o?.active) o.x = x0 + (x1 - x0) * t;
+      }
+    }
+    if (this.bg && this._scrollTileFrom != null) {
+      this.bg.tilePositionX = this._scrollTileFrom + W * t;
+    }
+
+    this.updateStageScrollPlayers();
+
+    if (tLeft <= 0 && !this._scrollCompleteCalled) {
+      this._scrollCompleteCalled = true;
+      this._onStageScrollComplete();
+    }
+  },
+
+  _trimStaleAmbient() {
+    if (!this.bgAmbientGroup) return;
+    for (const o of [...this.bgAmbientGroup.getChildren()]) {
+      if (o?.active && o.x < W * 0.15) {
+        this._destroyScrollObject(this.bgAmbientGroup, o);
+      }
+    }
   },
 
   _trimScrolledBackgrounds() {
@@ -278,6 +468,15 @@ export const stageMixin = {
   _onStageScrollComplete() {
     if (this.phase !== 'advance') return;
 
+    if (this._scrollObjects) {
+      for (const { o, x1 } of this._scrollObjects) {
+        if (o?.active) o.x = x1;
+      }
+    }
+    this._scrollObjects = null;
+    this._scrollTileFrom = null;
+    this._stageScrollEnterHook = null;
+
     for (let slot = 0; slot < this.playerCount(); slot++) {
       const p = this.playerAt(slot);
       if (!p || !p.active || p.hp <= 0) continue;
@@ -292,6 +491,8 @@ export const stageMixin = {
 
     this._pruneScrolledLayers();
     this._cleanupScrolledOut();
+    this._trimStaleAmbient();
+    this._levelHygiene();
     this._finishStageScroll(this._scrollHasNext, this._scrollNextIdx);
   },
 
@@ -310,29 +511,25 @@ export const stageMixin = {
     this._scrollEndsAt = this.time.now + dur;
     this._scrollHasNext = hasNextStage;
     this._scrollNextIdx = nextIdx;
+    this._scrollDurMs = dur;
+    this._scrollCompleteCalled = false;
+    this._scrollObjects = [];
+    this._scrollTileFrom = this.bg?.tilePositionX ?? null;
 
-    const slideLeft = (g) => {
-      if (!g) return;
-      g.getChildren().forEach((o) => {
-        if (o && o.active) {
-          this.tweens.add({
-            targets: o,
-            x: o.x - W,
-            duration: dur,
-            ease: STAGE_SCROLL_EASE,
-          });
-        }
-      });
+    this._cleanupScrolledOut();
+    this._registerStageScrollExisting(this.bgFarGroup);
+    this._registerStageScrollExisting(this.bgMainGroup);
+    this._registerStageScrollExisting(this.bgRoadGroup);
+    this._registerStageScrollExisting(this.bgAmbientGroup);
+    this._registerStageScrollExisting(this.decorGroup);
+    this._registerStageScrollExisting(this.props);
+    this._registerStageScrollExisting(this.pickups);
+    this._registerStageScrollExisting(this.fires);
+    this._registerStageScrollExisting(this.hazards);
+
+    this._stageScrollEnterHook = (o, x0, x1) => {
+      this._scrollObjects.push({ o, x0, x1 });
     };
-    slideLeft(this.bgFarGroup);
-    slideLeft(this.bgMainGroup);
-    slideLeft(this.bgRoadGroup);
-    slideLeft(this.bgAmbientGroup);
-    slideLeft(this.decorGroup);
-    slideLeft(this.props);
-    slideLeft(this.pickups);
-    slideLeft(this.fires);
-    slideLeft(this.hazards);
 
     for (let slot = 0; slot < this.playerCount(); slot++) {
       const p = this.playerAt(slot);
@@ -364,19 +561,11 @@ export const stageMixin = {
         enter: true,
         slideDuration: dur,
         slideEase: STAGE_SCROLL_EASE,
+        skipProps: true,
+        skipCrates: true,
       });
     }
-
-    if (this.bg) {
-      this.tweens.add({
-        targets: this.bg,
-        tilePositionX: this.bg.tilePositionX + W,
-        duration: dur,
-        ease: STAGE_SCROLL_EASE,
-      });
-    }
-
-    this.time.delayedCall(dur, () => this._onStageScrollComplete());
+    this._stageScrollEnterHook = null;
   },
 
   _finishStageScroll(hasNextStage, nextIdx) {
@@ -468,22 +657,95 @@ export const stageMixin = {
     }, COL.blood);
   },
 
-  gameOver(){if(this.phase==='over')return;this.phase='over';this.physics.pause();this.sfx('gameover');
-    this.banner('GAME OVER',()=>{this.add.text(W/2,H/2+70,'✕ ou Start pour rejouer',F(0,{fontSize:'20px',color:COL.cream})).setOrigin(0.5).setScrollFactor(0).setDepth(9600);
-      const restartData=this.testBoss?{ testBossLevel:this.levelIdx }:this.coop?{ coop: true }:undefined;
-      this._endAction=()=>this.scene.start(this.testBoss?'TestBoss':'PlayMode', restartData);});},
+  gameOver() {
+    if (this.phase === 'over') return;
+    this.phase = 'over';
+    this.physics.pause();
+    this.sfx('gameover');
+    const restartData = this.testBoss ? { testBossLevel: this.levelIdx } : this.coop ? { coop: true } : undefined;
+    this._setupEndScreen({
+      title: 'GAME OVER',
+      col: COL.gold,
+      onLeave: () => this.scene.start(this.testBoss ? 'TestBoss' : 'PlayMode', restartData),
+      buildLines: () => [{ text: '✕ ou Start pour rejouer', y: H / 2 + 70, fontSize: '20px' }],
+    });
+  },
 
-  victory(){if(this._won)return;this._won=true;dbgLog('victory: (levelIdx='+this.levelIdx+')');this.phase='win';this.physics.pause();this.sfx('victory');const isTest=this.lv.noBoss||this.testBoss;const next=!isTest&&(this.levelIdx+1)<LEVELS.length;dbgLog('victory: levelIdx='+this.levelIdx+' next='+next+' (LEVELS.length='+LEVELS.length+')');
-    if(!next&&!isTest)PROGRESS.gustavaxUnlocked=true;
-    const title=isTest?(this.testBoss?'BOSS VAINCU !':'TEST TERMINÉ !'):next?'VICTOIRE !':'TU AS FINI\nSTREETS OF SARANFOU !';
-    this.banner(title,()=>{
-      this.add.text(W/2,H/2+50,'SCORE  '+this.score,F(0,{fontSize:'24px',color:COL.gold})).setOrigin(0.5).setScrollFactor(0).setDepth(9600);
-      if(!next&&!isTest)this.add.text(W/2,H/2+86,'GUSTAVAX EST DÉBLOQUÉ !',F(0,{fontSize:'18px',color:COL.blood})).setOrigin(0.5).setScrollFactor(0).setDepth(9600);
-      const sub=this.testBoss?'✕ ou Start → test boss':isTest?'✕ ou Start → menu':next?'✕ ou Start → niveau suivant':'✕ ou Start → menu';
-      this.add.text(W/2,H/2+(next&&!isTest?86:118),sub,F(0,{fontSize:'18px',color:COL.cream})).setOrigin(0.5).setScrollFactor(0).setDepth(9600);
-      this._endAction=()=>{if(this.testBoss)this.scene.start('TestBoss');else if(isTest)this.scene.start('PlayMode');else if(next)this.scene.start('Game',this._gameStartData({ level: this.levelIdx + 1 }));else this.scene.start('Title');};});},
+  victory() {
+    if (this._won) return;
+    this._won = true;
+    this._clearBossHud?.();
+    dbgLog('victory: (levelIdx=' + this.levelIdx + ')');
+    this.phase = 'win';
+    this.physics.pause();
+    this.sfx('victory');
+    const isTest = this.lv.noBoss || this.testBoss;
+    const next = !isTest && this.levelIdx + 1 < LEVELS.length;
+    dbgLog('victory: levelIdx=' + this.levelIdx + ' next=' + next + ' (LEVELS.length=' + LEVELS.length + ')');
+    if (!next && !isTest) PROGRESS.gustavaxUnlocked = true;
+    const title = isTest
+      ? this.testBoss
+        ? 'BOSS VAINCU !'
+        : 'TEST TERMINÉ !'
+      : next
+        ? 'VICTOIRE !'
+        : 'TU AS FINI\nSTREETS OF SARANFOU !';
+    const sub = this.testBoss
+      ? '✕ ou Start → test boss'
+      : isTest
+        ? '✕ ou Start → menu'
+        : next
+          ? '✕ ou Start → niveau suivant'
+          : '✕ ou Start → menu';
+    this._setupEndScreen({
+      title,
+      col: COL.gold,
+      onLeave: () => {
+        if (this.testBoss) this.scene.start('TestBoss');
+        else if (isTest) this.scene.start('PlayMode');
+        else if (next) this.scene.start('Game', this._gameStartData({ level: this.levelIdx + 1 }));
+        else this.scene.start('Title');
+      },
+      buildLines: () => {
+        const lines = [{ text: 'SCORE  ' + this.score, y: H / 2 + 50, fontSize: '24px', color: COL.gold }];
+        if (!next && !isTest) {
+          lines.push({ text: 'GUSTAVAX EST DÉBLOQUÉ !', y: H / 2 + 86, fontSize: '18px', color: COL.blood });
+        }
+        lines.push({
+          text: sub,
+          y: H / 2 + (next && !isTest ? 86 : 118),
+          fontSize: '18px',
+        });
+        return lines;
+      },
+    });
+  },
 
-  banner(text,cb,col){const dim=this.add.rectangle(W/2,H/2,W,H,0x000000,0.6).setScrollFactor(0).setDepth(9500);
-    const t=this.add.text(W/2,H/2,text,F(0,{fontSize:'36px',fontStyle:'bold',color:col||COL.gold,align:'center',lineSpacing:8})).setOrigin(0.5).setScrollFactor(0).setDepth(9501).setStroke('#000',6);
-    this.time.delayedCall(1500,()=>{try{dim.destroy();t.destroy();if(cb){dbgLog('banner: exécution callback');cb();}}catch(e){showCrash('banner.callback',e);}});}
+  banner(text, cb, col) {
+    const dim = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.6).setScrollFactor(0).setDepth(9500);
+    const t = this.add
+      .text(W / 2, H / 2, text, F(0, { fontSize: '36px', fontStyle: 'bold', color: col || COL.gold, align: 'center', lineSpacing: 8 }))
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(9501)
+      .setStroke('#000', 6);
+    let fired = false;
+    const finish = () => {
+      if (fired) return;
+      fired = true;
+      if (this._bannerSkip?.finish === finish) this._bannerSkip = null;
+      try {
+        dim.destroy();
+        t.destroy();
+        if (cb) {
+          dbgLog('banner: exécution callback');
+          cb();
+        }
+      } catch (e) {
+        showCrash('banner.callback', e);
+      }
+    };
+    const ev = this.time.delayedCall(1500, finish);
+    this._bannerSkip = { finish, ev, minT: this.time.now + 350 };
+  },
 };

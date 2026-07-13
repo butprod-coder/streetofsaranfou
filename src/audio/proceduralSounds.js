@@ -182,23 +182,92 @@ export function makeTitleMusicBuffer(ctx) {
   });
 }
 
-/** Boucle combat (~4 s). */
-export function makeFightMusicBuffer(ctx) {
-  const bpm = 128;
+/**
+ * Boucle de combat paramétrable (8 temps).
+ * bass: 8 fréquences · lead: 8 fréquences (0 = silence) · doubleKick: kick aussi au demi-temps.
+ */
+function makeFightLoop(ctx, { bpm, bass, bassType = 'square', lead = null, leadVol = 0.14, doubleKick = false, hatVol = 0.12 }) {
   const beat = 60 / bpm;
   const duration = beat * 8;
-  const bass = [98, 98, 123, 98, 87, 87, 110, 87];
   return fillBuffer(ctx, duration, (t) => {
     const beatIdx = Math.floor(t / beat) % 8;
     const local = (t % beat) / beat;
     const bassFreq = bass[beatIdx];
-    const kick = local < 0.08 ? envelope(t % beat, 0.001, 0.04, beat) * noise() * 0.35 : 0;
+    let kick = local < 0.08 ? envelope(t % beat, 0.001, 0.04, beat) * noise() * 0.35 : 0;
+    if (doubleKick && local > 0.5 && local < 0.56) {
+      kick += envelope((local - 0.5) * beat, 0.001, 0.03, beat) * noise() * 0.22;
+    }
     const bassEnv = envelope(local * beat, 0.005, beat * 0.25, beat);
-    const hat = local > 0.45 && local < 0.52 ? noise() * 0.12 : 0;
+    const hat = local > 0.45 && local < 0.52 ? noise() * hatVol : 0;
+    let mel = 0;
+    if (lead) {
+      const lf = lead[beatIdx];
+      if (lf > 0 && local > 0.1) {
+        mel = tone(t, lf, 'square') * envelope((local - 0.1) * beat, 0.008, beat * 0.4, beat) * leadVol;
+      }
+    }
+    return tone(t, bassFreq, bassType) * bassEnv * 0.2 + kick + hat + mel;
+  });
+}
+
+/** Boucle combat par défaut (compatibilité : clé 'music_fight'). */
+export function makeFightMusicBuffer(ctx) {
+  return makeFightLoop(ctx, { bpm: 128, bass: [98, 98, 123, 98, 87, 87, 110, 87] });
+}
+
+/** Variante nerveuse — ruelles nocturnes. */
+export function makeFightMusic2Buffer(ctx) {
+  return makeFightLoop(ctx, {
+    bpm: 140,
+    bass: [110, 110, 131, 147, 98, 98, 117, 131],
+    lead: [0, 440, 0, 523, 0, 440, 587, 0],
+    hatVol: 0.15,
+  });
+}
+
+/** Variante lourde et menaçante — basse saw. */
+export function makeFightMusic3Buffer(ctx) {
+  return makeFightLoop(ctx, {
+    bpm: 116,
+    bass: [82, 82, 98, 82, 73, 73, 87, 92],
+    bassType: 'saw',
+    hatVol: 0.09,
+  });
+}
+
+/** Variante mélodique — plus lumineuse. */
+export function makeFightMusic4Buffer(ctx) {
+  return makeFightLoop(ctx, {
+    bpm: 134,
+    bass: [92, 110, 92, 123, 87, 104, 87, 117],
+    lead: [349, 0, 392, 0, 440, 0, 523, 466],
+    leadVol: 0.16,
+  });
+}
+
+/** Thème de boss — grave, double kick, sirène d'alerte. */
+export function makeBossMusicBuffer(ctx) {
+  const bpm = 150;
+  const beat = 60 / bpm;
+  const duration = beat * 8;
+  const bass = [65, 65, 78, 65, 62, 62, 73, 78];
+  return fillBuffer(ctx, duration, (t) => {
+    const beatIdx = Math.floor(t / beat) % 8;
+    const local = (t % beat) / beat;
+    let kick = local < 0.08 ? envelope(t % beat, 0.001, 0.04, beat) * noise() * 0.4 : 0;
+    if (local > 0.5 && local < 0.56) {
+      kick += envelope((local - 0.5) * beat, 0.001, 0.03, beat) * noise() * 0.28;
+    }
+    const bassEnv = envelope(local * beat, 0.005, beat * 0.3, beat);
+    // Sirène lente sur toute la boucle
+    const siren = tone(t, 620 + Math.sin((t / duration) * Math.PI * 2) * 140, 'sine') * 0.06;
+    const hat = local > 0.45 && local < 0.5 ? noise() * 0.1 : 0;
     return (
-      tone(t, bassFreq, 'square') * bassEnv * 0.2 +
+      tone(t, bass[beatIdx], 'saw') * bassEnv * 0.24 +
+      tone(t, bass[beatIdx] * 2, 'square') * bassEnv * 0.08 +
       kick +
-      hat
+      hat +
+      siren
     );
   });
 }

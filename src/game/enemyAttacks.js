@@ -35,19 +35,10 @@ export const enemyAttacksMixin = {
   },
 
   _enemyApproachStrike(e, time, p, dx, dy, d) {
-    if (d > e.reach - 8) {
-      const a = Math.atan2(dy, dx);
-      e.setVelocity(Math.cos(a) * e.speedV, Math.sin(a) * e.speedV);
-      this._enemyLocomote(e);
+    if (e._role === 'wait') {
+      this._aiWaitBehavior(e, time, p, dx);
     } else {
-      e.setVelocity(0, 0);
-      if (e.state2 !== 'idle') {
-        this._enemyReturnIdle(e);
-      }
-      if (time > e.nextAttack) {
-        e.nextAttack = time + e.attackCd;
-        this.strike(e);
-      }
+      this._aiAttackApproach(e, time, p, dx, dy, d);
     }
     this.clampBand(e);
   },
@@ -651,6 +642,7 @@ export const enemyAttacksMixin = {
         card.vx = vx;
         card.vy = vy;
         card.setFlipX(e.facing < 0);
+        card.spinSpeed = e.facing * 480;
         if (card.body) {
           card.body.setAllowGravity(false);
           card.body.setVelocity(vx, vy);
@@ -661,12 +653,6 @@ export const enemyAttacksMixin = {
           card.body.setSize(bw, bh);
           card.body.setOffset((fw - bw) / 2, (fh - bh) / 2);
         }
-        this.tweens.add({
-          targets: card,
-          angle: card.angle + (e.facing > 0 ? 420 : -420),
-          duration: 700,
-          repeat: -1,
-        });
         this.bullets.add(card);
       }
     });

@@ -506,38 +506,89 @@ export const bossAIMixin = {
     this._bossApproach(b, time, () => this.strike(b));
   },
 
+  _cancelJoSpin(b) {
+    if (!b) return;
+    if (b._joPullTimer) {
+      try {
+        b._joPullTimer.remove();
+      } catch (_) {}
+      b._joPullTimer = null;
+    }
+    if (b._joSpinEndCall) {
+      try {
+        b._joSpinEndCall.remove();
+      } catch (_) {}
+      b._joSpinEndCall = null;
+    }
+    if (b._joSpinTween) {
+      try {
+        b._joSpinTween.stop();
+      } catch (_) {}
+      b._joSpinTween = null;
+    }
+    if (b._joTornado?.active) {
+      try {
+        this.tweens.killTweensOf(b._joTornado);
+        b._joTornado.destroy();
+      } catch (_) {}
+      b._joTornado = null;
+    }
+    if (b.active && b.state2 === 'attack') {
+      b.state2 = 'idle';
+      this.anim(b, 'idle');
+    }
+  },
+
   joSpin(b, time) {
+    this._cancelJoSpin(b);
     b.setVelocity(0, 0);
     b.state2 = 'attack';
     this.anim(b, 'attack', false);
     b.busy = time + 1400;
-    let tornado = null;
     if (this.textures.exists('sp_jo_tornado2')) {
-      tornado = this._showFx('sp_jo_tornado2', b.x, b.y - 30, { targetH: 100, originY: 0.5, depth: b.depth + 3 });
-      if (tornado) this.tweens.add({ targets: tornado, angle: 360, duration: 600, repeat: 2 });
+      const tornado = this.add
+        .image(b.x, b.y - 30, 'sp_jo_tornado2')
+        .setOrigin(0.5, 0.5)
+        .setDepth(b.depth + 3)
+        .setScale(100 / this.textures.get('sp_jo_tornado2').getSourceImage().height);
+      b._joTornado = tornado;
+      b._joSpinTween = this.tweens.add({
+        targets: tornado,
+        angle: 360,
+        duration: 600,
+        repeat: 2,
+        onComplete: () => {
+          if (tornado?.active) tornado.destroy();
+          if (b._joTornado === tornado) b._joTornado = null;
+          b._joSpinTween = null;
+        },
+      });
     }
-    const pullTimer = this.time.addEvent({
-      delay: 130,
-      repeat: 9,
+    let sparkTick = 0;
+    b._joPullTimer = this.time.addEvent({
+      delay: 200,
+      repeat: 5,
       callback: () => {
-        const tx = tornado ? tornado.x : b.x;
-        const ty = tornado ? tornado.y : b.y - 20;
+        if (!b.active) return;
+        const tx = b._joTornado?.x ?? b.x;
+        const ty = (b._joTornado?.y ?? b.y) - 20;
         const p = this.nearestPlayerTo(b.x, b.y);
         if (p.hp > 0) {
           const dx = tx - p.x;
           const dy = ty - p.y;
           const d = Math.hypot(dx, dy);
-          if (d < 180 && d > 6) { p.x += dx * 0.1; p.y += dy * 0.05; }
+          if (d < 180 && d > 6) {
+            p.x += dx * 0.1;
+            p.y += dy * 0.05;
+          }
           if (d < 95) this.hurt(p, b.damage + 3, Math.sign(dx) || b.facing);
         }
-        this.spawnSpark(tx + Phaser.Math.Between(-25, 25), ty + Phaser.Math.Between(-15, 15));
+        if (sparkTick++ % 2 === 0) {
+          this.spawnSpark(tx + Phaser.Math.Between(-20, 20), ty + Phaser.Math.Between(-12, 12));
+        }
       },
     });
-    this.time.delayedCall(1400, () => {
-      pullTimer.remove();
-      if (tornado) tornado.destroy();
-      if (b.active) { b.state2 = 'idle'; this.anim(b, 'idle'); }
-    });
+    b._joSpinEndCall = this.time.delayedCall(1400, () => this._cancelJoSpin(b));
   },
 
   /** KIKOR — roulades et skateboard. */
