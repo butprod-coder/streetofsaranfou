@@ -26,11 +26,14 @@ import { TRISO_SPIT_FRAMES, TRISO_SPIT_ANIM } from '../config/trisoSlime.js';
 import { PAPY_SMOKE_FRAMES, PAPY_SMOKE_ANIM } from '../config/papyJalaFx.js';
 import { GUYLUX_CARD_KEY } from '../config/guyluxCards.js';
 import { KARONUX_BOSS_FILES, karonuxBossTexKey, karonuxBossTexPath, createKaronuxBossAnims } from '../config/bossKaronux.js';
+import { KIKOR_BOSS_FILES, kikorBossTexKey, kikorBossTexPath, createKikorBossAnims } from '../config/bossKikor.js';
 import {
   LEVEL1_TEXTURE_KEYS,
   LEVEL1_STAGE_PARTS,
   LEVEL2_TEXTURE_KEYS,
   LEVEL2_STAGE_PARTS,
+  LEVEL3_TEXTURE_KEYS,
+  LEVEL3_STAGE_PARTS,
   getLayerTextureKeys,
 } from '../config/levelLayers.js';
 
@@ -127,15 +130,22 @@ export class BootScene extends Phaser.Scene {
     LEVEL2_TEXTURE_KEYS.forEach((k) => {
       if (IMG[k]) this.load.image(k, IMG[k]);
     });
+    LEVEL3_TEXTURE_KEYS.forEach((k) => {
+      if (IMG[k]) this.load.image(k, IMG[k]);
+    });
     KARONUX_BOSS_FILES.forEach((f) => {
       this.load.image(karonuxBossTexKey(f), karonuxBossTexPath(f));
+    });
+    KIKOR_BOSS_FILES.forEach((f) => {
+      this.load.image(kikorBossTexKey(f), kikorBossTexPath(f));
     });
     LEVELS.forEach((lv) => {
       getLayerTextureKeys(lv.layers).forEach((k) => {
         if (
           IMG[k] &&
           !LEVEL1_TEXTURE_KEYS.includes(k) &&
-          !LEVEL2_TEXTURE_KEYS.includes(k)
+          !LEVEL2_TEXTURE_KEYS.includes(k) &&
+          !LEVEL3_TEXTURE_KEYS.includes(k)
         ) {
           this.load.image(k, IMG[k]);
         }
@@ -268,8 +278,9 @@ export class BootScene extends Phaser.Scene {
       repeat: -1,
     });
     registerProceduralSounds(this);
-    bakeFullStageTextures(this, [...LEVEL1_STAGE_PARTS, ...LEVEL2_STAGE_PARTS]);
+    bakeFullStageTextures(this, [...LEVEL1_STAGE_PARTS, ...LEVEL2_STAGE_PARTS, ...LEVEL3_STAGE_PARTS]);
     createKaronuxBossAnims(this);
+    createKikorBossAnims(this);
     ensureGamepadPatch(this.game);
     ensureGamepadReady(this);
     this.scene.start('Title');

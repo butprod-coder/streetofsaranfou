@@ -100,6 +100,10 @@ export const stageMixin = {
       this.spawnKaronuxBoss();
       return;
     }
+    if (this.lv.boss?.custom === 'kikor_boss') {
+      this.spawnKikorBoss();
+      return;
+    }
     this.phase = 'boss';
     const b = this.lv.boss;
     if (this.props) this.props.clear(true, true);
@@ -119,25 +123,7 @@ export const stageMixin = {
       boss.setFlipX(true);
       this.enemies.add(boss);
       this.boss = boss;
-      const { barY, left, barW, centerX } = this._bossHudLayout();
-      this.bossBarMaxW = barW;
-      this._clearBossHud();
-      const frame = this.add
-        .rectangle(centerX, barY, barW + 6, 22, 0x000000, 0)
-        .setStrokeStyle(2, 0xffffff, 0.6)
-        .setScrollFactor(0)
-        .setDepth(9000);
-      this.bossBar = this.add
-        .rectangle(left, barY, barW, 16, NUM('blood'))
-        .setOrigin(0, 0.5)
-        .setScrollFactor(0)
-        .setDepth(9001);
-      const nameT = this.add
-        .text(centerX, barY + 18, b.name, F(0, { fontSize: '13px', color: COL.cream }))
-        .setOrigin(0.5, 0)
-        .setScrollFactor(0)
-        .setDepth(9001);
-      this._bossHud = [frame, this.bossBar, nameT];
+      this._buildBossHud(b.name);
     });
   },
 
@@ -177,21 +163,6 @@ export const stageMixin = {
     trim(this.pickups);
     trim(this.fires);
     trim(this.hazards);
-  },
-
-  _clearBossHud() {
-    if (!this._bossHud?.length) {
-      this.bossBar = null;
-      return;
-    }
-    for (const o of this._bossHud) {
-      try {
-        this.tweens.killTweensOf(o);
-        o?.destroy?.();
-      } catch (_) {}
-    }
-    this._bossHud = null;
-    this.bossBar = null;
   },
 
   /** Nettoyage léger entre vagues/stages — même esprit qu'un redémarrage de GameScene. */

@@ -1,5 +1,5 @@
-import { playableBoss, GUSTAVAX_BOSS, KARONUX_BOSS } from './bosses.js';
-import { LEVEL1_LAYERS, LEVEL2_LAYERS } from './levelLayers.js';
+import { playableBoss, GUSTAVAX_BOSS, KARONUX_BOSS, KIKOR_BOSS } from './bosses.js';
+import { LEVEL1_LAYERS, LEVEL2_LAYERS, LEVEL3_LAYERS } from './levelLayers.js';
 
 /** Niveau sandbox : les 6 nouveaux ennemis, un par vague. */
 export const TEST_ENEMIES_LEVEL = {
@@ -63,12 +63,12 @@ export const CAMPAIGN_LEVELS = [
       { waves: [['heavy', 'runner', 'grunt'], ['kikor_e', 'guylux']] },
       { bossOnly: true },
     ],
-    boss: playableBoss('jualos', 1, { tint: 0xffaaaa, scale: 1.42, enrageBanner: 'JUALOS DEVIENT FOU !' }),
+    boss: KIKOR_BOSS,
   },
   {
-    name: 'COLLEGE MONTJOIE',
+    name: 'LE STADE COLETTE BESSON',
     music: 'music_fight3',
-    bgImg: null,
+    layers: LEVEL3_LAYERS,
     decor: ['obj_baril', 'obj_brasero', 'obj_poubelle'],
     skyTop: 0x281838,
     skyBot: 0x5a2868,
@@ -76,13 +76,16 @@ export const CAMPAIGN_LEVELS = [
     neon: 0xcc66ff,
     stages: [
       { waves: [['runner', 'runner'], ['grunt', 'runner']] },
+      { waves: [['heavy', 'grunt'], ['runner', 'grunt']] },
       { waves: [['kikor_e', 'runner'], ['papy_jala', 'grunt']] },
+      { waves: [['runner', 'runner'], ['heavy', 'grunt']] },
       { waves: [['kikor_e', 'runner', 'grunt'], ['runner', 'remy']] },
+      { bossOnly: true },
     ],
     boss: playableBoss('yanu', 2, { tint: 0xccccff, speed: 118, enrageBanner: 'YANU SE TRANSFORME !' }),
   },
   {
-    name: 'ALLEE DE LA GUIGNACE',
+    name: 'BOURG DE SARAN',
     music: 'music_fight4',
     bgImg: 'level_bg_0',
     decor: ['obj_poubelle', 'obj_benne', 'obj_baril'],
@@ -98,7 +101,7 @@ export const CAMPAIGN_LEVELS = [
     boss: playableBoss('lorenzo', 3, { tint: 0xff8f7a, scale: 1.48, enrageBanner: 'LORENZO S\'ÉNERVE !' }),
   },
   {
-    name: 'ORME AU COIN',
+    name: 'COLLEGE MONTJOIE',
     music: 'music_fight2',
     bgImg: null,
     decor: ['obj_caisse', 'obj_baril', 'obj_brasero'],
@@ -127,7 +130,7 @@ export const CAMPAIGN_LEVELS = [
       { waves: [['makouille'], ['heavy', 'orelsan'], ['kikor_e', 'grunt']] },
       { waves: [['kikor_e', 'kikor_e', 'runner'], ['makouille', 'charlingals']] },
     ],
-    boss: playableBoss('kikor', 5, { tint: 0xaaddff, enrageBanner: 'KIKOR ROULE À TOUT VA !' }),
+    boss: playableBoss('jualos', 1, { tint: 0xffaaaa, scale: 1.42, enrageBanner: 'JUALOS DEVIENT FOU !' }),
   },
   {
     name: 'LES CHIMOUTONS',

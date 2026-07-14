@@ -20,6 +20,7 @@ import { specialsMixin } from '../game/specials.js';
 import { pauseMixin } from '../game/pause.js';
 import { grabMixin } from '../game/grab.js';
 import { karonuxBossMixin } from '../game/bosses/karonuxBoss.js';
+import { kikorBossMixin } from '../game/bosses/kikorBoss.js';
 import { playersMixin } from '../game/players.js';
 
 export class GameScene extends Phaser.Scene {
@@ -156,6 +157,7 @@ Object.assign(
   pauseMixin,
   grabMixin,
   karonuxBossMixin,
+  kikorBossMixin,
   aiMixin,
   enemyAttacksMixin,
   inputMixin

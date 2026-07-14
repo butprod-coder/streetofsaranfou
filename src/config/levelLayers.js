@@ -40,7 +40,19 @@ export const LEVEL2_STAGE_PARTS = [
 
 export const LEVEL2_TEXTURE_KEYS = [...LEVEL2_STAGE_PARTS];
 
-export const ALL_LEVEL_TEXTURE_KEYS = [...LEVEL1_TEXTURE_KEYS, ...LEVEL2_TEXTURE_KEYS];
+/** Sprites plein écran niveau 3 — Stade Colette Besson (assets/shared/levels/level3/). */
+export const LEVEL3_STAGE_PARTS = [
+  'stade1',
+  'stade2',
+  'stade3',
+  'stade4',
+  'stade5',
+  'stade6',
+];
+
+export const LEVEL3_TEXTURE_KEYS = [...LEVEL3_STAGE_PARTS];
+
+export const ALL_LEVEL_TEXTURE_KEYS = [...LEVEL1_TEXTURE_KEYS, ...LEVEL2_TEXTURE_KEYS, ...LEVEL3_TEXTURE_KEYS];
 
 /** Chêne Maillard — un sprite plein écran par stage (décor + gameplay). */
 export const LEVEL1_LAYERS = {
@@ -66,11 +78,26 @@ export const LEVEL2_LAYERS = {
   props: [],
 };
 
+/** Stade Colette Besson — un sprite plein écran par stage (décor + gameplay). */
+export const LEVEL3_LAYERS = {
+  fullStage: true,
+  stageParts: LEVEL3_STAGE_PARTS,
+  ambient: { type: 'dust', count: 2 },
+  roadRatio: 0.55,
+  walkInsetTop: 0.12,
+  walkInsetBottom: 10,
+  propCount: [0, 0],
+  props: [],
+};
+
 /** Hauteur mini des decors — référence pour le scale max (1774×887 px). */
 export const LEVEL1_DECOR_REF = { width: 1774, height: 887 };
 
 /** Référence décor Château de l'étang (1774×887 px). */
 export const LEVEL2_DECOR_REF = { width: 1774, height: 887 };
+
+/** Référence décor Stade Colette Besson (1774×887 px). */
+export const LEVEL3_DECOR_REF = { width: 1774, height: 887 };
 
 export function mainPartsRefSize(layers, getSize) {
   const parts = layers?.mainParts;

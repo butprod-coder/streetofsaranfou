@@ -1,5 +1,5 @@
 /** Sous-dossier assets/ pour une cle d'image. */
-import { LEVEL1_TEXTURE_KEYS, LEVEL2_TEXTURE_KEYS } from './levelLayers.js';
+import { LEVEL1_TEXTURE_KEYS, LEVEL2_TEXTURE_KEYS, LEVEL3_TEXTURE_KEYS } from './levelLayers.js';
 
 export const PLAYABLE_CHARS = [
   'karonux', 'jualos', 'yanu', 'lorenzo', 'jo', 'kikor', 'gustavax',
@@ -22,7 +22,7 @@ export function assetSubdir(key) {
     if (key.startsWith(`sp_${c}_`)) return c;
     if (key.startsWith(`${c}_`)) {
       const suffix = key.slice(c.length + 1);
-      if (/^(marche|court|fight|idle|saut|saute|tombe|mort|meurt|poing|pied)(\s*\(\d+\)|\d+)$/.test(suffix)) return c;
+      if (/^(marche|court|fight|idle|saut|saute|tombe|mort|meurt|poing|pied|chope|genou\d*)(\s*\(\d+\)|\d+)?$/.test(suffix)) return c;
       if (/^\d+$/.test(suffix)) return c;
     }
   }
@@ -40,6 +40,7 @@ export function assetSubdir(key) {
   if (key.startsWith('level_bg_') || key === 'titlebg') return 'shared/levels';
   if (LEVEL1_TEXTURE_KEYS.includes(key)) return 'shared/levels/level1';
   if (LEVEL2_TEXTURE_KEYS.includes(key)) return 'shared/levels/level2';
+  if (LEVEL3_TEXTURE_KEYS.includes(key)) return 'shared/levels/level3';
   if (key === 'chicken' || key === 'chicken_gold' || key === 'skateboard') return 'shared/pickups';
   if (key === 'specials_storyboard') return 'shared/specials';
   return '';

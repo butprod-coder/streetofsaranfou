@@ -35,8 +35,21 @@ export const inputMixin = {
       if (this.checkGodToggle()) return;
       if (this.checkPauseToggle()) return;
 
+      if (this._policeActive) {
+        for (const p of this.allPlayers()) {
+          if (p?.active) p.setVelocity(0, 0);
+        }
+        if (this.enemies?.getChildren) {
+          for (const e of this.enemies.getChildren()) {
+            if (e?.active && e.hp > 0) e.setVelocity(0, 0);
+          }
+        }
+        return;
+      }
+
       const kxBlock = this._karonuxBlocksInput?.();
-      if (!kxBlock) {
+      const kkBlock = this._kkBlocksInput?.();
+      if (!kxBlock && !kkBlock) {
         for (let slot = 0; slot < this.playerCount(); slot++) {
           const p = this.playerAt(slot);
           if (!p || !p.active || p.hp <= 0) continue;
@@ -44,7 +57,7 @@ export const inputMixin = {
         }
       }
 
-      if (this.phase !== 'intro' && !kxBlock) {
+      if (this.phase !== 'intro' && !kxBlock && !kkBlock) {
         for (let slot = 0; slot < this.playerCount(); slot++) {
           const p = this.playerAt(slot);
           if (p && p.active && p.hp > 0) this.movePlayer(slot);
@@ -176,6 +189,7 @@ export const inputMixin = {
   },
 
   padActions(slot = 0) {
+    if (this._policeActive) return;
     const p = this.playerAt(slot);
     if (!p || this.isPlayerStunned(p)) return;
     const pad = padForPlayer(this, slot);
@@ -196,14 +210,17 @@ export const inputMixin = {
       else this.jump(slot);
     }
     if (edge(PAD.ROND)) {
-      if (grabbing) this.grabKnee(slot);
-      else this.attack(slot);
+      if (grabbing) {
+        if (this._grabBackHeld?.(slot)) this.grabThrowBack(slot);
+        else this.grabKnee(slot);
+      } else this.attack(slot);
     }
     if (edge(PAD.CARRE) && !grabbing) this.special(slot);
     if (edge(PAD.TRIANGLE) && !grabbing) this.callPolice();
   },
 
   movePlayer(slot = 0) {
+    if (this._policeActive) return;
     if (this.phase === 'advance') return;
     const p = this.playerAt(slot);
     if (!p) return;

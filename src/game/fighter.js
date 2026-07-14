@@ -25,8 +25,30 @@ export const fighterMixin = {
     const h = f.texture.source[0].height;
     if (!h) return;
     const refH = this._frameRefHeight(f) || h;
-    const displayH = dispH * (h / refH);
+    const texKey = f.texture?.key;
+    const fixedClip = fa?.fixedDisplayClips?.some((clip) => fa[clip]?.includes(texKey));
+    const displayH = fixedClip ? dispH : dispH * (h / refH);
     f.setDisplaySize(displayH * (w / h), displayH);
+  },
+
+  /** Applique tout de suite la taille frame (évite un flash à la 1re frame). */
+  _syncFrameFit(f) {
+    if (!f?.usesFrameAnim) return;
+    f._lastFitKey = f.texture?.key ?? null;
+    this._fitFrameSprite(f);
+    this._setFrameHitbox(f);
+  },
+
+  /** Texture + taille correctes avant de lancer l'anim (clips PNG hors gabarit). */
+  _primeFrameClip(f, clipName) {
+    const frameKey = f.frameSheet ?? f.sheet;
+    const fa = FRAME_ANIM_CHARS[frameKey];
+    const tex = fa?.[clipName]?.[0];
+    if (!tex || !this.textures.exists(tex)) return false;
+    f.anims.stop();
+    f.setTexture(tex);
+    this._syncFrameFit(f);
+    return true;
   },
 
   _setFrameHitbox(f) {
@@ -226,6 +248,9 @@ export const fighterMixin = {
     ) {
       return;
     }
+    if (f.state2 === 'grab' && name !== 'grab' && name !== 'grabKnee' && name !== 'hurt' && name !== 'ko' && name !== 'fall') {
+      return;
+    }
     const frameKey = f.frameSheet ?? f.sheet;
     const fa = FRAME_ANIM_CHARS[frameKey];
     const sheetFallback = ['hurt', 'ko', 'jump'];
@@ -279,6 +304,7 @@ export const fighterMixin = {
             });
           }
           f.anims.play(animKey, ignore);
+          if (f.usesFrameAnim) this._syncFrameFit(f);
         }
         return;
       }

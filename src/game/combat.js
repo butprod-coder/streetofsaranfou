@@ -420,6 +420,9 @@ export const combatMixin = {
   },
 
   melee(src, range, band, dmg, aoe) {
+    if (src.isPlayer && this._kkMeleeCanvases) {
+      this._kkMeleeCanvases(src, range, band, dmg);
+    }
     if (src.isPlayer && this._kx?.phase === 'car' && this._kx.car?.active) {
       const car = this._kx.car;
       const dx = car.x - src.x;
@@ -551,6 +554,10 @@ export const combatMixin = {
         return;
       }
       if (b.fromPlayer) {
+        if (this._kkBulletCanvases?.(b)) {
+          this._destroyBullet(b);
+          return;
+        }
         if (this._kx?.phase === 'car' && this._kx.car?.active) {
           const car = this._kx.car;
           if (Math.abs(car.x - b.x) < car.displayWidth * 0.42 && Math.abs(car.y - b.y) < 58) {
@@ -614,6 +621,9 @@ export const combatMixin = {
         if (t.bossCustom !== 'karonux_boss') this.spawnSpark(t.x, t.y - 48);
         return;
       }
+    }
+    if (!t.isPlayer && t.bossCustom === 'kikor_boss' && this.kikorBossHurt) {
+      dmg = this.kikorBossHurt(t, dmg);
     }
     const wasAirborne = !!t.airborne || (t.jumpZ ?? 0) > 4;
     if (t.airborne) {
@@ -768,6 +778,24 @@ export const combatMixin = {
       if (t.body) t.body.enable = false;
       this.karonuxBossDie(t);
       this.time.delayedCall(3200, () => {
+        if (!t?.scene) return;
+        this.phase = 'win';
+        this.time.delayedCall(700, () => {
+          try { this.victory(); } catch (e) { showCrash('victory()', e); }
+        });
+      });
+      return;
+    }
+    if (t.bossCustom === 'kikor_boss' && !t._kkDeathStarted) {
+      t._kkDeathStarted = true;
+      t.dying = true;
+      t._dyingSince = this.time.now;
+      t.hp = 0;
+      t.invuln = Number.MAX_SAFE_INTEGER;
+      t.setVelocity(0, 0);
+      if (t.body) t.body.enable = false;
+      this.kikorBossDie(t);
+      this.time.delayedCall(2800, () => {
         if (!t?.scene) return;
         this.phase = 'win';
         this.time.delayedCall(700, () => {

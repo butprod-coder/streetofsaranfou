@@ -17,6 +17,8 @@ export const FRAME_ANIM_TYPES = [
   { key: 'fall', rate: 'fallRate', repeat: 0 },
   { key: 'hurt', rate: 'hurtRate', repeat: 0 },
   { key: 'ko', rate: 'koRate', repeat: 0 },
+  { key: 'grab', rate: 'grabRate', repeat: -1 },
+  { key: 'grabKnee', rate: 'grabKneeRate', repeat: 0 },
 ];
 
 export const FRAME_ANIM_CHARS = {
@@ -266,6 +268,10 @@ export const FRAME_ANIM_CHARS = {
       'lorenzo_mort (5)',
       'lorenzo_mort (6)',
     ],
+    grab: ['lorenzo_chope'],
+    grabKnee: ['lorenzo_genou1', 'lorenzo_genou2'],
+    /** Ces clips ont des PNG plus grands — on les affiche à la même taille que idle/marche. */
+    fixedDisplayClips: ['grab', 'grabKnee'],
     idleRate: 3,
     walkRate: 8,
     runRate: 11,
@@ -274,6 +280,8 @@ export const FRAME_ANIM_CHARS = {
     jumpRate: 12,
     fallRate: 15,
     koRate: 8,
+    grabRate: 4,
+    grabKneeRate: 16,
     runSpeedRatio: 0.68,
     comboHits: 2,
     comboWindow: 680,

@@ -12,6 +12,9 @@ export const bossAIMixin = {
       case 'karonux_boss':
         this.updateKaronuxBoss(time);
         break;
+      case 'kikor_boss':
+        this.updateKikorBoss(time);
+        break;
       case 'karonux': this.karonuxBossAI(b, time); break;
       case 'jualos': this.jualosBossAI(b, time); break;
       case 'yanu': this.yanuBossAI(b, time); break;

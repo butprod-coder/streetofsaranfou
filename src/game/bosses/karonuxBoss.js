@@ -434,9 +434,7 @@ export const karonuxBossMixin = {
   },
 
   _kxUpdateBossBar() {
-    if (!this.bossBar || !this.boss?.active) return;
-    const maxW = this.bossBarMaxW ?? 320;
-    this.bossBar.width = maxW * Phaser.Math.Clamp(this.boss.hp / this.boss.hpMax, 0, 1);
+    this.updateHUD();
   },
 
   updateKaronuxBoss(time) {
@@ -887,18 +885,7 @@ export const karonuxBossMixin = {
     kx.laserMode = false;
     kx.bossHp = boss.hp;
 
-    const { barY, left, barW, centerX } = this._bossHudLayout();
-    this.bossBarMaxW = barW;
-    this.bossBar = this.add
-      .rectangle(left, barY, barW, 16, NUM('blood'))
-      .setOrigin(0, 0.5)
-      .setScrollFactor(0)
-      .setDepth(9001);
-    this.add
-      .text(centerX, barY + 18, def.name, F(0, { fontSize: '13px', color: COL.cream }))
-      .setOrigin(0.5, 0)
-      .setScrollFactor(0)
-      .setDepth(9001);
+    this._buildBossHud(def.name);
 
     this.tweens.add({
       targets: boss,

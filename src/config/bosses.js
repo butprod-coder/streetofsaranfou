@@ -1,7 +1,9 @@
 import { CHARACTERS } from './characters.js';
 import { KARONUX_BOSS_DEF } from './bossKaronux.js';
+import { KIKOR_BOSS_DEF } from './bossKikor.js';
 
 export const KARONUX_BOSS = { ...KARONUX_BOSS_DEF };
+export const KIKOR_BOSS = { ...KIKOR_BOSS_DEF };
 
 /** Stats de boss derivees d'un perso jouable. */
 export function playableBoss(charKey, levelIdx, extra = {}) {
