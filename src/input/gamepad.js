@@ -182,8 +182,13 @@ function hasAnyInput(raw) {
 
 function wrapRawGamepad(raw) {
   if (!raw) return null;
-  const id = raw.id || `gamepad-${raw.index}`;
-  let wrapped = rawPadCache.get(id);
+  // Clé de cache = index natif du navigateur, pas raw.id : deux manettes du même
+  // modèle (cas courant en coop) renvoient souvent le même texte `id` (ex. "Xbox
+  // Controller (XInput STANDARD GAMEPAD)"), ce qui écraserait la 1re manette dans
+  // le cache et ferait disparaître la 2e comme « doublon » dans connectedPads().
+  const cacheKey = raw.index;
+  const id = `${raw.id || 'Manette'}#${raw.index}`;
+  let wrapped = rawPadCache.get(cacheKey);
   if (!wrapped) {
     wrapped = {
       id,
@@ -204,10 +209,11 @@ function wrapRawGamepad(raw) {
         return typeof v === 'number' ? v : 0;
       },
     }));
-    rawPadCache.set(id, wrapped);
+    rawPadCache.set(cacheKey, wrapped);
   } else {
     wrapped._raw = raw;
     wrapped.index = raw.index;
+    wrapped.id = id;
   }
   return wrapped;
 }

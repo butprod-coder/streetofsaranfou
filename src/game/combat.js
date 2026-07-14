@@ -647,15 +647,32 @@ export const combatMixin = {
       this._breakComboChain(t.playerSlot ?? 0, false);
       if (t._grabbing) this._releaseGrab?.(t);
     }
-    this.flash(t, 0xffffff);
+    // Armure : l'ennemi encaisse (dégâts pris) mais n'est ni repoussé ni interrompu.
+    const armored =
+      !t.isPlayer &&
+      !t.bossDef &&
+      t.hp > 0 &&
+      !opts.knockdown &&
+      !!t.aiProfile?.armor &&
+      Math.random() < t.aiProfile.armor;
+    // Karonux pilote ses attaques scriptées (charge, sieste clope, agenouillement) via des tweens
+    // qui ciblent le boss lui-même : un killTweensOf générique ici couperait cette tween sans jamais
+    // déclencher son onComplete, et laisserait kx.sub bloqué pour le reste du combat.
+    const isKxBoss = !t.isPlayer && t.bossCustom === 'karonux_boss';
+    const kxScriptedLock =
+      isKxBoss &&
+      ['charge', 'clope', 'yawn', 'kneel', 'laser'].includes(this._kx?.sub);
+    this.flash(t, armored ? 0xffaa44 : 0xffffff);
     this.spawnSpark(t.x - (dir || 0) * 10, t.y - 50);
     this.shake(90, 0.006);
     this.sfx(t.isPlayer ? 'hurt' : 'hit', { vol: t.isPlayer ? 1 : 0.85 });
-    const kb = opts.knockback ?? attacker?._lastHitKnockback ?? 16;
-    try {
-      this.tweens.killTweensOf(t);
-    } catch (_) {}
-    this.tweens.add({ targets: t, x: t.x + (dir || 1) * kb, duration: kb > 20 ? 120 : 90 });
+    if (!armored && !kxScriptedLock) {
+      const kb = opts.knockback ?? attacker?._lastHitKnockback ?? 16;
+      try {
+        this.tweens.killTweensOf(t);
+      } catch (_) {}
+      this.tweens.add({ targets: t, x: t.x + (dir || 1) * kb, duration: kb > 20 ? 120 : 90 });
+    }
     if (attacker?._lastHitKnockback) attacker._lastHitKnockback = null;
     if (t.hp > 0) {
       if (t.isPlayer) {
@@ -676,7 +693,6 @@ export const combatMixin = {
           });
         }
       } else {
-        const isKxBoss = t.bossCustom === 'karonux_boss';
         const inTurbo = isKxBoss && (this._kx?.turboUntil || 0) > this.time.now;
         const inClope = isKxBoss && this._kx?.sub === 'clope';
         const kxBusy =
@@ -687,7 +703,7 @@ export const combatMixin = {
             this._kx?.sub === 'yawn' ||
             this._kx?.sub === 'kneel');
 
-        if (!kxBusy && !inClope) {
+        if (!kxBusy && !inClope && !armored) {
           t.state2 = 'hurt';
           if (isKxBoss && this._playBk) {
             this._playBk(t, 'bk_hurt', false);
@@ -762,7 +778,7 @@ export const combatMixin = {
   },
 
   die(t, dir) {
-    if (t.type2 === 'triso' && this._stopTrisoSpit) this._stopTrisoSpit(t);
+    if (t.type2 === 'triso' && this._trisoEndRush) this._trisoEndRush(t);
     if (t.dying) return;
     if (t._grabbedBy) this._releaseGrab?.(t._grabbedBy);
     if (t.isPlayer && t._grabbing) this._releaseGrab?.(t);

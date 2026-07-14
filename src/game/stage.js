@@ -243,20 +243,37 @@ export const stageMixin = {
     return hints[key] || '';
   },
 
+  /** Point d'entrée d'un ennemi de vague : gauche/droite (bord d'écran) ou
+   * haut/bas (bord de la bande de jeu) — pour ne pas toujours voir arriver
+   * les ennemis symétriquement des deux côtés de l'écran. */
+  _waveEntryPoint(i) {
+    const top = this.walkTop();
+    const bottom = this.walkBottom();
+    const side = ['left', 'right', 'top', 'bottom'][Phaser.Math.Between(0, 3)];
+    switch (side) {
+      case 'left':
+        return { x: -40 - i * 18, y: Phaser.Math.Between(top + 4, bottom - 4) };
+      case 'right':
+        return { x: W + 40 + i * 18, y: Phaser.Math.Between(top + 4, bottom - 4) };
+      case 'top':
+        return { x: Phaser.Math.Between(50, W - 50), y: top - 40 };
+      default:
+        return { x: Phaser.Math.Between(50, W - 50), y: bottom + 40 };
+    }
+  },
+
   _spawnWaveEnemies(wave, enterFromAhead = false) {
     wave.forEach((k, i) => {
-      const side = enterFromAhead
-        ? W + 48 + i * 34
-        : i % 2 === 0
-          ? -40
-          : W + 40;
+      const { x, y } = enterFromAhead
+        ? { x: W + 48 + i * 34, y: Phaser.Math.Between(FLOOR_TOP + 30, FLOOR_BOTTOM - 5) }
+        : this._waveEntryPoint(i);
       const e = this.makeFighter(
-        side,
-        Phaser.Math.Between(FLOOR_TOP + 30, FLOOR_BOTTOM - 5),
+        x,
+        y,
         ENEMY_TYPES[k].sheet,
         { hpMax: ENEMY_TYPES[k].hp, speed: ENEMY_TYPES[k].speed, type: k, scale: ENEMY_TYPES[k].scale }
       );
-      e.facing = side < W * 0.5 ? 1 : -1;
+      e.facing = x < W * 0.5 ? 1 : -1;
       e.setFlipX(e.facing < 0);
       this.enemies.add(e);
     });

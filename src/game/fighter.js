@@ -120,6 +120,7 @@ export const fighterMixin = {
       f.reach = e.reach;
       f.attackCd = e.attackCd;
       f.score = e.score;
+      f.aiProfile = e.ai || null;
       if (e.tint !== 0xffffff) {
         f.baseTint = e.tint;
         f.setTint(e.tint);

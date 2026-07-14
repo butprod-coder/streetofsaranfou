@@ -4,9 +4,14 @@ import { CONFIG } from '../config/difficulty.js';
 import { CHARLINGALS_BILL_FRAMES, CHARLINGALS_BILL_ANIM } from '../config/charlingalsBills.js';
 import {
   TRISO_SPIT_ANIM,
-  TRISO_SPIT_MS,
-  TRISO_PUDDLE_EXTRA_MS,
   TRISO_SPIT_FRAMES,
+  TRISO_PUDDLE_EXTRA_MS,
+  TRISO_RUSH_MS,
+  TRISO_RUSH_RECOVER_MS,
+  TRISO_VOMIT_RANGE,
+  TRISO_VOMIT_BAND,
+  TRISO_VOMIT_TICK_MS,
+  TRISO_TRAIL_INTERVAL_MS,
 } from '../config/trisoSlime.js';
 import { PAPY_SMOKE_ANIM, PAPY_SMOKE_FRAMES } from '../config/papyJalaFx.js';
 import { GUYLUX_CARD_KEY, GUYLUX_CARD_SCALE } from '../config/guyluxCards.js';
@@ -353,11 +358,10 @@ export const enemyAttacksMixin = {
 
   _trisoStartConfused(e, time) {
     if (this._trisoIsConfused(e, time)) return;
-    this._stopTrisoSpit(e);
+    this._trisoEndRush(e);
     e.trisoConfusedUntil = time + 5000;
     e.trisoConfusedFacing = e.trisoSpitFacing ?? e.facing;
     e.trisoSpitFacing = null;
-    e.trisoSlimeActive = 0;
     e.trisoStillSince = 0;
     e.busy = time + 5000;
     e.setVelocity(0, 0);
@@ -377,8 +381,9 @@ export const enemyAttacksMixin = {
     if (e.baseTint && e.baseTint !== 0xffffff) e.setTint(e.baseTint);
     const p = this.nearestPlayerTo(e.x, e.y);
     this._enemyFaceTarget(e, p.x - e.x);
-    e.nextAttack = time + 500;
-    this.enemyTrisoSlime(e);
+    e.nextAttack = time + 700;
+    e.state2 = 'idle';
+    this.anim(e, 'idle');
   },
 
   _hitTrisoFromBehind(t, fromX) {
@@ -537,58 +542,140 @@ export const enemyAttacksMixin = {
       e.trisoSpitFx.destroy();
       e.trisoSpitFx = null;
     }
+    if (e.trisoMouthFx) {
+      e.trisoMouthFx.destroy();
+      e.trisoMouthFx = null;
+    }
     if (e.active) e.setVisible(true);
   },
 
-  enemyTrisoSlime(e) {
+  /** Dessine le jet de vomi qui prolonge la gueule de Triso — plusieurs
+   * épaisseurs superposées pour un effet de souffle façon crache-feu SOR. */
+  _trisoDrawVomitJet(g, x, y, dir, time) {
+    g.clear();
+    const len = TRISO_VOMIT_RANGE;
+    const ex = x + dir * len;
+    const wob = Math.sin(time * 0.02) * 7;
+    g.lineStyle(22, 0x2f6b1f, 0.14);
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(ex, y + wob);
+    g.strokePath();
+    g.lineStyle(13, 0x4caf30, 0.38);
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(ex, y + wob);
+    g.strokePath();
+    g.lineStyle(6, 0xafe66b, 0.72);
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(ex, y + wob * 0.55);
+    g.strokePath();
+  },
+
+  /** Nettoyage sûr (idempotent) de la charge-vomi, appelé par la tween, par le
+   * filet de sécurité minuté, ou si Triso est interrompu (backstab, mort). */
+  _trisoEndRush(e) {
+    if (e._trisoRushTween) {
+      try {
+        e._trisoRushTween.stop();
+      } catch (_) {}
+      e._trisoRushTween = null;
+    }
+    e.trisoRushUntil = 0;
+    this._stopTrisoSpit(e);
+    if (!e.active) return;
+    e.setVelocity(0, 0);
+    if (e.state2 === 'special') {
+      e.state2 = 'idle';
+      this.anim(e, 'idle');
+    }
+  },
+
+  /** Charge-vomi façon gros ennemi Streets of Rage qui fonce en crachant du
+   * feu : Triso reste visible, avance vite droit sur sa cible et arrose devant
+   * lui — jet + trainée de gerbe au sol qu'il faut esquiver ou contourner. */
+  enemyTrisoVomitRush(e) {
     const now = this.time.now;
     this._stopTrisoSpit(e);
 
+    const p = this.nearestPlayerTo(e.x, e.y);
+    e.facing = p.x < e.x ? -1 : 1;
+    e.setFlipX(e.facing < 0);
+    const dir = e.facing;
+
     e.state2 = 'special';
-    e.busy = now + TRISO_SPIT_MS + 300;
-    e.trisoSlimeActive = now + TRISO_SPIT_MS + 600;
-    e.trisoSpitFacing = e.facing;
+    e.trisoRushUntil = now + TRISO_RUSH_MS;
+    e.busy = now + TRISO_RUSH_MS + TRISO_RUSH_RECOVER_MS;
+    e.trisoSpitFacing = dir;
+    e.trisoStillSince = 0;
     e.setVelocity(0, 0);
-    e.setVisible(false);
-    this.anim(e, 'idle');
 
-    const tex = TRISO_SPIT_FRAMES[0];
-    if (!this.textures.exists(tex)) return;
+    this.anim(e, 'walk', true);
+    this.sfx('shoot', { vol: 0.5 });
+    this.flash(e, 0x99ff66);
 
-    const fx = this.add.sprite(e.x, e.y, tex);
-    fx.setOrigin(0.18, 0.92);
-    fx.setFlipX(e.facing < 0);
-    const targetH = 98;
-    fx.setScale(targetH / fx.height);
-    fx.setDepth(e.depth + 4);
-    if (this.anims.exists(TRISO_SPIT_ANIM)) fx.play(TRISO_SPIT_ANIM);
-    e.trisoSpitFx = fx;
+    const wallPad = 46;
+    const endX = Phaser.Math.Clamp(e.x + dir * (W * 0.55), wallPad, W - wallPad);
 
-    e._trisoFollowEvt = this.time.addEvent({
-      delay: 32,
-      loop: true,
-      callback: () => {
-        if (!e.active || !fx.active) return;
-        fx.setPosition(e.x + e.facing * 6, e.y);
-        fx.setDepth(e.depth + 4);
+    const jet = this.add.graphics().setDepth(e.depth + 3);
+    e.trisoSpitFx = jet;
+
+    let mouthFx = null;
+    const spitTex = TRISO_SPIT_FRAMES[0];
+    if (this.textures.exists(spitTex)) {
+      mouthFx = this.add.sprite(e.x, e.y, spitTex).setOrigin(0.15, 0.85).setDepth(e.depth + 4);
+      const targetH = 74;
+      mouthFx.setScale(targetH / mouthFx.height);
+      mouthFx.setFlipX(dir < 0);
+      if (this.anims.exists(TRISO_SPIT_ANIM)) mouthFx.play(TRISO_SPIT_ANIM);
+    }
+    e.trisoMouthFx = mouthFx;
+
+    let nextTrailAt = now + 120;
+    let nextHitAt = now;
+
+    e._trisoRushTween = this.tweens.add({
+      targets: e,
+      x: endX,
+      duration: TRISO_RUSH_MS,
+      ease: 'Sine.easeIn',
+      onUpdate: () => {
+        if (!e.active) return;
+        e.setFlipX(dir < 0);
+        const mouthX = e.x + dir * 20;
+        const mouthY = e.y - e.displayHeight * 0.42;
+        if (mouthFx?.active) {
+          mouthFx.setPosition(mouthX, mouthY);
+          mouthFx.setDepth(e.depth + 4);
+        }
+        if (jet?.active) jet.setDepth(e.depth + 3);
+        const jx = e.x + dir * 26;
+        const jy = e.y - e.displayHeight * 0.38;
+        const t = this.time.now;
+        this._trisoDrawVomitJet(jet, jx, jy, dir, t);
+
+        if (t >= nextTrailAt) {
+          nextTrailAt = t + TRISO_TRAIL_INTERVAL_MS;
+          this.spawnSlimePuddle(e.x - dir * 16, e.y, dir, TRISO_PUDDLE_EXTRA_MS);
+        }
+        if (t >= nextHitAt) {
+          nextHitAt = t + TRISO_VOMIT_TICK_MS;
+          for (const pl of this.activePlayers()) {
+            if (!pl?.active || pl.hp <= 0) continue;
+            const ahead = dir > 0 ? pl.x - jx : jx - pl.x;
+            if (ahead < -12 || ahead > TRISO_VOMIT_RANGE) continue;
+            if (Math.abs(pl.y - jy) > TRISO_VOMIT_BAND) continue;
+            if (pl.airborne && (pl.jumpZ ?? 0) >= 16) continue;
+            this.hurt(pl, e.damage, dir, e.x, e);
+          }
+        }
       },
+      onComplete: () => this._trisoEndRush(e),
     });
 
-    this.sfx('shoot', { vol: 0.38 });
-
-    const puddleX = e.x + e.facing * 92;
-    this.time.delayedCall(280, () => {
-      if (!e.active) return;
-      this.spawnSlimePuddle(puddleX, e.y, e.facing, TRISO_SPIT_MS + TRISO_PUDDLE_EXTRA_MS);
-    });
-
-    this.time.delayedCall(TRISO_SPIT_MS, () => {
-      this._stopTrisoSpit(e);
-      if (e.active) {
-        e.setVisible(true);
-        e.state2 = 'idle';
-        this.anim(e, 'idle');
-      }
+    this.time.delayedCall(TRISO_RUSH_MS + 40, () => {
+      if (e.trisoRushUntil) this._trisoEndRush(e);
     });
   },
 
@@ -611,7 +698,7 @@ export const enemyAttacksMixin = {
       targets: s,
       scaleX: growX,
       scaleY: 1.12,
-      duration: TRISO_SPIT_MS - 200,
+      duration: 320,
       ease: 'Quad.easeOut',
     });
     this.hazards.add(s);
@@ -809,18 +896,19 @@ export const enemyAttacksMixin = {
       return;
     }
 
-    const rooted = (e.trisoSlimeActive || 0) > time;
-    if (rooted) {
+    const rushing = (e.trisoRushUntil || 0) > time;
+    if (rushing) {
       if (e.trisoSpitFacing != null) {
         e.facing = e.trisoSpitFacing;
         e.setFlipX(e.facing < 0);
       }
+      // Se faire toucher dans le dos pendant la charge le déboussole et
+      // coupe net le jet — c'est la fenêtre de contre à exploiter.
       if (this._trisoPlayerBehind(e, p)) {
         this._trisoStartConfused(e, time);
         this.clampBand(e);
         return;
       }
-      e.setVelocity(0, 0);
       this.clampBand(e);
       return;
     }
@@ -836,20 +924,20 @@ export const enemyAttacksMixin = {
     const adx = Math.abs(dx);
     this._enemyFaceTarget(e, dx);
 
-    const spitDist = 120;
-    const spitMin = 52;
-    const aligned = Math.abs(dy) < 58;
+    const rushMax = 380;
+    const rushMin = 70;
+    const aligned = Math.abs(dy) < 62;
 
-    if (aligned && adx <= spitDist && adx >= spitMin) {
-      e.setVelocity(0, 0);
-      if (e.state2 !== 'idle') this._enemyReturnIdle(e);
-      if (time > e.nextAttack) {
-        e.nextAttack = time + e.attackCd * 2.4;
-        this.enemyTrisoSlime(e);
+    if (aligned && adx >= rushMin && adx <= rushMax) {
+      if (time > e.nextAttack && Math.random() < 0.5) {
+        e.nextAttack = time + e.attackCd * 2.2;
+        this.enemyTrisoVomitRush(e);
         this.clampBand(e);
         return;
       }
-    } else if (aligned && adx > spitDist) {
+      e.setVelocity(0, 0);
+      if (e.state2 !== 'idle') this._enemyReturnIdle(e);
+    } else if (aligned && adx > rushMax) {
       e.trisoStillSince = 0;
       const a = Math.atan2(dy, dx);
       e.setVelocity(Math.cos(a) * e.speedV, Math.sin(a) * e.speedV);

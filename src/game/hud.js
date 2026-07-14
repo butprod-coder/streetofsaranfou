@@ -27,24 +27,27 @@ export const hudMixin = {
   },
 
   _createHealthBar(x, y, width, height, accent, originX = 0) {
+    // originX pilote déjà l'ancrage gauche/droite via setOrigin : pas besoin
+    // (et surtout pas correct) de décaler x en plus côté droit, ça double le
+    // décalage et détache toute la barre du cadre pour le joueur 2.
     const track = this.add
       .rectangle(x, y, width + 4, height + 6, 0x000000, 0.55)
       .setOrigin(originX, 0.5)
       .setScrollFactor(0)
       .setDepth(HUD.depth.bar - 1);
     const trackInner = this.add
-      .rectangle(x + (originX === 1 ? -width : 0), y, width, height, 0x1a1018, 1)
+      .rectangle(x, y, width, height, 0x1a1018, 1)
       .setOrigin(originX, 0.5)
       .setScrollFactor(0)
       .setDepth(HUD.depth.bar - 1);
     trackInner.setStrokeStyle(1, 0x3a2838, 0.9);
     const fill = this.add
-      .rectangle(x + (originX === 1 ? -width : 0), y, width, height - 2, accent)
+      .rectangle(x, y, width, height - 2, accent)
       .setOrigin(originX, 0.5)
       .setScrollFactor(0)
       .setDepth(HUD.depth.bar);
     const shine = this.add
-      .rectangle(x + (originX === 1 ? -width : 0), y - 2, width, Math.max(3, Math.floor(height * 0.35)), accent, 0.35)
+      .rectangle(x, y - 2, width, Math.max(3, Math.floor(height * 0.35)), accent, 0.35)
       .setOrigin(originX, 0.5)
       .setScrollFactor(0)
       .setDepth(HUD.depth.bar + 1);

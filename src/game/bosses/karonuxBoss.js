@@ -81,6 +81,7 @@ export const karonuxBossMixin = {
     kx._laserBeamTween = null;
     kx._laserGfx?.destroy();
     kx._laserGfx = null;
+    this._kxClearChmekAura(kx);
   },
 
   _kxTrackLaserCall(kx, call) {
@@ -88,6 +89,18 @@ export const karonuxBossMixin = {
     if (!kx._laserCalls) kx._laserCalls = [];
     kx._laserCalls.push(call);
     return call;
+  },
+
+  /** Annule proprement un Chmek laser en cours (timers, rayon, aura) sans figer le boss. */
+  _kxCancelLaser(b) {
+    const kx = this._kx;
+    if (!kx || kx.sub !== 'laser') return;
+    this._kxResetLaserFx(kx);
+    kx.sub = null;
+    if (b?.active) {
+      b.setTint(b.baseTint ?? 0xffffff);
+      this._playBk(b, 'bk_marche', true);
+    }
   },
 
   _playBk(spr, key, repeat = false) {
@@ -928,6 +941,22 @@ export const karonuxBossMixin = {
       kx._chargeTween.stop();
     }
     kx._chargeTween = null;
+    kx._chargeWatchdog?.remove();
+    kx._chargeWatchdog = null;
+  },
+
+  /** Filet de sécurité : si la tween de charge est interrompue par autre chose
+   * qu'un impact normal (ex. tweens.killTweensOf du recul générique sur hit),
+   * son onComplete ne se déclenche jamais et kx.sub restait bloqué sur 'charge'
+   * pour le reste du combat. On force alors une sortie propre de l'état. */
+  _kxChargeWatchdog(b, kx) {
+    if (!b?.active || !kx || kx.sub !== 'charge') return;
+    kx.sub = null;
+    kx._chargeTween = null;
+    b.setVelocity(0, 0);
+    b.busy = this.time.now + 300;
+    kx.nextAtk = this.time.now + 500;
+    this._playBk(b, 'bk_marche', true);
   },
 
   _kxClearDizzyFx(kx) {
@@ -997,6 +1026,7 @@ export const karonuxBossMixin = {
     const kx = this._kx;
     if (!b?.active || !kx) return;
     if (kx.sub === 'charge') return;
+    if (kx.sub === 'laser') this._kxCancelLaser(b);
 
     const p = this.nearestPlayerTo(b.x, b.y);
     let dir = opts.dir;
@@ -1055,6 +1085,9 @@ export const karonuxBossMixin = {
     this.sfx('shoot', { vol: 0.3 });
 
     this._kxCancelChargeMotion(kx);
+    kx._chargeWatchdog = this.time.delayedCall(windup + rushMs + wallStunMs + 400, () =>
+      this._kxChargeWatchdog(b, kx)
+    );
     kx._chargeDelay = this.time.delayedCall(windup, () => {
       kx._chargeDelay = null;
       if (!b.active || kx.sub !== 'charge') return;
@@ -1199,17 +1232,17 @@ export const karonuxBossMixin = {
   _kxEnterLaserMode(b, time) {
     const kx = this._kx;
     b.setVelocity(0, 0);
-    b.busy = time + 1800;
-    kx.nextAtk = time + 2000;
+    b.busy = time + 1200;
+    kx.nextAtk = time + 1350;
     kx.laserMode = true;
-    this._kxSetUntouchable(time + 2200);
+    this._kxSetUntouchable(time + 1400);
     b.setTint(0xff0000);
     b.baseTint = 0xff0000;
     this.flash(b, 0xff0000);
     this.shake(280, 0.012);
     this.banner('REGARD INSOMNIAQUE !', null, COL.blood);
     this._playBk(b, 'bk_rage', false);
-    this.time.delayedCall(1800, () => {
+    this.time.delayedCall(1200, () => {
       if (b.active) this._playBk(b, 'bk_marche', true);
     });
   },
@@ -1383,11 +1416,12 @@ export const karonuxBossMixin = {
     b.setFlipX(b.facing < 0);
 
     const auraWindupMs = 480;
-    const afterAuraMs = 540;
-    const chargeMs = 860;
+    const afterAuraMs = 300;
+    const chargeMs = 820;
+    const aimLockMs = 260; // la visée se fige avant le tir → esquive lisible
     const beamMs = 520;
     const laserStartMs = auraWindupMs + afterAuraMs;
-    const totalMs = laserStartMs + chargeMs + beamMs + 280;
+    const totalMs = laserStartMs + chargeMs + 240 + beamMs + 120;
 
     kx.sub = 'laser';
     kx.lastLaser = time;
@@ -1428,18 +1462,29 @@ export const karonuxBossMixin = {
         const tele = this.add.graphics().setDepth(99991);
         kx._laserGfx = tele;
 
-        const teleStepMs = 100;
+        // Visée : suit le joueur puis se verrouille aimLockMs avant le tir.
+        const aim = { x: b.x + b.facing * 200, y: b.y, locked: false };
+        const teleStepMs = 50;
+        const teleStart = this.time.now;
         kx._laserTeleEvt = this.time.addEvent({
           delay: teleStepMs,
           repeat: Math.floor(chargeMs / teleStepMs),
           callback: () => {
-            if (!b.active || kx.sub !== 'laser') return;
+            if (!b.active || kx.sub !== 'laser' || !tele.active) return;
             const { x: sx, y: sy } = this._kxChmekLaserOrigin(b);
-            const tgt = this.nearestPlayerTo(b.x, b.y);
-            const ex = tgt.x;
-            const ey = tgt.y - tgt.displayHeight * 0.38;
-            const pulse = 0.28 + 0.12 * Math.sin(this.time.now * 0.014);
-            this._kxDrawLaserTelegraph(tele, sx, sy, ex, ey, pulse);
+            if (!aim.locked) {
+              const tgt = this.nearestPlayerTo(b.x, b.y);
+              aim.x = tgt.x;
+              aim.y = tgt.y - tgt.displayHeight * 0.38;
+              if (this.time.now - teleStart >= chargeMs - aimLockMs) {
+                aim.locked = true;
+                this.sfx('shoot', { vol: 0.35 });
+              }
+            }
+            const pulse = aim.locked
+              ? 0.75
+              : 0.28 + 0.12 * Math.sin(this.time.now * 0.014);
+            this._kxDrawLaserTelegraph(tele, sx, sy, aim.x, aim.y, pulse);
           },
         });
 
@@ -1448,17 +1493,13 @@ export const karonuxBossMixin = {
           this.time.delayedCall(chargeMs, () => {
             kx._laserTeleEvt?.remove();
             kx._laserTeleEvt = null;
-            if (!b.active || kx.sub !== 'laser') {
-              tele.destroy();
-              if (kx._laserGfx === tele) kx._laserGfx = null;
-              return;
-            }
-
             tele.destroy();
+            if (kx._laserGfx === tele) kx._laserGfx = null;
+            if (!b.active || kx.sub !== 'laser') return;
+
             const { x: sx, y: sy } = this._kxChmekLaserOrigin(b);
-            const tgt = this.nearestPlayerTo(b.x, b.y);
-            const ex = tgt.x;
-            const ey = tgt.y - tgt.displayHeight * 0.38;
+            const ex = aim.x;
+            const ey = aim.y;
             const beam = this.add.graphics().setDepth(99992);
             kx._laserGfx = beam;
             const prog = { t: 0 };
@@ -1474,12 +1515,18 @@ export const karonuxBossMixin = {
               duration: 240,
               ease: 'Quad.easeOut',
               onUpdate: () => {
+                if (!beam.active) return;
                 const mx = sx + (ex - sx) * prog.t;
                 const my = sy + (ey - sy) * prog.t;
                 this._kxDrawLaserBeam(beam, sx, sy, mx, my);
               },
               onComplete: () => {
-                if (!b.active || kx.sub !== 'laser') return;
+                kx._laserBeamTween = null;
+                if (!b.active || kx.sub !== 'laser' || !beam.active) {
+                  beam.destroy();
+                  if (kx._laserGfx === beam) kx._laserGfx = null;
+                  return;
+                }
                 this._kxDrawLaserBeam(beam, sx, sy, ex, ey);
                 const hitFlag = {};
                 let ticks = 0;
@@ -1487,7 +1534,7 @@ export const karonuxBossMixin = {
                   delay: 100,
                   repeat: Math.floor(beamMs / 100),
                   callback: () => {
-                    if (!b.active || kx.sub !== 'laser') return;
+                    if (!b.active || kx.sub !== 'laser' || !beam.active) return;
                     this._kxDrawLaserBeam(beam, sx, sy, ex, ey, 1 - ticks * 0.08);
                     this._kxLaserHitPlayers(b, sx, sy, ex, ey, laserDmg, hitFlag);
                     ticks++;
@@ -1499,6 +1546,8 @@ export const karonuxBossMixin = {
                   this.time.delayedCall(beamMs + 60, () => {
                     kx._laserTeleEvt?.remove();
                     kx._laserTeleEvt = null;
+                    if (kx.sub === 'laser') kx.sub = null;
+                    if (b.active) this._playBk(b, 'bk_marche', true);
                     if (!beam.active) return;
                     this.tweens.add({
                       targets: beam,
@@ -1509,8 +1558,6 @@ export const karonuxBossMixin = {
                         if (kx._laserGfx === beam) kx._laserGfx = null;
                       },
                     });
-                    if (b.active) this._playBk(b, 'bk_marche', true);
-                    kx.sub = null;
                   })
                 );
               },
@@ -1754,7 +1801,8 @@ export const karonuxBossMixin = {
       if (
         kx.hitLog.length >= 8 &&
         now > (kx.lastForcedRetreat || 0) + 8500 &&
-        kx.sub !== 'charge'
+        kx.sub !== 'charge' &&
+        kx.sub !== 'laser'
       ) {
         kx.lastForcedRetreat = now;
         kx.hitLog = [];

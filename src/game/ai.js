@@ -4,6 +4,10 @@ import { CONFIG } from '../config/difficulty.js';
 
 /** Rayon de l'anneau d'attente autour du joueur (px). */
 const AI_RING_DIST = 190;
+/** Durée d'un pas d'esquive (ms). */
+const AI_DODGE_MS = 300;
+/** Distance sous laquelle l'approche se termine toujours en course (dernier sprint). */
+const AI_RUSH_DIST = 150;
 
 export const aiMixin = {
   /** Nombre max d'ennemis autorisés à engager en même temps. */
@@ -46,6 +50,13 @@ export const aiMixin = {
 
   /** Rôdeur : tient ses distances, se répartit sur la hauteur, harcèle du regard. */
   _aiWaitBehavior(e, time, p, dx) {
+    if (e._dodgeUntil && time < e._dodgeUntil) {
+      e.setVelocity(e._dodgeVx || 0, e._dodgeVy || 0);
+      this._enemyFaceTarget(e, dx);
+      this._enemyLocomote(e);
+      return;
+    }
+    if (this._aiTryDodge(e, time)) return;
     if (!e._waitRepick || time > e._waitRepick) {
       e._waitRepick = time + Phaser.Math.Between(900, 1900);
       e._waitY = Phaser.Math.Between(this.walkTop() + 6, this.walkBottom() - 6);
@@ -71,11 +82,72 @@ export const aiMixin = {
     }
   },
 
-  /** Attaquant : approche par le flanc assigné, frappe à cadence variable, replis occasionnels. */
+  /** Un joueur proche est-il en train de porter un coup vers cet ennemi ? */
+  _aiPlayerThreat(e) {
+    for (let slot = 0; slot < this.playerCount(); slot++) {
+      const p = this.playerAt(slot);
+      if (!p?.active || p.hp <= 0) continue;
+      if (p.state2 !== 'attack' && !p.kicking) continue;
+      const dx = e.x - p.x;
+      if (Math.abs(dx) > 190 || Math.abs(e.y - p.y) > 64) continue;
+      if (Math.sign(dx) !== p.facing && dx !== 0) continue;
+      return p;
+    }
+    return null;
+  },
+
+  /** Esquive réactive : pas de côté (vertical) ou bond arrière quand un coup part.
+   * Un seul tirage par coup adverse (« armé » tant qu'aucune menace n'est détectée,
+   * puis désarmé dès le tirage fait) — pas une temporisation globale, sinon l'esquive
+   * ne se voit quasiment jamais avec des probabilités de 10-35 %. */
+  _aiTryDodge(e, time) {
+    const prof = e.aiProfile;
+    if (!prof?.dodge) return false;
+    if (e._dodgeUntil && time < e._dodgeUntil) return false;
+    const threat = this._aiPlayerThreat(e);
+    if (!threat) {
+      e._dodgeArmed = true;
+      return false;
+    }
+    if (e._dodgeArmed === false) return false;
+    e._dodgeArmed = false;
+    if (Math.random() >= prof.dodge) return false;
+
+    const top = this.walkTop();
+    const bottom = this.walkBottom();
+    const room = 46;
+    let vy;
+    if (e.y - top < room) vy = 1;
+    else if (bottom - e.y < room) vy = -1;
+    else vy = Math.random() < 0.5 ? 1 : -1;
+
+    const backHop = Math.random() < 0.35;
+    const away = Math.sign(e.x - threat.x) || -e.facing;
+    e._dodgeUntil = time + AI_DODGE_MS;
+    e._dodgeVx = backHop ? away * e.speedV * 1.5 : away * e.speedV * 0.35;
+    e._dodgeVy = backHop ? 0 : vy * e.speedV * 1.45;
+    e.state2 = 'idle';
+    this.anim(e, 'idle');
+    this.flash(e, 0xffffff);
+    return true;
+  },
+
+  /** Attaquant : approche par le flanc assigné, frappe à cadence variable,
+   * esquive les coups, feinte au contact et se replie après avoir frappé. */
   _aiAttackApproach(e, time, p, dx, dy, d) {
+    const prof = e.aiProfile;
+
+    if (e._dodgeUntil && time < e._dodgeUntil) {
+      e.setVelocity(e._dodgeVx || 0, e._dodgeVy || 0);
+      this._enemyFaceTarget(e, dx);
+      this._enemyLocomote(e);
+      return;
+    }
+    if (this._aiTryDodge(e, time)) return;
+
     if (e._retreatUntil && time < e._retreatUntil) {
       const away = Math.sign(e.x - p.x) || -e.facing;
-      e.setVelocity(away * e.speedV * 0.7, 0);
+      e.setVelocity(away * e.speedV * 0.7, (e._retreatVy || 0) * e.speedV * 0.4);
       this._enemyFaceTarget(e, dx);
       this._enemyLocomote(e);
       return;
@@ -88,16 +160,35 @@ export const aiMixin = {
         this.anim(e, 'idle');
       }
       if (time > e.nextAttack) {
+        // Feinte : recule au lieu de frapper, puis revient frapper vite.
+        if (prof?.feint && time > (e._feintCdUntil || 0) && Math.random() < prof.feint) {
+          e._feintCdUntil = time + 2600;
+          e._retreatUntil = time + Phaser.Math.Between(260, 480);
+          e._retreatVy = Math.random() < 0.5 ? 1 : -1;
+          e.nextAttack = time + Phaser.Math.Between(350, 600);
+          return;
+        }
         e.nextAttack = time + e.attackCd * Phaser.Math.FloatBetween(0.85, 1.35);
         this.strike(e);
-        if (Math.random() < 0.35) e._retreatUntil = time + Phaser.Math.Between(300, 550);
+        if (Math.random() < (prof?.retreat ?? 0.35)) {
+          e._retreatUntil = time + Phaser.Math.Between(300, 550);
+          e._retreatVy = Math.random() < 0.6 ? 0 : Math.random() < 0.5 ? 1 : -1;
+        }
       }
       return;
     }
+    // Allure variée à l'approche : tantôt une marche prudente, tantôt un sprint —
+    // toujours un sprint sur le dernier tronçon pour conclure l'engagement.
+    if (!e._paceUntil || time > e._paceUntil) {
+      e._paceUntil = time + Phaser.Math.Between(650, 1500);
+      e._paceRun = Math.random() < 0.45;
+    }
+    const speedMul = e._paceRun || d < AI_RUSH_DIST ? 1 : Phaser.Math.FloatBetween(0.5, 0.62);
+
     const flank = e._flank || Math.sign(e.x - p.x) || 1;
     const gx = Phaser.Math.Clamp(p.x + flank * Math.max(30, e.reach - 14), 26, W - 26);
     const a = Math.atan2(p.y - e.y, gx - e.x);
-    e.setVelocity(Math.cos(a) * e.speedV, Math.sin(a) * e.speedV);
+    e.setVelocity(Math.cos(a) * e.speedV * speedMul, Math.sin(a) * e.speedV * speedMul);
     this._enemyFaceTarget(e, dx);
     this._enemyLocomote(e);
   },
