@@ -4,6 +4,7 @@ import { WEAPONS, POLICE_ITEM } from '../config/weapons.js';
 import { CONFIG } from '../config/difficulty.js';
 import { pickWeightedProp, mainKeyForStage, mainPartsRefSize, LEVEL1_DECOR_REF, LEVEL2_DECOR_REF } from '../config/levelLayers.js';
 import { getStagePlacements, hasAuthoredPlacements } from '../config/levelPlacements.js';
+import { applyStageAlignToMetrics, fullStageScrollBetween, fullStageSegmentCenterX, fullStagePlayCenterX } from '../config/stageAlign.js';
 
 const BG_DEPTH = { far: 2, ambient: 6, main: 8, road: 14 };
 
@@ -196,11 +197,12 @@ export const decorMixin = {
     this._walkBottom = Math.round(metrics.walkBottom);
   },
 
-  _addWideLayer(key, depth, x, y, scaleX, scaleY, originX, originY, group, place) {
+  _addWideLayer(key, depth, x, y, scaleX, scaleY, originX, originY, group, place, meta = {}) {
     if (!key || !this.textures.exists(key)) return null;
     const img = this.add.image(x, y, key).setOrigin(originX, originY).setScale(scaleX, scaleY);
     img.setDepth(depth);
     img.bgLayer = true;
+    if (meta.stageIdx != null) img.stagePartIdx = meta.stageIdx;
     place(img, x);
     group.add(img);
     return img;
@@ -240,17 +242,19 @@ export const decorMixin = {
     this._applyWalkBand(metrics);
 
     if (layers.fullStage) {
+      const aligned = applyStageAlignToMetrics(metrics, this.levelIdx ?? 0, stageIdx);
       this._addWideLayer(
         mainKey,
         BG_DEPTH.main,
         centerX,
-        0,
-        metrics.scaleX,
-        metrics.scaleY,
+        aligned.alignY ?? 0,
+        aligned.scaleX,
+        aligned.scaleY,
         0.5,
         0,
         this.bgMainGroup,
-        place
+        place,
+        { stageIdx }
       );
       if (!opts.skipAmbient) {
         this._spawnAmbient(centerX, place, layers.ambient, metrics.farMaxH);
@@ -325,7 +329,7 @@ export const decorMixin = {
     this._clearLayerGroups();
     this.decorGroup?.clear(true, true);
     const stageIdx = Math.min(this.stageIdx, this.lv.stages.length - 1);
-    this._spawnLevelSegment(W / 2, { stageIdx, enter: false, skipProps: true });
+    this._spawnLevelSegment(this._fullStagePlayCenterX(stageIdx), { stageIdx, enter: false, skipProps: true });
   },
 
   _clearLayerGroups() {
@@ -350,15 +354,80 @@ export const decorMixin = {
     } catch (_) {}
   },
 
-  /** Retire les calques hors écran et ne garde qu'un fond principal centré. */
+  _fullStageSegmentCenterX(stageIdx) {
+    return fullStageSegmentCenterX(stageIdx, this.levelIdx ?? 0);
+  },
+
+  _fullStagePlayCenterX(stageIdx) {
+    return fullStagePlayCenterX(stageIdx, this.levelIdx ?? 0);
+  },
+
+  _fullStageScrollBetween(fromIdx, toIdx) {
+    return fullStageScrollBetween(fromIdx, toIdx, this.levelIdx ?? 0);
+  },
+
+  /** Recale le(s) fond(s) plein écran sur la position éditeur du segment. */
+  _snapFullStageMains(stageIdx, centerX) {
+    if (!this.lv?.layers?.fullStage || !this.bgMainGroup) return;
+    const layers = this.lv.layers;
+    const mainKey = mainKeyForStage(layers, stageIdx);
+    const metrics = this._layerMetrics(layers, mainKey);
+    const aligned = applyStageAlignToMetrics(metrics, this.levelIdx ?? 0, stageIdx);
+    const cx = centerX ?? this._fullStagePlayCenterX(stageIdx);
+    const cy = aligned.alignY ?? 0;
+    for (const o of [...this.bgMainGroup.getChildren()]) {
+      if (!o?.active || !o.bgLayer) continue;
+      if (o.stagePartIdx != null && o.stagePartIdx !== stageIdx) continue;
+      o.x = cx;
+      o.y = cy;
+      o.finalX = cx;
+      o.setScale(aligned.scaleX, aligned.scaleY);
+    }
+  },
+
+  _clearFullStagePartsBefore(stageIdx) {
+    if (!this.lv?.layers?.fullStage || !this.bgMainGroup) return;
+    for (const o of [...this.bgMainGroup.getChildren()]) {
+      if (!o?.active || !o.bgLayer) continue;
+      if (o.stagePartIdx != null && o.stagePartIdx < stageIdx) {
+        this._destroyScrollObject(this.bgMainGroup, o);
+      }
+    }
+  },
+
+  /** Respawn le fond plein écran du stage courant si absent (sécurité après transition). */
+  _ensureFullStageMain(stageIdx) {
+    if (!this.lv?.layers?.fullStage) return;
+    this._ensureDecorGroups();
+    const has = this.bgMainGroup?.getChildren?.().some(
+      (o) => o?.active && o.bgLayer && o.stagePartIdx === stageIdx
+    );
+    if (!has) {
+      this._spawnLevelSegment(this._fullStagePlayCenterX(stageIdx), {
+        stageIdx,
+        enter: false,
+        skipProps: true,
+        skipCrates: true,
+        skipAmbient: true,
+      });
+    }
+  },
+
   _pruneScrolledLayers(opts = {}) {
+    const fullStage = this.lv?.layers?.fullStage;
     const center = W / 2;
-    const leftCut = opts.leftCut ?? W * 0.4;
-    const rightCut = opts.rightCut ?? W * 1.35;
+    const leftCut = opts.leftCut ?? (fullStage ? W : W * 0.4);
+    const rightCut = opts.rightCut ?? (fullStage ? W * 2.5 : W * 1.35);
     const prune = (g) => {
       if (!g) return;
       for (const o of [...g.getChildren()]) {
         if (!o) continue;
+        if (fullStage && g === this.bgMainGroup && o.stagePartIdx != null) {
+          if (o.stagePartIdx < this.stageIdx && o.x < -leftCut) {
+            this._destroyScrollObject(g, o);
+          }
+          continue;
+        }
         if (o.x < -leftCut || o.x > rightCut) this._destroyScrollObject(g, o);
       }
     };
@@ -367,7 +436,7 @@ export const decorMixin = {
     prune(this.bgRoadGroup);
     prune(this.bgAmbientGroup);
 
-    if (opts.keepSingleMain !== false && this.bgMainGroup) {
+    if (!fullStage && opts.keepSingleMain !== false && this.bgMainGroup) {
       const mains = this.bgMainGroup.getChildren().filter((o) => o?.active);
       if (mains.length > 1) {
         mains.sort((a, b) => Math.abs(a.x - center) - Math.abs(b.x - center));
@@ -534,7 +603,8 @@ export const decorMixin = {
         stagePlacements.crates.length > 0);
 
     if (lv.layers && !opts.skipLayers) {
-      this._spawnLevelSegment(W / 2, {
+      const segX = lv.layers.fullStage ? this._fullStagePlayCenterX(stageIdx) : W / 2;
+      this._spawnLevelSegment(segX, {
         enter,
         slideDuration,
         slideEase,

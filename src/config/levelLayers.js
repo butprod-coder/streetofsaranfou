@@ -61,7 +61,7 @@ export const LEVEL1_LAYERS = {
   ambient: { type: 'dust', count: 2 },
   roadRatio: 0.55,
   walkInsetTop: 0.12,
-  walkInsetBottom: 10,
+  walkInsetBottom: 26,
   propCount: [0, 0],
   props: [],
 };
@@ -73,7 +73,7 @@ export const LEVEL2_LAYERS = {
   ambient: { type: 'leaves', count: 2 },
   roadRatio: 0.55,
   walkInsetTop: 0.12,
-  walkInsetBottom: 10,
+  walkInsetBottom: 26,
   propCount: [0, 0],
   props: [],
 };
@@ -85,7 +85,7 @@ export const LEVEL3_LAYERS = {
   ambient: { type: 'dust', count: 2 },
   roadRatio: 0.55,
   walkInsetTop: 0.12,
-  walkInsetBottom: 10,
+  walkInsetBottom: 26,
   propCount: [0, 0],
   props: [],
 };

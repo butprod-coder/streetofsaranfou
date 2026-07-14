@@ -4,7 +4,7 @@ import { CONFIG } from '../config/difficulty.js';
 
 const HUD = {
   depth: { panel: 8000, content: 8001, bar: 8002, bossPanel: 8998, bossContent: 8999, bossBar: 9000 },
-  player: { panelW: 314, panelH: 80, hpW: 210, hpH: 12 },
+  player: { panelW: 314, panelH: 80, hpW: 210, hpH: 12, safeTop: 10 },
   boss: { barY: 17, panelH: 34 },
 };
 
@@ -19,7 +19,7 @@ export const hudMixin = {
   _bossHudLayout() {
     const sidePanel = HUD.player.panelW + 6;
     const pad = 10;
-    const barY = HUD.boss.barY;
+    const barY = HUD.player.safeTop + HUD.boss.barY;
     const left = sidePanel + pad;
     const right = this.coop ? W - sidePanel - pad : W - pad;
     const barW = Math.max(220, Math.min(520, right - left));
@@ -72,54 +72,55 @@ export const hudMixin = {
     const barX = isLeft ? 84 : W - 84;
     const barOrigin = isLeft ? 0 : 1;
 
+    const hudY = HUD.player.safeTop;
     const panel = this.add
-      .rectangle(panelX, 0, HUD.player.panelW, HUD.player.panelH, 0x0a0712, 0.78)
+      .rectangle(panelX, hudY, HUD.player.panelW, HUD.player.panelH, 0x0a0712, 0.78)
       .setOrigin(panelOriginX, 0)
       .setScrollFactor(0)
       .setDepth(HUD.depth.panel);
     panel.setStrokeStyle(1, accent, 0.35);
 
     const accentStrip = this.add
-      .rectangle(isLeft ? 0 : W, HUD.player.panelH - 2, HUD.player.panelW, 2, accent, 0.55)
+      .rectangle(isLeft ? 0 : W, hudY + HUD.player.panelH - 2, HUD.player.panelW, 2, accent, 0.55)
       .setOrigin(panelOriginX, 1)
       .setScrollFactor(0)
       .setDepth(HUD.depth.panel + 1);
 
     const portraitFrame = this.add
-      .rectangle(portraitX, 40, 62, 58, 0x000000, 0.35)
+      .rectangle(portraitX, hudY + 40, 62, 58, 0x000000, 0.35)
       .setScrollFactor(0)
       .setDepth(HUD.depth.content);
     portraitFrame.setStrokeStyle(2, accent, 0.75);
 
     const portrait = this.add
-      .image(portraitX, 40, portraitKey)
+      .image(portraitX, hudY + 40, portraitKey)
       .setDisplaySize(54, 46)
       .setScrollFactor(0)
       .setDepth(HUD.depth.content + 1);
 
     const slotLabel = this.add
-      .text(isLeft ? 14 : W - 14, 10, accentLabel, F(0, { fontSize: '10px', fontStyle: 'bold', color: accent }))
+      .text(isLeft ? 14 : W - 14, hudY + 10, accentLabel, F(0, { fontSize: '10px', fontStyle: 'bold', color: accent }))
       .setOrigin(textOrigin, 0)
       .setScrollFactor(0)
       .setDepth(HUD.depth.content);
 
     const nameT = this.add
-      .text(textAnchorX, 16, name, F(0, { fontSize: '15px', fontStyle: 'bold', color: COL.cream }))
+      .text(textAnchorX, hudY + 16, name, F(0, { fontSize: '15px', fontStyle: 'bold', color: COL.cream }))
       .setOrigin(textOrigin, 0)
       .setScrollFactor(0)
       .setDepth(HUD.depth.content)
       .setStroke('#000', 3);
 
-    const hpBar = this._createHealthBar(barX, 44, HUD.player.hpW, HUD.player.hpH, hpColor, barOrigin);
+    const hpBar = this._createHealthBar(barX, hudY + 44, HUD.player.hpW, HUD.player.hpH, hpColor, barOrigin);
 
     const hpText = this.add
-      .text(textAnchorX, 56, '', F(0, { fontSize: '10px', color: COL.grey }))
+      .text(textAnchorX, hudY + 56, '', F(0, { fontSize: '10px', color: COL.grey }))
       .setOrigin(textOrigin, 0)
       .setScrollFactor(0)
       .setDepth(HUD.depth.content);
 
     const livesT = this.add
-      .text(isLeft ? HUD.player.panelW - 14 : W - HUD.player.panelW + 14, 22, '', F(0, { fontSize: '13px', fontStyle: 'bold', color: COL.cream }))
+      .text(isLeft ? HUD.player.panelW - 14 : W - HUD.player.panelW + 14, hudY + 22, '', F(0, { fontSize: '13px', fontStyle: 'bold', color: COL.cream }))
       .setOrigin(isLeft ? 1 : 0, 0.5)
       .setScrollFactor(0)
       .setDepth(HUD.depth.content)
@@ -130,7 +131,7 @@ export const hudMixin = {
 
   _createPlayerScoreLabel() {
     return this.add
-      .text(14, HUD.player.panelH + 2, 'SCORE 0', F(0, { fontSize: '11px', fontStyle: 'bold', color: COL.gold }))
+      .text(14, HUD.player.safeTop + HUD.player.panelH + 2, 'SCORE 0', F(0, { fontSize: '11px', fontStyle: 'bold', color: COL.gold }))
       .setOrigin(0, 0)
       .setScrollFactor(0)
       .setDepth(HUD.depth.content)
@@ -155,7 +156,7 @@ export const hudMixin = {
     this.scoreT = this._createPlayerScoreLabel();
 
     this.comboT = this.add
-      .text(W / 2, 38, '', F(0, { fontSize: '17px', fontStyle: 'bold', color: COL.cyan }))
+      .text(W / 2, HUD.player.safeTop + 38, '', F(0, { fontSize: '17px', fontStyle: 'bold', color: COL.cyan }))
       .setOrigin(0.5, 0)
       .setScrollFactor(0)
       .setDepth(HUD.depth.content)
@@ -163,7 +164,7 @@ export const hudMixin = {
 
     if (this.coop) {
       this.comboT2 = this.add
-        .text(W / 2 + 96, 38, '', F(0, { fontSize: '17px', fontStyle: 'bold', color: COL.gold }))
+        .text(W / 2 + 96, HUD.player.safeTop + 38, '', F(0, { fontSize: '17px', fontStyle: 'bold', color: COL.gold }))
         .setOrigin(0.5, 0)
         .setScrollFactor(0)
         .setDepth(HUD.depth.content)
@@ -185,7 +186,7 @@ export const hudMixin = {
     }
 
     this.policeT = this.add
-      .text(W / 2, 54, '', F(0, { fontSize: '11px', fontStyle: 'bold', color: '#66aaff' }))
+      .text(W / 2, HUD.player.safeTop + 54, '', F(0, { fontSize: '11px', fontStyle: 'bold', color: '#66aaff' }))
       .setOrigin(0.5, 0)
       .setScrollFactor(0)
       .setDepth(HUD.depth.content)

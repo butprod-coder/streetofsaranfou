@@ -15,10 +15,6 @@ export const policeMixin = {
     if (this._policeActive) return;
     if (this._specialActive?.some?.(Boolean)) return;
     if (this._karonuxBlocksInput?.() || this._kkBlocksInput?.()) return;
-    if (this.phase === 'advance') {
-      this.floatText(W / 2, FLOOR_BOTTOM - 30, 'PATIENTEZ...', COL.grey);
-      return;
-    }
 
     CONFIG.policeCharges--;
     this.updateHUD();

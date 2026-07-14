@@ -31,7 +31,7 @@ export class PlayModeScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setStroke('#000', 6);
 
-    this.labels = ['1 JOUEUR', '2 JOUEURS', 'TEST ENNEMIS', 'TEST NIVEAUX', 'TEST BOSS', 'ÉDITEUR DECOR'];
+    this.labels = ['1 JOUEUR', '2 JOUEURS', 'TEST ENNEMIS', 'TEST NIVEAUX', 'TEST BOSS', 'ÉDITEUR DECOR', 'ALIGN STAGES'];
     this.mi = 0;
     this.rows = this.labels.map((label, i) =>
       this.add
@@ -79,8 +79,10 @@ export class PlayModeScene extends Phaser.Scene {
       this.scene.start('TestLevel');
     } else if (this.mi === 4) {
       this.scene.start('TestBoss');
-    } else {
+    } else if (this.mi === 5) {
       this.scene.start('LevelEditor');
+    } else {
+      this.scene.start('StageAlignEditor');
     }
   }
 }

@@ -11,7 +11,7 @@ export const inputMixin = {
     try {
       if (this._hitStopTick?.()) return;
       this._updateBannerSkip?.();
-      if (this.phase === 'fight' || this.phase === 'boss' || this.phase === 'advance') {
+      if (this.phase === 'fight' || this.phase === 'boss' || this.phase === 'go_wait') {
         this.game?.loop?.wake?.();
       }
       if (this._kx && (this._kx.phase === 'car' || this._kx.phase === 'intro' || this._kx.phase === 'transition')) {
@@ -23,13 +23,6 @@ export const inputMixin = {
       }
       if (this.phase === 'pause') {
         this.updatePauseMenu();
-        return;
-      }
-      if (this.phase === 'advance') {
-        this.updateStageScroll();
-        for (const p of this.allPlayers()) {
-          if (p?.active) this.clamp(p);
-        }
         return;
       }
       if (this.checkGodToggle()) return;
@@ -45,6 +38,10 @@ export const inputMixin = {
           }
         }
         return;
+      }
+
+      if (this.phase === 'fight' || this.phase === 'go_wait') {
+        this.updateLevelScroll?.(this.game.loop.delta);
       }
 
       const kxBlock = this._karonuxBlocksInput?.();
@@ -65,7 +62,6 @@ export const inputMixin = {
       }
 
       if (this.phase === 'go_wait') {
-        this.game?.loop?.wake?.();
         this.updateGoExit();
       }
 
@@ -82,7 +78,7 @@ export const inputMixin = {
       }
       for (const p of this.allPlayers()) {
         if (p && p.active) {
-          if (this.phase !== 'advance') this.clamp(p);
+          this.clamp(p);
           this.pushOut(p);
         }
       }
@@ -221,7 +217,6 @@ export const inputMixin = {
 
   movePlayer(slot = 0) {
     if (this._policeActive) return;
-    if (this.phase === 'advance') return;
     const p = this.playerAt(slot);
     if (!p) return;
     if (this.isPlayerStunned(p)) {

@@ -12,6 +12,7 @@ import { TestLevelScene } from './scenes/TestLevelScene.js';
 import { TestBossScene } from './scenes/TestBossScene.js';
 import { CoopInputScene } from './scenes/CoopInputScene.js';
 import { LevelEditorScene } from './scenes/LevelEditorScene.js';
+import { StageAlignEditorScene } from './scenes/StageAlignEditorScene.js';
 import { GameScene } from './scenes/GameScene.js';
 import { initGfx, getGfx, applyGfxToGame } from './config/graphics.js';
 
@@ -58,6 +59,7 @@ const game = new Phaser.Game({
     CoopInputScene,
     SelectScene,
     LevelEditorScene,
+    StageAlignEditorScene,
     GameScene,
   ],
 });

@@ -139,6 +139,7 @@ export class GameScene extends Phaser.Scene {
       }
     });
     this.startFightMusic();
+    this._applyLevelCamera?.();
   }
 }
 
