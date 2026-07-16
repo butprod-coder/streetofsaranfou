@@ -51,6 +51,9 @@ export const stageMixin = {
     this._scrollNextIdx = null;
     this._scrollSpeed = 0;
     this._goIdleSince = null;
+    // Un seul spawn des objets placés à l'éditeur par stage, même si le fond est
+    // re-pré-chargé plusieurs fois (ahead-of-scroll, filet de sécurité `_ensureFullStageMain`).
+    this._fsAuthoredSpawned = new Set();
     if (this.lv?.layers?.fullStage && !this.lv.testArena) this._initFullStageRun();
   },
 
@@ -262,10 +265,29 @@ export const stageMixin = {
     }
   },
 
+  /** Point d'entrée d'une vague en niveau plein écran continu. « Ahead » (droite,
+   * classique) reste majoritaire, mais on varie aussi via la gauche (près du bord,
+   * pour une arrivée rapide) et le haut/bas de la bande de jeu, centrés sur le
+   * joueur le plus avancé — évite que les ennemis n'arrivent plus que de la droite. */
+  _fsWaveEntryPoint(i) {
+    const top = this.walkTop();
+    const bottom = this.walkBottom();
+    const roll = Math.random();
+    if (roll < 0.45) {
+      return { x: W + 48 + i * 34, y: Phaser.Math.Between(FLOOR_TOP + 30, FLOOR_BOTTOM - 5) };
+    }
+    if (roll < 0.65) {
+      return { x: 6 + i * 16, y: Phaser.Math.Between(top + 4, bottom - 4) };
+    }
+    const leaderX = this._frontmostActivePlayerX?.() ?? W * 0.5;
+    const x = Phaser.Math.Clamp(leaderX + Phaser.Math.Between(-60, 140), 70, W - 70);
+    return roll < 0.82 ? { x, y: top - 40 - i * 6 } : { x, y: bottom + 40 + i * 6 };
+  },
+
   _spawnWaveEnemies(wave, enterFromAhead = false) {
     wave.forEach((k, i) => {
       const { x, y } = enterFromAhead
-        ? { x: W + 48 + i * 34, y: Phaser.Math.Between(FLOOR_TOP + 30, FLOOR_BOTTOM - 5) }
+        ? this._fsWaveEntryPoint(i)
         : this._waveEntryPoint(i);
       const e = this.makeFighter(
         x,

@@ -1,5 +1,11 @@
 /** Sous-dossier assets/ pour une cle d'image. */
-import { LEVEL1_TEXTURE_KEYS, LEVEL2_TEXTURE_KEYS, LEVEL3_TEXTURE_KEYS } from './levelLayers.js';
+import {
+  LEVEL1_TEXTURE_KEYS,
+  LEVEL2_TEXTURE_KEYS,
+  LEVEL3_TEXTURE_KEYS,
+  LEVEL4_TEXTURE_KEYS,
+  LEVEL5_TEXTURE_KEYS,
+} from './levelLayers.js';
 
 export const PLAYABLE_CHARS = [
   'karonux', 'jualos', 'yanu', 'lorenzo', 'jo', 'kikor', 'gustavax',
@@ -41,6 +47,8 @@ export function assetSubdir(key) {
   if (LEVEL1_TEXTURE_KEYS.includes(key)) return 'shared/levels/level1';
   if (LEVEL2_TEXTURE_KEYS.includes(key)) return 'shared/levels/level2';
   if (LEVEL3_TEXTURE_KEYS.includes(key)) return 'shared/levels/level3';
+  if (LEVEL4_TEXTURE_KEYS.includes(key)) return 'shared/levels/level4';
+  if (LEVEL5_TEXTURE_KEYS.includes(key)) return 'shared/levels/level5';
   if (key === 'chicken' || key === 'chicken_gold' || key === 'skateboard') return 'shared/pickups';
   if (key === 'specials_storyboard') return 'shared/specials';
   return '';

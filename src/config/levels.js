@@ -1,5 +1,11 @@
 import { playableBoss, GUSTAVAX_BOSS, KARONUX_BOSS, KIKOR_BOSS } from './bosses.js';
-import { LEVEL1_LAYERS, LEVEL2_LAYERS, LEVEL3_LAYERS } from './levelLayers.js';
+import {
+  LEVEL1_LAYERS,
+  LEVEL2_LAYERS,
+  LEVEL3_LAYERS,
+  LEVEL4_LAYERS,
+  LEVEL5_LAYERS,
+} from './levelLayers.js';
 
 /** Niveau sandbox : les 6 nouveaux ennemis, un par vague. */
 export const TEST_ENEMIES_LEVEL = {
@@ -87,32 +93,38 @@ export const CAMPAIGN_LEVELS = [
   {
     name: 'BOURG DE SARAN',
     music: 'music_fight4',
-    bgImg: 'level_bg_0',
+    layers: LEVEL4_LAYERS,
     decor: ['obj_poubelle', 'obj_benne', 'obj_baril'],
     skyTop: 0x241445,
     skyBot: 0x4a2c6e,
     ground: 0x241f31,
     neon: 0xff5fa2,
     stages: [
-      { waves: [['grunt', 'grunt'], ['kikor_e', 'grunt'], ['runner', 'grunt']] },
-      { waves: [['grunt', 'heavy'], ['triso', 'kikor_e'], ['heavy', 'runner']] },
-      { waves: [['kikor_e', 'runner', 'grunt'], ['charlingals', 'orelsan'], ['heavy']] },
+      { waves: [['grunt', 'grunt'], ['kikor_e', 'grunt']] },
+      { waves: [['runner', 'grunt'], ['grunt', 'heavy']] },
+      { waves: [['triso', 'kikor_e'], ['heavy', 'runner']] },
+      { waves: [['kikor_e', 'runner', 'grunt'], ['charlingals', 'orelsan']] },
+      { waves: [['heavy']] },
+      { bossOnly: true },
     ],
     boss: playableBoss('lorenzo', 3, { tint: 0xff8f7a, scale: 1.48, enrageBanner: 'LORENZO S\'ÉNERVE !' }),
   },
   {
-    name: 'COLLEGE MONTJOIE',
+    name: 'SARAN BY NIGHT',
     music: 'music_fight2',
-    bgImg: null,
-    decor: ['obj_caisse', 'obj_baril', 'obj_brasero'],
-    skyTop: 0x3a2810,
-    skyBot: 0x6a4820,
-    ground: 0x2a2018,
-    neon: 0xffcc44,
+    layers: LEVEL5_LAYERS,
+    decor: ['obj_baril', 'obj_brasero', 'obj_poubelle'],
+    skyTop: 0x07152d,
+    skyBot: 0x152c56,
+    ground: 0x101725,
+    neon: 0x5c8dff,
     stages: [
-      { waves: [['runner', 'runner', 'grunt'], ['kikor_e', 'remy']] },
-      { waves: [['runner', 'heavy'], ['guylux', 'heavy']] },
+      { waves: [['runner', 'runner', 'grunt']] },
+      { waves: [['kikor_e', 'remy']] },
+      { waves: [['runner', 'heavy']] },
+      { waves: [['guylux', 'heavy']] },
       { waves: [['runner', 'runner', 'heavy'], ['papy_jala', 'kikor_e', 'grunt']] },
+      { bossOnly: true },
     ],
     boss: playableBoss('jo', 4, { tint: 0xffeeaa, speed: 105, enrageBanner: 'JO DÉCHAÎNE LE TOURBILLON !' }),
   },

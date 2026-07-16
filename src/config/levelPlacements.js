@@ -3,6 +3,67 @@ import { LEVEL1_TEXTURE_KEYS, LEVEL1_STAGE_PARTS } from './levelLayers.js';
 
 export const PLACEMENTS_STORAGE_KEY = 'saranfou_placements_v1';
 
+/** Composition livrée avec le niveau 1. Les placements enregistrés dans l'éditeur
+ * restent prioritaires stage par stage, ce qui permet de retoucher ou vider chaque
+ * segment sans modifier cette base. La voie centrale reste assez dégagée pour les
+ * combats, tandis que les caisses espacées rythment la récupération. */
+const LEVEL1_DEFAULT_PLACEMENTS = {
+  0: {
+    decor: [
+      { key: 'lampadaire_allume', x: 205, y: 374, scale: 0.92 },
+      { key: 'banc', x: 350, y: 402, scale: 0.88 },
+      { key: 'buisson', x: 830, y: 392, scale: 0.9 },
+      { key: 'poubelle', x: 885, y: 490, scale: 0.82 },
+    ],
+    crates: [{ x: 690, y: 482, hp: 3, loot: 'random' }],
+  },
+  1: {
+    decor: [
+      { key: 'sacs_poubelle', x: 210, y: 486, scale: 0.88 },
+      { key: 'lampadaire_eteint', x: 375, y: 370, scale: 0.95 },
+      { key: 'cone', x: 705, y: 470, scale: 0.8 },
+      { key: 'barriere', x: 830, y: 406, scale: 0.82 },
+    ],
+    crates: [{ x: 520, y: 492, hp: 3, loot: 'random' }],
+  },
+  2: {
+    decor: [
+      { key: 'stop', x: 190, y: 390, scale: 0.88 },
+      { key: 'buisson', x: 315, y: 480, scale: 0.86 },
+      { key: 'obj_baril', x: 790, y: 486, scale: 0.72 },
+      { key: 'lampadaire_allume', x: 875, y: 368, scale: 0.92 },
+    ],
+    crates: [{ x: 610, y: 470, hp: 4, loot: 'poulet' }],
+  },
+  3: {
+    decor: [
+      { key: 'bouche', x: 235, y: 492, scale: 0.82 },
+      { key: 'banc', x: 410, y: 390, scale: 0.86 },
+      { key: 'sacs_poubelle', x: 760, y: 493, scale: 0.86 },
+      { key: 'interdit', x: 870, y: 388, scale: 0.86 },
+    ],
+    crates: [{ x: 625, y: 462, hp: 3, loot: 'random' }],
+  },
+  4: {
+    decor: [
+      { key: 'transfo', x: 205, y: 420, scale: 0.82 },
+      { key: 'cone', x: 350, y: 490, scale: 0.78 },
+      { key: 'obj_brasero', x: 755, y: 475, scale: 0.7 },
+      { key: 'barriere', x: 855, y: 402, scale: 0.8 },
+    ],
+    crates: [{ x: 535, y: 488, hp: 4, loot: 'poulet' }],
+  },
+  5: {
+    decor: [
+      { key: 'lampadaire_allume', x: 190, y: 370, scale: 0.92 },
+      { key: 'obj_baril', x: 330, y: 488, scale: 0.72 },
+      { key: 'buisson', x: 790, y: 484, scale: 0.88 },
+      { key: 'lampadaire_allume', x: 880, y: 370, scale: 0.92 },
+    ],
+    crates: [{ x: 250, y: 475, hp: 4, loot: 'poulet' }],
+  },
+};
+
 /** Objets placables dans l'éditeur. */
 export const EDITOR_PALETTE = [
   { key: 'lampadaire_allume', scale: 1.05 },
@@ -51,12 +112,14 @@ export function saveAllPlacements(data) {
 export function getStagePlacements(levelIdx, stageIdx) {
   const all = loadAllPlacements();
   const lv = all[String(levelIdx)];
-  if (!lv) return emptyPlacements();
-  const st = lv[String(stageIdx)];
-  if (!st) return emptyPlacements();
+  const st = lv?.[String(stageIdx)];
+  // Niveau 1 : une composition équilibrée est fournie par défaut. La présence
+  // d'une entrée locale, même vide, signifie que l'utilisateur l'a personnalisée.
+  const source = st ?? (levelIdx === 0 ? LEVEL1_DEFAULT_PLACEMENTS[stageIdx] : null);
+  if (!source) return emptyPlacements();
   return {
-    decor: Array.isArray(st.decor) ? st.decor.map(cloneDecor) : [],
-    crates: Array.isArray(st.crates) ? st.crates.map(cloneCrate) : [],
+    decor: Array.isArray(source.decor) ? source.decor.map(cloneDecor) : [],
+    crates: Array.isArray(source.crates) ? source.crates.map(cloneCrate) : [],
   };
 }
 

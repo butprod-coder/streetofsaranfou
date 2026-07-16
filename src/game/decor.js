@@ -262,6 +262,9 @@ export const decorMixin = {
       if (!opts.skipProps) {
         this._spawnLayerProps(centerX, place, layers, metrics.walkBottom);
       }
+      if (!opts.skipAuthored) {
+        this._spawnAuthoredForStage(stageIdx, centerX, place);
+      }
       return;
     }
 
@@ -319,6 +322,9 @@ export const decorMixin = {
     }
     if (!opts.skipProps) {
       this._spawnLayerProps(centerX, place, layers, metrics.walkBottom);
+    }
+    if (!opts.skipAuthored) {
+      this._spawnAuthoredForStage(stageIdx, centerX, place);
     }
   },
 
@@ -550,24 +556,44 @@ export const decorMixin = {
     }
   },
 
-  _spawnAuthoredPlacements(placements, place) {
+  /** `offsetX` recale les coordonnées de l'éditeur (qui présume le stage centré sur
+   * l'écran, x=0..W) vers leur position réelle une fois le fond replacé ailleurs
+   * (défilement continu plein écran, alignement éditeur avec offset X, etc.). */
+  _spawnAuthoredPlacements(placements, place, offsetX = 0) {
     for (const d of placements.decor ?? []) {
       if (!this.textures.exists(d.key)) continue;
-      const o = this.add.image(d.x, d.y, d.key).setOrigin(0.5, 1).setScale(d.scale ?? 1);
+      const fx = d.x + offsetX;
+      const o = this.add.image(fx, d.y, d.key).setOrigin(0.5, 1).setScale(d.scale ?? 1);
       o.setDepth(Math.floor(d.y) - 2);
-      place(o, d.x);
+      place(o, fx);
       this.decorGroup.add(o);
     }
     for (const c of placements.crates ?? []) {
-      const crate = this.add.image(c.x, c.y, 'crate0').setOrigin(0.5, 1).setScale(0.92);
+      const fx = c.x + offsetX;
+      const crate = this.add.image(fx, c.y, 'crate0').setOrigin(0.5, 1).setScale(0.92);
       crate.setDepth(Math.floor(c.y));
       crate.hp = c.hp ?? 3;
       crate.hpMax = crate.hp;
       crate.cw = 26;
       crate.loot = c.loot ?? 'random';
-      place(crate, c.x);
+      place(crate, fx);
       this.props.add(crate);
     }
+  },
+
+  /** Spawn (une seule fois par stage) les décors/caisses placés à l'éditeur pour
+   * `stageIdx`, recalés sur la position écran réelle du fond (`centerX`). Appelé
+   * depuis `_spawnLevelSegment` — couvre à la fois le spawn initial ET le
+   * pré-chargement « ahead of scroll » des niveaux plein écran continus, qui ne
+   * passaient jamais par les placements manuels jusqu'ici. */
+  _spawnAuthoredForStage(stageIdx, centerX, place) {
+    if (!this._fsAuthoredSpawned) this._fsAuthoredSpawned = new Set();
+    if (this._fsAuthoredSpawned.has(stageIdx)) return false;
+    this._fsAuthoredSpawned.add(stageIdx);
+    const placements = getStagePlacements(this.levelIdx ?? 0, stageIdx);
+    if (!placements.decor.length && !placements.crates.length) return false;
+    this._spawnAuthoredPlacements(placements, place, centerX - W / 2);
+    return true;
   },
 
   spawnDecor(opts = {}) {
@@ -602,7 +628,11 @@ export const decorMixin = {
         stagePlacements.decor.length > 0 ||
         stagePlacements.crates.length > 0);
 
-    if (lv.layers && !opts.skipLayers) {
+    // `_spawnLevelSegment` prend déjà en charge le spawn des placements auteur (avec le
+    // bon recalage X) pour ce stage : ne pas le refaire nous-même plus bas sinon doublon.
+    const handledByLayerSegment = !!(lv.layers && !opts.skipLayers);
+
+    if (handledByLayerSegment) {
       const segX = lv.layers.fullStage ? this._fullStagePlayCenterX(stageIdx) : W / 2;
       this._spawnLevelSegment(segX, {
         enter,
@@ -611,6 +641,7 @@ export const decorMixin = {
         stageIdx,
         skipProps: opts.skipProps || useAuthored,
         skipAmbient: opts.skipAmbient,
+        skipAuthored: opts.skipAuthored,
       });
     } else if (lv.layers && opts.skipLayers) {
       const metrics = this._layerMetrics(lv.layers, mainKeyForStage(lv.layers, stageIdx));
@@ -638,9 +669,9 @@ export const decorMixin = {
       }
     }
 
-    if (useAuthored) {
+    if (useAuthored && !handledByLayerSegment) {
       this._spawnAuthoredPlacements(stagePlacements, place);
-    } else if (!opts.skipCrates) {
+    } else if (!useAuthored && !opts.skipCrates) {
       const nc = lv.layers ? Phaser.Math.Between(0, 1) : 1 + Math.floor(Math.random() * 2);
       const cused = [];
       for (let i = 0; i < nc; i++) {

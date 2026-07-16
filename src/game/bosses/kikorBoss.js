@@ -311,11 +311,20 @@ export const kikorBossMixin = {
       return;
     }
 
+    // Toujours réorienté vers le joueur le plus proche, même hors phase d'approche —
+    // sinon en coop, dès qu'un joueur passe de l'autre côté, le boss continue de
+    // foncer/tirer dans le sens figé et finit coincé dans le coin opposé.
+    const nearest = this.nearestPlayerTo(b.x, b.y);
+    if (nearest?.active) {
+      b.facing = nearest.x < b.x ? -1 : 1;
+      b.setFlipX(b.facing < 0);
+    }
+
     if (time > (kk.nextAtk || 0)) {
       if (kk.bike) {
         kk.atkIdx = (kk.atkIdx + 1) % 4;
         kk.nextAtk = time + 2000;
-        if (kk.atkIdx === 0) this._kkBikeDrift(b, time);
+        if (kk.atkIdx === 0) this._kkBikeLoop(b, time);
         else if (kk.atkIdx === 1) this._kkPaintSpawn(b, time);
         else if (kk.atkIdx === 2) this._kkThrowBrush(b, time, true);
         else this._kkPaintSpawn(b, time);
@@ -329,7 +338,7 @@ export const kikorBossMixin = {
       return;
     }
 
-    if (b.state2 === 'walk') this._kkApproach(b, time, true);
+    this._kkApproach(b, time, true);
   },
 
   _kkApproach(b, time, hold = false) {
@@ -519,44 +528,87 @@ export const kikorBossMixin = {
     });
   },
 
-  _kkBikeDrift(b, time) {
-    const dir = b.facing;
+  /** Grande boucle à vélo (façon looping) : Kikor décrit une large ellipse centrée
+   * vers le joueur le plus proche, percute qui se trouve sur sa trajectoire, et
+   * lance deux pinceaux au passage — puis termine en dérapage, jamais coincé dans
+   * un coin puisque la boucle est toujours recentrée sur la cible du moment. */
+  _kkBikeLoop(b, time) {
     b.setVelocity(0, 0);
-    b.busy = time + 900;
-    this._playKk(b, 'bk_kikor_velo_derapage', false);
-    this.sfx('special', { vol: 0.65 });
-    if (CONFIG.shake) this.cameras.main.shake(100, 0.007);
-    const startX = b.x;
-    const endX = Phaser.Math.Clamp(startX + dir * 300, 40, W - 40);
-    const startY = b.y;
+    const loopMs = 1500;
+    b.busy = time + loopMs + 420;
+    this.sfx('special', { vol: 0.6 });
+    if (CONFIG.shake) this.cameras.main.shake(140, 0.006);
+
+    const p0 = this.nearestPlayerTo(b.x, b.y);
+    const dirToPlayer = p0.x < b.x ? -1 : 1;
+    const top = this.walkTop();
+    const bottom = this.walkBottom();
+    const radiusX = 150;
+    const radiusY = Math.max(20, Math.min(44, (bottom - top) / 2 - 4));
+    // Centre la boucle du côté du joueur et ancre l'angle de départ sur la
+    // position actuelle : pas de saut visuel, et la boucle avale du terrain
+    // vers la cible au lieu de foncer droit dans un mur.
+    const cx = Phaser.Math.Clamp(b.x + dirToPlayer * radiusX, 60, W - 60);
+    const cy = b.y;
+    const startAngle = dirToPlayer > 0 ? Math.PI : 0;
+    const sweep = dirToPlayer * Math.PI * 2 * 1.15;
+
+    this._playKk(b, 'bk_kikor_velo_roule', true);
     const smokeKey = kikorBossTexKey('fumée (1).png');
+    const brushCues = [0.32, 0.68];
+    const firedCues = new Set();
+    let prevX = b.x;
+    const state = { t: 0 };
+
     this.tweens.add({
-      targets: b,
-      x: endX,
-      duration: 420,
-      ease: 'Quad.easeIn',
+      targets: state,
+      t: 1,
+      duration: loopMs,
+      ease: 'Sine.easeInOut',
       onUpdate: () => {
         if (!b.active) return;
+        const ang = startAngle + sweep * state.t;
+        const nx = Phaser.Math.Clamp(cx + Math.cos(ang) * radiusX, 30, W - 30);
+        const ny = Phaser.Math.Clamp(cy + Math.sin(ang) * radiusY, top + 4, bottom - 4);
+        b.facing = nx >= prevX ? 1 : -1;
+        b.setFlipX(b.facing < 0);
+        prevX = nx;
+        b.x = nx;
+        b.y = ny;
+        b.setDepth(Math.floor(ny));
+
         const p = this.nearestPlayerTo(b.x, b.y);
         if (p.hp > 0 && Math.abs(b.x - p.x) < 70 && Math.abs(b.y - p.y) < 50) {
-          this.hurt(p, b.damage + 6, dir, b.x);
+          this.hurt(p, b.damage + 4, b.facing, b.x);
         }
-        if (Math.random() < 0.35 && this.textures.exists(smokeKey)) {
-          const puff = this.add.image(b.x - dir * 20, b.y - 8, smokeKey).setAlpha(0.7).setDepth(b.depth - 1);
-          puff.setScale(b.scale * 0.5);
-          this.tweens.add({ targets: puff, alpha: 0, scale: puff.scale * 1.4, duration: 400, onComplete: () => puff.destroy() });
+        if (Math.random() < 0.3 && this.textures.exists(smokeKey)) {
+          const puff = this.add.image(b.x - b.facing * 18, b.y - 8, smokeKey).setAlpha(0.65).setDepth(b.depth - 1);
+          puff.setScale(b.scale * 0.45);
+          this.tweens.add({ targets: puff, alpha: 0, scale: puff.scale * 1.3, duration: 380, onComplete: () => puff.destroy() });
+        }
+        for (const cue of brushCues) {
+          if (state.t >= cue && !firedCues.has(cue)) {
+            firedCues.add(cue);
+            const kk = this._kk;
+            const target2 = this.nearestPlayerTo(b.x, b.y);
+            const dir = target2.x < b.x ? -1 : 1;
+            this.sfx('shoot', { vol: 0.45 });
+            this._kkSpawnBrush(b.x + dir * 30, b.y - 46, dir, kk.brushSeq++);
+          }
         }
       },
       onComplete: () => {
         if (!b.active) return;
-        b.y = startY;
+        this._playKk(b, 'bk_kikor_velo_derapage', false);
         const tKey = KIKOR_TACHE_KEYS[Phaser.Math.Between(0, KIKOR_TACHE_KEYS.length - 1)];
         if (this.textures.exists(tKey)) {
           const stain = this.add.image(b.x, b.y - 4, tKey).setOrigin(0.5, 1).setDepth(Math.floor(b.y) - 3).setAlpha(0.85);
           stain.setScale(b.scale * 0.55);
           this.time.delayedCall(5000, () => stain.destroy());
         }
-        this._playKk(b, 'bk_kikor_velo_idle', true);
+        this.time.delayedCall(340, () => {
+          if (b.active) this._playKk(b, 'bk_kikor_velo_idle', true);
+        });
       },
     });
   },

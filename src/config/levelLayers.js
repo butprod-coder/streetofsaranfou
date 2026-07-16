@@ -52,7 +52,37 @@ export const LEVEL3_STAGE_PARTS = [
 
 export const LEVEL3_TEXTURE_KEYS = [...LEVEL3_STAGE_PARTS];
 
-export const ALL_LEVEL_TEXTURE_KEYS = [...LEVEL1_TEXTURE_KEYS, ...LEVEL2_TEXTURE_KEYS, ...LEVEL3_TEXTURE_KEYS];
+/** Sprites plein écran niveau 4 — Bourg de Saran (assets/shared/levels/level4/). */
+export const LEVEL4_STAGE_PARTS = [
+  'bourg1',
+  'bourg2',
+  'bourg3',
+  'bourg4',
+  'bourg5',
+  'bourg6',
+];
+
+export const LEVEL4_TEXTURE_KEYS = [...LEVEL4_STAGE_PARTS];
+
+/** Sprites plein écran niveau 5 — Saran by Night (assets/shared/levels/level5/). */
+export const LEVEL5_STAGE_PARTS = [
+  'capsaran1',
+  'capsaran2',
+  'capsaran3',
+  'capsaran4',
+  'capsaran5',
+  'capsaran6',
+];
+
+export const LEVEL5_TEXTURE_KEYS = [...LEVEL5_STAGE_PARTS];
+
+export const ALL_LEVEL_TEXTURE_KEYS = [
+  ...LEVEL1_TEXTURE_KEYS,
+  ...LEVEL2_TEXTURE_KEYS,
+  ...LEVEL3_TEXTURE_KEYS,
+  ...LEVEL4_TEXTURE_KEYS,
+  ...LEVEL5_TEXTURE_KEYS,
+];
 
 /** Chêne Maillard — un sprite plein écran par stage (décor + gameplay). */
 export const LEVEL1_LAYERS = {
@@ -90,6 +120,30 @@ export const LEVEL3_LAYERS = {
   props: [],
 };
 
+/** Bourg de Saran — un sprite plein écran par stage (décor + gameplay). */
+export const LEVEL4_LAYERS = {
+  fullStage: true,
+  stageParts: LEVEL4_STAGE_PARTS,
+  ambient: { type: 'dust', count: 2 },
+  roadRatio: 0.55,
+  walkInsetTop: 0.12,
+  walkInsetBottom: 26,
+  propCount: [0, 0],
+  props: [],
+};
+
+/** Saran by Night — six panoramas nocturnes plein écran. */
+export const LEVEL5_LAYERS = {
+  fullStage: true,
+  stageParts: LEVEL5_STAGE_PARTS,
+  ambient: { type: 'dust', count: 2 },
+  roadRatio: 0.55,
+  walkInsetTop: 0.12,
+  walkInsetBottom: 26,
+  propCount: [0, 0],
+  props: [],
+};
+
 /** Hauteur mini des decors — référence pour le scale max (1774×887 px). */
 export const LEVEL1_DECOR_REF = { width: 1774, height: 887 };
 
@@ -98,6 +152,12 @@ export const LEVEL2_DECOR_REF = { width: 1774, height: 887 };
 
 /** Référence décor Stade Colette Besson (1774×887 px). */
 export const LEVEL3_DECOR_REF = { width: 1774, height: 887 };
+
+/** Référence décor Bourg de Saran (1774×887 px). */
+export const LEVEL4_DECOR_REF = { width: 1774, height: 887 };
+
+/** Référence décor Saran by Night (1024×512 px). */
+export const LEVEL5_DECOR_REF = { width: 1024, height: 512 };
 
 export function mainPartsRefSize(layers, getSize) {
   const parts = layers?.mainParts;
