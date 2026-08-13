@@ -5,6 +5,7 @@ import {
   LEVEL3_LAYERS,
   LEVEL4_LAYERS,
   LEVEL5_LAYERS,
+  LEVEL6_LAYERS,
 } from './levelLayers.js';
 
 /** Niveau sandbox : les 6 nouveaux ennemis, un par vague. */
@@ -118,6 +119,25 @@ export const CAMPAIGN_LEVELS = [
     skyBot: 0x152c56,
     ground: 0x101725,
     neon: 0x5c8dff,
+    stages: [
+      { waves: [['runner', 'runner', 'grunt']] },
+      { waves: [['kikor_e', 'remy']] },
+      { waves: [['runner', 'heavy']] },
+      { waves: [['guylux', 'heavy']] },
+      { waves: [['runner', 'runner', 'heavy'], ['papy_jala', 'kikor_e', 'grunt']] },
+      { bossOnly: true },
+    ],
+    boss: playableBoss('jo', 4, { tint: 0xffeeaa, speed: 105, enrageBanner: 'JO DÉCHAÎNE LE TOURBILLON !' }),
+  },
+  {
+    name: 'COLLEGE MONTJOIE',
+    music: 'music_fight2',
+    layers: LEVEL6_LAYERS,
+    decor: ['obj_caisse', 'obj_baril', 'obj_brasero'],
+    skyTop: 0x3a2810,
+    skyBot: 0x6a4820,
+    ground: 0x2a2018,
+    neon: 0xffcc44,
     stages: [
       { waves: [['runner', 'runner', 'grunt']] },
       { waves: [['kikor_e', 'remy']] },

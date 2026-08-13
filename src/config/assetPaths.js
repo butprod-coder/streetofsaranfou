@@ -5,6 +5,7 @@ import {
   LEVEL3_TEXTURE_KEYS,
   LEVEL4_TEXTURE_KEYS,
   LEVEL5_TEXTURE_KEYS,
+  LEVEL6_TEXTURE_KEYS,
 } from './levelLayers.js';
 
 export const PLAYABLE_CHARS = [
@@ -49,6 +50,7 @@ export function assetSubdir(key) {
   if (LEVEL3_TEXTURE_KEYS.includes(key)) return 'shared/levels/level3';
   if (LEVEL4_TEXTURE_KEYS.includes(key)) return 'shared/levels/level4';
   if (LEVEL5_TEXTURE_KEYS.includes(key)) return 'shared/levels/level5';
+  if (LEVEL6_TEXTURE_KEYS.includes(key)) return 'shared/levels/level6';
   if (key === 'chicken' || key === 'chicken_gold' || key === 'skateboard') return 'shared/pickups';
   if (key === 'specials_storyboard') return 'shared/specials';
   return '';

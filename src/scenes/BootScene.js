@@ -38,6 +38,8 @@ import {
   LEVEL4_STAGE_PARTS,
   LEVEL5_TEXTURE_KEYS,
   LEVEL5_STAGE_PARTS,
+  LEVEL6_TEXTURE_KEYS,
+  LEVEL6_STAGE_PARTS,
   getLayerTextureKeys,
 } from '../config/levelLayers.js';
 
@@ -143,6 +145,9 @@ export class BootScene extends Phaser.Scene {
     LEVEL5_TEXTURE_KEYS.forEach((k) => {
       if (IMG[k]) this.load.image(k, IMG[k]);
     });
+    LEVEL6_TEXTURE_KEYS.forEach((k) => {
+      if (IMG[k]) this.load.image(k, IMG[k]);
+    });
     KARONUX_BOSS_FILES.forEach((f) => {
       this.load.image(karonuxBossTexKey(f), karonuxBossTexPath(f));
     });
@@ -157,7 +162,8 @@ export class BootScene extends Phaser.Scene {
           !LEVEL2_TEXTURE_KEYS.includes(k) &&
           !LEVEL3_TEXTURE_KEYS.includes(k) &&
           !LEVEL4_TEXTURE_KEYS.includes(k) &&
-          !LEVEL5_TEXTURE_KEYS.includes(k)
+          !LEVEL5_TEXTURE_KEYS.includes(k) &&
+          !LEVEL6_TEXTURE_KEYS.includes(k)
         ) {
           this.load.image(k, IMG[k]);
         }
@@ -296,6 +302,7 @@ export class BootScene extends Phaser.Scene {
       ...LEVEL3_STAGE_PARTS,
       ...LEVEL4_STAGE_PARTS,
       ...LEVEL5_STAGE_PARTS,
+      ...LEVEL6_STAGE_PARTS,
     ]);
     createKaronuxBossAnims(this);
     createKikorBossAnims(this);

@@ -76,12 +76,25 @@ export const LEVEL5_STAGE_PARTS = [
 
 export const LEVEL5_TEXTURE_KEYS = [...LEVEL5_STAGE_PARTS];
 
+/** Sprites plein écran niveau 6 — Collège Montjoie (assets/shared/levels/level6/). */
+export const LEVEL6_STAGE_PARTS = [
+  'college_montjoie1',
+  'college_montjoie2',
+  'college_montjoie3',
+  'college_montjoie4',
+  'college_montjoie5',
+  'college_montjoie6',
+];
+
+export const LEVEL6_TEXTURE_KEYS = [...LEVEL6_STAGE_PARTS];
+
 export const ALL_LEVEL_TEXTURE_KEYS = [
   ...LEVEL1_TEXTURE_KEYS,
   ...LEVEL2_TEXTURE_KEYS,
   ...LEVEL3_TEXTURE_KEYS,
   ...LEVEL4_TEXTURE_KEYS,
   ...LEVEL5_TEXTURE_KEYS,
+  ...LEVEL6_TEXTURE_KEYS,
 ];
 
 /** Chêne Maillard — un sprite plein écran par stage (décor + gameplay). */
@@ -144,6 +157,18 @@ export const LEVEL5_LAYERS = {
   props: [],
 };
 
+/** Collège Montjoie — six panoramas plein écran. */
+export const LEVEL6_LAYERS = {
+  fullStage: true,
+  stageParts: LEVEL6_STAGE_PARTS,
+  ambient: { type: 'dust', count: 2 },
+  roadRatio: 0.55,
+  walkInsetTop: 0.12,
+  walkInsetBottom: 26,
+  propCount: [0, 0],
+  props: [],
+};
+
 /** Hauteur mini des decors — référence pour le scale max (1774×887 px). */
 export const LEVEL1_DECOR_REF = { width: 1774, height: 887 };
 
@@ -158,6 +183,9 @@ export const LEVEL4_DECOR_REF = { width: 1774, height: 887 };
 
 /** Référence décor Saran by Night (1024×512 px). */
 export const LEVEL5_DECOR_REF = { width: 1024, height: 512 };
+
+/** Référence décor Collège Montjoie (1024×512 px). */
+export const LEVEL6_DECOR_REF = { width: 1024, height: 512 };
 
 export function mainPartsRefSize(layers, getSize) {
   const parts = layers?.mainParts;
