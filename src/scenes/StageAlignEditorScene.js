@@ -312,6 +312,13 @@ export class StageAlignEditorScene extends Phaser.Scene {
     this.editorZoom = 1;
     this.panX = 0;
     this.panY = 0;
+    // Poser le container sur sa vue par défaut AVANT d'y ajouter les stages :
+    // sinon Phaser convertit leurs coords scène -> local avec l'ancien zoom/pan,
+    // ce qui fausse le stage 1 (index 0) à chaque rebuild/sauvegarde/rechargement.
+    this.fitScale = CONTENT_W / (n * W);
+    this.levelContainer.setScale(this.viewScale());
+    this.levelContainer.x = this.containerBaseX(this.viewScale()) + this.panX;
+    this.levelContainer.y = this.containerBaseY(this.viewScale()) + this.panY;
 
     for (let i = 0; i < n; i++) {
       this.spawnStageSprite(i);
@@ -331,15 +338,14 @@ export class StageAlignEditorScene extends Phaser.Scene {
     const { sx, sy } = this.baseScale(key);
     const mul = align.scale ?? 1;
     const baseX = this.stageBaseCenterX(stageIdx);
-    const spr = this.add
-      .image(baseX + (align.x ?? 0), align.y ?? 0, key)
-      .setOrigin(0.5, 0)
-      .setScale(sx * mul, sy * mul)
-      .setDepth(stageIdx === this.stageIdx ? 30 : 20);
+    const spr = this.add.image(0, 0, key).setOrigin(0.5, 0);
     spr.stageIdx = stageIdx;
+    this.levelContainer.add(spr);
+    spr.setPosition(baseX + (align.x ?? 0), align.y ?? 0);
+    spr.setScale(sx * mul, sy * mul);
+    spr.setDepth(stageIdx === this.stageIdx ? 30 : 20);
     spr.setInteractive({ useHandCursor: true });
 
-    this.levelContainer.add(spr);
     this.stageSprites.push(spr);
     this.updateStageVisual(stageIdx);
   }
@@ -660,13 +666,32 @@ export class StageAlignEditorScene extends Phaser.Scene {
     this.rebuildLevel();
   }
 
+  _syncAlignsFromSprites() {
+    for (const spr of this.stageSprites) {
+      if (!spr?.active || spr.stageIdx == null) continue;
+      const i = spr.stageIdx;
+      const lv = CAMPAIGN_LEVELS[this.levelIdx];
+      const key = this.stageKey(lv, i);
+      if (!key) continue;
+      const { sx } = this.baseScale(key);
+      const align = this.aligns[i] ?? (this.aligns[i] = { ...DEFAULT_STAGE_ALIGN });
+      align.x = Math.round(spr.x - this.stageBaseCenterX(i));
+      align.y = Math.round(spr.y);
+      align.scale = Math.round((spr.scaleX / sx) * 1000) / 1000;
+    }
+  }
+
   saveAll(withSfx) {
     const lv = CAMPAIGN_LEVELS[this.levelIdx];
     if (!this.levelHasFullStage(lv)) return;
+    this._syncAlignsFromSprites();
     const n = this.stageCount(lv);
     for (let i = 0; i < n; i++) {
       if (this.aligns[i]) setStageAlign(this.levelIdx, i, this.aligns[i]);
     }
+    this.loadAligns(lv);
+    this.stageSprites.forEach((s) => this.updateStageVisual(s.stageIdx));
+    if (this.stageIdx >= 0) this.refreshHud();
     if (withSfx) sfx(this, 'sfx_confirm');
   }
 
