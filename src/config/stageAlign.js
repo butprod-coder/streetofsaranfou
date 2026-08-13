@@ -1,10 +1,19 @@
-/** Réglages X / Y / zoom par segment de fond plein écran (localStorage). */
+/** Réglages X / Y / zoom par segment de fond plein écran (localStorage + défauts repo). */
 
 import { W } from './gameConfig.js';
+import { STAGE_ALIGN_DEFAULTS } from './stageAlignDefaults.js';
 
 export const STAGE_ALIGN_STORAGE_KEY = 'saranfou_stage_align_v1';
 
 export const DEFAULT_STAGE_ALIGN = { x: 0, y: 0, scale: 1 };
+
+function cloneAlign(st) {
+  return {
+    x: Number(st.x) || 0,
+    y: Number(st.y) || 0,
+    scale: Number(st.scale) || 1,
+  };
+}
 
 export function loadAllStageAligns() {
   try {
@@ -23,12 +32,10 @@ export function getStageAlign(levelIdx, stageIdx) {
   const all = loadAllStageAligns();
   const lv = all[String(levelIdx)];
   const st = lv?.[String(stageIdx)];
-  if (!st) return { ...DEFAULT_STAGE_ALIGN };
-  return {
-    x: Number(st.x) || 0,
-    y: Number(st.y) || 0,
-    scale: Number(st.scale) || 1,
-  };
+  if (st) return cloneAlign(st);
+  const fallback = STAGE_ALIGN_DEFAULTS[String(levelIdx)]?.[String(stageIdx)];
+  if (fallback) return cloneAlign(fallback);
+  return { ...DEFAULT_STAGE_ALIGN };
 }
 
 export function setStageAlign(levelIdx, stageIdx, align) {
