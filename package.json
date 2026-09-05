@@ -1,0 +1,19 @@
+{
+  "name": "streets-of-saranfou",
+  "version": "3.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Beat'em up arcade solo et coopératif en ligne, dans les rues de Saran.",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "test": "node --test tests/*.test.js",
+    "test:browser": "node tests/browser.mjs",
+    "test:controller": "node tests/controller.mjs",
+    "check": "node scripts/check.mjs",
+    "build": "node scripts/build.mjs"
+  },
+  "dependencies": { "ws": "8.21.3" },
+  "devDependencies": { "playwright": "^1.58.2" }
+}

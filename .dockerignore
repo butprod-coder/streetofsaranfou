@@ -1,0 +1,11 @@
+.git
+.claude
+.runtime
+node_modules
+test-results
+dist
+src
+src3d
+tests
+scripts
+.env*

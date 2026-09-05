@@ -39,7 +39,7 @@ function Send-File($context, $filePath) {
 }
 
 # Jeu déjà servi (ex. précédent play.bat encore actif) → ouvrir le navigateur
-foreach ($p in @(8080, 8081, 8082, 8765, 5173)) {
+foreach ($p in @(8080, 8081, 8082, 8765, 5173, 9123, 9124)) {
     if (Test-GameAlreadyRunning $p) {
         Write-Host "Jeu deja accessible sur http://localhost:$p/ - ouverture du navigateur."
         Open-Browser $p
@@ -49,7 +49,7 @@ foreach ($p in @(8080, 8081, 8082, 8765, 5173)) {
 
 $listener = $null
 $port = $null
-foreach ($tryPort in @(8080, 8081, 8082, 8765, 5173)) {
+foreach ($tryPort in @(8080, 8081, 8082, 8765, 5173, 9123, 9124)) {
     $candidate = New-Object System.Net.HttpListener
     $candidate.Prefixes.Add("http://localhost:$tryPort/")
     try {
@@ -64,7 +64,7 @@ foreach ($tryPort in @(8080, 8081, 8082, 8765, 5173)) {
 
 if (-not $listener) {
     Write-Host ""
-    Write-Host "ERREUR: impossible de demarrer le serveur (ports 8080-8082, 8765, 5173 occupes)."
+    Write-Host "ERREUR: impossible de demarrer le serveur (ports 8080-8082, 8765, 5173, 9123-9124 occupes)."
     Write-Host "Fermez les autres fenetres PowerShell du jeu ou redemarrez le PC."
     Write-Host ""
     Read-Host "Appuyez sur Entree pour quitter"

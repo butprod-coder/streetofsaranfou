@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <meta name="theme-color" content="#070912">
+  <title>Streets of SaranFou 3D</title>
+  <link rel="stylesheet" href="styles/game3d.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js"
+    }
+  }
+  </script>
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head>
+<body>
+  <main id="app">
+    <div id="viewport" aria-label="Jeu Streets of SaranFou 3D"></div>
+
+    <section id="title-screen" class="screen title-screen active">
+      <div class="title-vignette"></div>
+      <div class="title-actions panel">
+        <p class="eyebrow">UNE HISTOIRE DE POTOs · SARAN · 1998</p>
+        <h1 class="sr-only">Streets of SaranFou</h1>
+        <button class="arcade primary" data-action="solo"><span>01</span> HISTOIRE SOLO</button>
+        <button class="arcade" data-action="online"><span>02</span> DUO EN LIGNE</button>
+        <button class="arcade" data-action="how"><span>?</span> COMMANDES</button>
+        <a class="classic-link" href="classic.html">Jouer à la version classique 2D</a>
+      </div>
+      <p class="press-start">CHOISIS TA RUE. RETROUVE LA BANDE. NETTOIE SARAN.</p>
+    </section>
+
+    <section id="select-screen" class="screen select-screen">
+      <header class="select-header">
+        <p class="eyebrow">DOSSIERS DE LA BANDE</p>
+        <h2>CHOISIS TON COMBATTANT</h2>
+        <p id="select-status">Joueur 1 — fais ton choix</p>
+      </header>
+      <div id="character-grid" class="character-grid"></div>
+      <button class="back-button" data-action="back">← RETOUR</button>
+    </section>
+
+    <section id="online-screen" class="screen online-screen">
+      <div class="online-card panel">
+        <p class="eyebrow">CONNEXION DIRECTE</p>
+        <h2>DUO EN LIGNE</h2>
+        <p class="online-intro">Crée un salon et partage le code à ton pote, ou saisis le sien.</p>
+        <div id="online-start">
+          <button class="arcade primary" data-action="host">CRÉER UN SALON</button>
+          <div class="join-row">
+            <input id="room-input" maxlength="10" autocomplete="off" spellcheck="false" placeholder="CODE DU SALON" aria-label="Code du salon">
+            <button class="arcade" data-action="join">REJOINDRE</button>
+          </div>
+        </div>
+        <div id="room-wait" class="room-wait hidden">
+          <span>CODE DU SALON</span>
+          <strong id="room-code">······</strong>
+          <button id="copy-code" class="mini-button">COPIER LE CODE</button>
+          <p id="network-status">Ouverture du salon…</p>
+          <div class="signal"><i></i><i></i><i></i><i></i></div>
+        </div>
+        <button class="back-button" data-action="back">← RETOUR</button>
+      </div>
+    </section>
+
+    <section id="how-screen" class="screen how-screen">
+      <div class="how-card panel">
+        <p class="eyebrow">CASSETTE D'ENTRAÎNEMENT</p>
+        <h2>COMMANDES</h2>
+        <div class="controls-grid">
+          <div><kbd>ZQSD</kbd><b>Se déplacer</b><span>Les flèches marchent aussi</span></div>
+          <div><kbd>J</kbd><b>Poing / combo</b><span>Rapide, efficace au corps à corps</span></div>
+          <div><kbd>K</kbd><b>Coup de pied</b><span>Plus lent, repousse les ennemis</span></div>
+          <div><kbd>L</kbd><b>Technique perso</b><span>Consomme la jauge orange</span></div>
+          <div><kbd>Espace</kbd><b>Sauter</b><span>Attaque aérienne avec J ou K</span></div>
+          <div><kbd>Échap</kbd><b>Pause</b><span>Souffle un coup, poto</span></div>
+        </div>
+        <button class="arcade primary" data-action="back">J'AI COMPRIS</button>
+      </div>
+    </section>
+
+    <section id="hud" class="hud hidden" aria-live="polite">
+      <div class="player-hud p1"><img id="p1-face" alt=""><div><b id="p1-name">P1</b><div class="bar hp"><i id="p1-hp"></i></div><div class="bar special"><i id="p1-special"></i></div></div></div>
+      <div class="mission"><small id="chapter-label">CHAPITRE 1</small><strong id="location-label">LE CHÊNE MAILLARD</strong><span id="objective-label">0 ENNEMI</span></div>
+      <div class="player-hud p2 hidden" id="p2-hud"><div><b id="p2-name">P2</b><div class="bar hp"><i id="p2-hp"></i></div><div class="bar special"><i id="p2-special"></i></div></div><img id="p2-face" alt=""></div>
+      <div class="score">SCORE <b id="score-value">000000</b></div>
+    </section>
+
+    <div id="chapter-card" class="chapter-card hidden"><small>CHAPITRE 1</small><b>LE CHÊNE MAILLARD</b><span>« On rentre à pied. »</span></div>
+    <div id="toast" class="toast hidden"></div>
+    <button id="pause-button" class="pause-button hidden" aria-label="Pause">Ⅱ</button>
+
+    <section id="pause-screen" class="screen pause-screen">
+      <div class="pause-card panel"><p class="eyebrow">PARTIE EN PAUSE</p><h2>ON SOUFFLE ?</h2><button class="arcade primary" data-action="resume">REPRENDRE</button><button class="arcade" data-action="quit">QUITTER LA PARTIE</button></div>
+    </section>
+
+    <section id="end-screen" class="screen end-screen">
+      <div class="end-card panel"><p id="end-kicker" class="eyebrow">SARAN EST CALME</p><h2 id="end-title">LA BANDE EST RÉUNIE</h2><p id="end-copy"></p><div id="end-score"></div><button class="arcade primary" data-action="replay">REJOUER</button><button class="arcade" data-action="quit">MENU PRINCIPAL</button></div>
+    </section>
+
+    <div id="touch-controls" class="touch-controls hidden">
+      <div class="touch-stick"><button data-key="up">▲</button><button data-key="left">◀</button><button data-key="down">▼</button><button data-key="right">▶</button></div>
+      <div class="touch-actions"><button data-key="jump">↑</button><button data-key="punch">J</button><button data-key="kick">K</button><button data-key="special">L</button></div>
+    </div>
+  </main>
+  <script type="module" src="src3d/main.js"></script>
+</body>
+</html>

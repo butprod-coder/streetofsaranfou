@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: streets-of-saranfou
+    runtime: docker
+    region: frankfurt
+    plan: starter
+    numInstances: 1
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000

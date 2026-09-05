@@ -3,3 +3,10 @@ Thumbs.db
 desktop.ini
 *.log
 .cursor/
+node_modules/
+dist/
+test-results/
+.runtime/
+.env
+.env.*
+!.env.example
