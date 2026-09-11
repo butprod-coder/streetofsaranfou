@@ -115,7 +115,7 @@ export function createGameServer({ root = ROOT, maxRooms = 100, reconnectMs = 45
         let code;
         do { code = [...randomBytes(6)].map(n => alphabet[n % alphabet.length]).join(''); } while (rooms.has(code));
         const player = { character: validCharacter(msg.character) ? msg.character : 'karonux', token: randomBytes(24).toString('hex'), ready: false, loaded: false, input: blankInput(), lastInput: 0 };
-        player.profile = normalizeProfile(msg.profile);
+        player.profile = normalizeProfile({}, player.character);
         const room = { code, chapter: 0, players: [player, null], sim: null, createdAt: Date.now(), lastActive: Date.now(), accumulator: 0, snapshotCounter: 0 };
         room.difficulty = Object.hasOwn(DIFFICULTIES, msg.difficulty) ? msg.difficulty : 'normal';
         rooms.set(code, room); setMember(ws, room, 0, player); return;
@@ -138,7 +138,7 @@ export function createGameServer({ root = ROOT, maxRooms = 100, reconnectMs = 45
         }
         if (room.sim || room.players[1]) { error(ws, 'Ce salon est complet ou la partie a déjà commencé.'); return; }
         const p = { character: validCharacter(msg.character) ? msg.character : 'yanu', token: randomBytes(24).toString('hex'), ready: false, loaded: false, input: blankInput(), lastInput: 0 };
-        p.profile = normalizeProfile(msg.profile);
+        p.profile = normalizeProfile({}, p.character);
         setMember(ws, room, 1, p); return;
       }
       const room = ws.room, player = room?.players[ws.slot];
@@ -146,7 +146,7 @@ export function createGameServer({ root = ROOT, maxRooms = 100, reconnectMs = 45
       room.lastActive = Date.now();
       if (msg.type === 'leave') { detach(ws, true); return; }
       if (msg.type === 'select' && !room.sim) {
-        if (validCharacter(msg.character)) { player.character = msg.character; player.profile = normalizeProfile(msg.profile); player.ready = false; }
+        if (validCharacter(msg.character)) { player.character = msg.character; player.profile = normalizeProfile({}, player.character); player.ready = false; }
         if (ws.slot === 0 && Object.hasOwn(DIFFICULTIES, msg.difficulty)) { room.difficulty = msg.difficulty; for (const p of room.players) if (p) p.ready = false; }
         if (ws.slot === 0 && Number.isInteger(msg.chapter) && msg.chapter >= 0 && msg.chapter < CHAPTERS.length) {
           room.chapter = msg.chapter; for (const p of room.players) if (p) p.ready = false;
@@ -187,7 +187,7 @@ export function createGameServer({ root = ROOT, maxRooms = 100, reconnectMs = 45
       if (msg.type === 'retry' && room.sim && ['won', 'over'].includes(room.sim.state.phase)) {
         if (ws.slot !== 0) { error(ws, 'L’hôte peut relancer la partie.'); return; }
         room.chapter = room.sim.state.phase === 'won' ? 0 : room.sim.state.chapter;
-        for (let i = 0; i < room.players.length; i++) if (room.players[i]) room.players[i].profile = normalizeProfile(room.sim.state.players[i].progression);
+        for (const member of room.players) if (member) member.profile = normalizeProfile({}, member.character);
         room.sim = null;
         for (const p of room.players) if (p) { p.ready = false; p.loaded = false; p.input = blankInput(); }
         lobby(room);

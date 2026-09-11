@@ -20,7 +20,7 @@ for (const c of FIGHTERS) {
   for (const action of ['idle', 'walk', 'punch', 'kick', 'special', 'jump', 'hurt', 'dead', 'dodge']) for (const f of animation(c.id, action)) urls.add(f.url);
 }
 for (const id of Object.keys(ENEMIES)) for (const action of ['idle', 'walk', 'punch', 'special', 'hurt', 'dead']) for (const f of animation(id, action, true)) urls.add(f.url);
-for (const file of ['shared/levels/titlebg.jpg', 'shared/decor/crate0.png', 'shared/decor/obj_baril.png', 'shared/pickups/chicken.png']) urls.add(`/assets/${file}`);
+urls.add('/assets/shared/levels/titlebg.jpg');
 for (const url of urls) {
   const dest = path.join(out, url.slice(1)); await mkdir(path.dirname(dest), { recursive: true }); await copyFile(path.join(root, url.slice(1)), dest);
 }

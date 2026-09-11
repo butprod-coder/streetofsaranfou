@@ -1,0 +1,32 @@
+# Arcade street assets
+
+Generated using the built-in imagegen tool. Transparent originals copied into this folder without pixel modification. Runtime source rectangles crop the sprite cells; character sprites and level backgrounds are retained.
+
+## crate.png
+
+Use case: stylized-concept. Production sprite for a 2D side-scrolling French suburban night-time arcade beat-em-up. Refined hand-pixelled 32-bit arcade pixel art, crisp dark outlines, chunky readable pixel clusters, cool navy shadows and warm amber edge lighting, believable materials, restrained colors. Transparent RGBA background, absolutely no checkerboard drawn, no scene, no floor, no text, no labels, no watermark. ONE horizontal sprite sheet, exactly three equally sized square cells in one row, 1536x512 canvas. Same wooden delivery crate with teal metal corner reinforcements and amber straps, slight front/side perspective suitable for belt-scroll gameplay. Left cell intact, middle cell cracked and splintered, right cell collapsed pile of the same boards. Same camera and scale in all cells, centered horizontally per cell, bottoms aligned at 90% cell height, ample transparent margins. No objects crossing cell boundaries.
+
+## barrel.png
+
+Use case: stylized-concept. Production sprite for a 2D side-scrolling French suburban night-time arcade beat-em-up. Refined hand-pixelled 32-bit arcade pixel art, crisp dark outlines, chunky readable pixel clusters, cool navy shadows and warm amber edge lighting, believable materials, restrained colors. Transparent RGBA background, absolutely no checkerboard drawn, no scene, no floor, no text, no labels, no watermark. ONE horizontal sprite sheet, exactly three equally sized square cells in one row, 1536x512 canvas. Same red-orange dented steel fuel drum, cream horizontal band with simple black flame pictogram, slight front/side view suitable for belt-scroll gameplay. Left cell intact, middle cell deeply dented with a small spark at lid, right cell flattened ruptured metal wreck, no large flames. Same camera and scale, centered per cell, bottoms aligned at 90% cell height, ample transparent margins. No objects crossing cell boundaries.
+
+## bin.png
+
+Use case: stylized-concept. Production sprite for a 2D side-scrolling French suburban night-time arcade beat-em-up. Refined hand-pixelled 32-bit arcade pixel art, crisp dark outlines, chunky readable pixel clusters, cool navy shadows and warm amber edge lighting, believable materials, restrained colors. Transparent RGBA background, absolutely no checkerboard drawn, no scene, no floor, no text, no labels, no watermark. ONE horizontal sprite sheet, exactly three equally sized square cells in one row, 1536x512 canvas. Same mint-green French wheelie bin with dark lid, tiny graffiti scribble shapes not text, slight front/side view for belt-scroll gameplay. Left cell intact lid closed, middle cell cracked and lid lifted, right cell broken toppled bin and modest contents. Same camera and scale, centered per cell, bottoms aligned at 90% cell height, ample transparent margins. No objects crossing cell boundaries.
+
+## bonus-car.png
+
+Use case: stylized-concept. Production sprite for a 2D side-scrolling French suburban night-time arcade beat-em-up. Refined hand-pixelled 32-bit arcade pixel art, crisp dark outlines, chunky readable pixel clusters, cool navy shadows and warm amber edge lighting, believable materials, restrained colors. Transparent RGBA background, absolutely no checkerboard drawn, no scene, no floor, no text, no labels, no watermark. ONE vertical damage sprite sheet, exactly three equally sized WIDE cells in one column, 1024x1536 canvas. Same compact 1990s white hatchback car, no brand emblems, wide side view with a very slight visible front facing right, suitable for bonus car-smashing stage. Top cell intact, middle cell dented doors and broken windshield, bottom cell crushed non-burning wreck on flattened wheels. Each cell 1024x512, entire vehicle inside its own cell, same size and camera, centered horizontally, wheels baseline at 90% of each cell, generous transparent margins. No people, no smoke obscuring shape.
+
+## food.png
+
+Use case: stylized-concept. Production sprite for a 2D side-scrolling French suburban night-time arcade beat-em-up. Refined hand-pixelled 32-bit arcade pixel art, crisp dark outlines, chunky readable pixel clusters, cool navy shadows and warm amber edge lighting, believable materials, restrained colors. Transparent RGBA background, absolutely no checkerboard drawn, no scene, no floor, no text, no labels, no watermark. ONE isolated pickup sprite: a delicious half baguette sandwich wrapped in cream paper, grilled filling with tiny green lettuce, three-quarter side view, readable collectible silhouette, centered, square 1024x1024 canvas, object fills 75% width, no plate, no extra items, no shadow.
+
+## energy.png
+
+Use case: stylized-concept. Production sprite for a 2D side-scrolling French suburban night-time arcade beat-em-up. Refined hand-pixelled 32-bit arcade pixel art, crisp dark outlines, chunky readable pixel clusters, cool navy shadows and warm amber edge lighting, believable materials, restrained colors. Transparent RGBA background, absolutely no checkerboard drawn, no scene, no floor, no text, no labels, no watermark. ONE isolated pickup sprite: amber orange energy drink can with silver top and bold cream lightning pictogram, tiny cyan reflections, slight three-quarter side view, centered square 1024x1024 canvas, object fills 75% height, no words, no extra items, no shadow.
+
+## dash.png
+
+Use case: stylized-concept. Production sprite for a 2D side-scrolling French suburban night-time arcade beat-em-up. Refined hand-pixelled 32-bit arcade pixel art, crisp dark outlines, chunky readable pixel clusters, cool navy shadows and warm amber edge lighting, believable materials, restrained colors. Transparent RGBA background, absolutely no checkerboard drawn, no scene, no floor, no text, no labels, no watermark. ONE horizontal animation sprite sheet, exactly three equal square cells in one row, 1536x512. Low ground dust burst and thin mint-white speed streaks for an evasive dash toward the RIGHT, no character. Left frame compact starting puff, middle frame elongated ground dust and speed lines, right frame dispersed dust fading away. Sprite content only in bottom half of each cell, ground baseline 90% of each cell. Same camera, centered each cell, no crossing boundaries.
+

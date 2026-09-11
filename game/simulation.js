@@ -1,12 +1,14 @@
 import { FIGHTERS, CHAPTERS, ENEMIES, FLOOR, STEP, fighter, clamp, blankInput } from './data.js';
 import { BALANCE, difficulty } from './balance.js';
-import { applyProfile, gainXp, spendPoint } from './progression.js';
+import { applyProfile, completeChapter, spendPoint } from './progression.js';
 import { wavePlan } from './encounters.js';
 import { combat } from './combat.js';
+import { streetEvents } from './street-events.js';
+import { elites } from './elites.js';
 
 const distance = (a, b) => Math.hypot(a.x - b.x, (a.y - b.y) * 1.5);
 const alive = a => a.hp > 0;
-const DECAY = ['cooldown', 'stun', 'invincible', 'dodgeCd', 'buff', 'flash', 'comboWindow', 'specialCd', 'recovering'];
+const DECAY = ['cooldown', 'stun', 'invincible', 'dodgeCd', 'dodgeBuffer', 'buff', 'flash', 'comboWindow', 'specialCd', 'recovering'];
 
 /** Browser and server run the same fixed-step simulation. Rendering never deals damage. */
 export class Simulation {
@@ -19,7 +21,7 @@ export class Simulation {
       players: characters.slice(0, 2).map((id, i) => this.makePlayer(id, i)), enemies: [], props: [], pickups: [], events: [],
       eventSeq: 0, score: 0, kills: 0, combo: 0, comboTime: 0, bestCombo: 0, allDown: 0,
       difficulty: ['easy', 'normal', 'hard'].includes(options.difficulty) ? options.difficulty : 'normal',
-      hazards: [], allies: [], wave: -1, waves: [], spawnQueue: [], spawnTimer: 0,
+      hazards: [], allies: [], wave: -1, waves: [], spawnQueue: [], spawnTimer: 0, surprise: null, surpriseDone: false,
     };
     for (const [i, p] of this.state.players.entries()) { applyProfile(p, options.profiles?.[i], false); p.lives = difficulty(this.state.difficulty).lives; }
     this.enterStreet();
@@ -54,13 +56,13 @@ export class Simulation {
     const s = this.state;
     s.enemies = []; s.pickups = []; s.combo = 0; s.comboTime = 0;
     s.hazards = []; s.allies = []; s.wave = -1; s.spawnQueue = []; s.spawnTimer = 0;
-    s.waves = wavePlan(s.chapter, s.stage, s.players.length, s.difficulty);
-    s.props = [0, 1].map((_, i) => ({ id: this.nextId++, x: 570 + i * 405, y: i ? 624 : 468, hp: 2,
-      kind: i ? 'barrel' : 'crate', drop: (s.stage + i) % 2 ? 'energy' : 'food' }));
+    s.waves = wavePlan(s.chapter, s.stage, s.players.length, s.difficulty, () => this.random());
+    s.props = this.streetProps(); s.surprise = null; s.surpriseDone = false;
     for (const [i, p] of s.players.entries()) {
       p.x = 200 + i * 95; p.y = 535 + i * 55; p.z = 0; p.vz = 0; p.vx = 0; p.vy = 0;
       p.attack = null; p.stun = 0; p.invincible = 1.8; p.facing = 1; p.action = 'idle'; p.moving = false;
-      p.specialState = null;
+      this.endSpecial(p); p.dodgeBuffer = 0; p.dodgeHeld = false;
+      p.sitting = null; p.seatHold = 0;
       if (p.hp <= 0) this.revivePlayer(p, .45);
     }
     s.phase = 'intro'; s.phaseTime = s.stage === 0 ? 2.4 : 1.15;
@@ -87,20 +89,18 @@ export class Simulation {
     const hp = Math.round(c.hp * (1 + s.chapter * BALANCE.enemy.chapterHp) * (s.players.length > 1 ? BALANCE.enemy.duoHp : 1));
     // Every reinforcement starts inside the navigable floor, away from the closest player.
     const leftDistance = Math.min(...s.players.map(p => Math.abs(p.x - 85))), rightDistance = Math.min(...s.players.map(p => Math.abs(p.x - 1195)));
-    const e = { ...this.actor(kind, this.nextId++, true), hp, maxHp: hp, power: c.power + s.chapter * .6,
+    const e = { ...this.actor(kind, this.nextId++, true), hp, maxHp: hp, power: c.power * (1 + s.chapter * BALANCE.enemy.chapterPower),
       speed: c.speed * mode.speed * (1 + s.chapter * BALANCE.enemy.chapterSpeed), reach: c.reach, value: c.score,
       x: leftDistance > rightDistance ? 85 : 1195, y: FLOOR.top + 20 + this.random() * 155, cooldown: 1.1, invincible: .35, attackCount: 0, ...overrides };
-    s.enemies.push(e); this.event('spawn', { x: e.x, y: e.y, actor: e.id }); return e;
+    s.enemies.push(e); this.initElite(e); this.event('spawn', { x: e.x, y: e.y, actor: e.id }); return e;
   }
 
-  awardXp(amount) {
-    const s = this.state, reward = Math.round(amount * difficulty(s.difficulty).xp);
+  awardChapterTalent() {
+    const s = this.state;
     for (const p of s.players) {
-      const previous = p.progression.level, profile = gainXp(p.progression, reward);
-      const gained = profile.totalXp - p.progression.totalXp;
+      const previous = p.progression.completed.length, profile = completeChapter(p.progression, s.chapter);
       applyProfile(p, profile);
-      if (gained > 0) this.event('xp', { actor: p.id, x: p.x, y: p.y - 130, amount: gained });
-      if (profile.level > previous) this.event('levelup', { actor: p.id, x: p.x, y: p.y - 155, level: profile.level, points: profile.points, pointsGained: (profile.level - previous) * BALANCE.rpg.pointsPerLevel });
+      if (profile.completed.length > previous) this.event('talent', { actor: p.id, x: p.x, y: p.y - 155, label: 'CHAPITRE TERMINÉ · +1 TALENT · PAUSE' });
     }
   }
 
@@ -132,7 +132,6 @@ export class Simulation {
       s.phaseTime -= dt;
       if (s.phaseTime <= 0) {
         if (++s.stage > 5) {
-          this.awardXp(BALANCE.xp.chapter);
           s.stage = 0; s.chapter++;
           if (s.chapter >= CHAPTERS.length) { s.chapter = CHAPTERS.length - 1; s.stage = 5; s.phase = 'won'; this.event('win'); return; }
           for (const p of s.players) { p.hp = Math.min(p.maxHp, Math.max(1, p.hp) + p.maxHp * .4); p.lives = Math.min(3, p.lives + 1); p.energy = 100; }
@@ -144,6 +143,7 @@ export class Simulation {
     for (const [i, p] of s.players.entries()) this.updatePlayer(p, inputs[i] || blankInput(), dt);
     for (const e of s.enemies) this.updateEnemy(e, dt);
     this.updateWorld(dt);
+    this.updateScenery(dt);
     this.separateEnemies(dt);
     for (const actor of [...s.players, ...s.enemies]) this.physics(actor, dt);
     this.collectPickups();
@@ -158,27 +158,25 @@ export class Simulation {
       }
     } else s.allDown = 0;
 
-    if (s.phase === 'fight') {
+    if (s.phase === 'fight' || s.phase === 'surprise' && s.surprise?.warning <= 0) {
       s.spawnTimer -= dt;
       if (s.spawnQueue.length && s.spawnTimer <= 0 && s.enemies.filter(alive).length < (s.players.length > 1 ? BALANCE.waves.activeDuo : BALANCE.waves.activeSolo)) {
         this.spawnEnemy(s.spawnQueue.shift()); s.spawnTimer = BALANCE.waves.spawnDelay;
       }
     }
     if (s.phase === 'rest') { s.phaseTime -= dt; if (s.phaseTime <= 0) this.spawnWave(); }
-    if (s.phase === 'fight' && !s.enemies.some(alive) && !s.spawnQueue.length) {
-      this.awardXp(BALANCE.xp.wave); s.hazards = s.hazards.filter(h => !h.enemy);
+    if (s.phase === 'fight' && s.players.some(alive) && !s.enemies.some(alive) && !s.spawnQueue.length) {
+      s.hazards = s.hazards.filter(h => !h.enemy);
       if (s.wave < s.waves.length - 1) {
         s.phase = 'rest'; s.phaseTime = s.waves[s.wave + 1].rest;
         this.event('breather', { label: 'UNE SECONDE POUR SOUFFLER…' });
         for (const p of s.players) { p.energy = Math.min(100, p.energy + 12); if (p.hp > 0) p.hp = Math.min(p.maxHp, p.hp + 7); }
         if (s.phaseTime >= BALANCE.waves.calmRest) s.pickups.push({ id: this.nextId++, x: 640, y: 550, kind: 'food' });
       } else {
-      s.phase = 'clear'; this.event('clear'); s.score += 250; this.awardXp(BALANCE.xp.street);
-      // A cleared street is a safe place to bring the teammate back.
-      for (const p of s.players) if (p.hp <= 0) this.revivePlayer(p, .4);
-      if (!s.pickups.some(p => p.kind === 'food')) s.pickups.push({ id: this.nextId++, x: 1060, y: 545, kind: 'food' });
+        if (!this.beginSurprise()) this.clearStreet();
       }
     }
+    this.updateSurprise(dt);
     if (s.phase === 'clear' && s.players.filter(alive).every(p => p.x > 1135)) {
       s.phase = 'transition'; s.phaseTime = .65;
     }
@@ -207,27 +205,33 @@ export class Simulation {
       if (p.downTime > 14 && p.lives > 0) { p.lives--; this.revivePlayer(p, .75); }
       return;
     }
-    p.energy = Math.min(100, p.energy + dt * (p.buff > 0 ? 2 : 3.5));
+    p.energy = Math.min(100, p.energy + dt * (p.buff > 0 ? 2 : 3.5) * p.bonuses.energyRegen);
     const pressed = {};
+    const dodgeTap = (input.taps?.dodge || 0) > (p.taps.dodge || 0);
+    if (dodgeTap || input.dodge && !p.dodgeHeld) p.dodgeBuffer = BALANCE.dodge.buffer;
+    p.dodgeHeld = !!input.dodge;
     for (const action of ['punch', 'kick', 'special', 'jump', 'dodge']) {
       pressed[action] = input[action] || (input.taps?.[action] || 0) > (p.taps[action] || 0);
       p.taps[action] = input.taps?.[action] || 0;
     }
-    if (p.specialState) { this.updateSpecial(p, input, dt); return; }
+    if (p.specialState) { this.updateSpecial(p, input, dt); if (p.kind !== 'gustavax') return; }
     if (p.stun > 0) return;
+    if (this.sitOnSofa(p, input, dt)) return;
     if (p.action === 'dodge') {
-      if (p.actionTime < .3) { p.vx = p.dodgeX * 640; p.vy = p.dodgeY * 440; return; }
+      if (p.actionTime < BALANCE.dodge.duration) { p.vx = p.dodgeX * BALANCE.dodge.speedX; p.vy = p.dodgeY * BALANCE.dodge.speedY; return; }
       p.action = 'idle'; p.vx *= .3; p.vy *= .3;
     }
-    if (pressed.dodge && p.dodgeCd <= 0 && p.z === 0) {
+    if (p.dodgeBuffer > 0 && p.dodgeCd <= 0 && p.z === 0) {
       const length = Math.hypot(input.x, input.y) || 1;
       p.dodgeX = input.x || input.y ? input.x / length : p.facing;
-      p.dodgeY = input.y / length; p.action = 'dodge'; p.actionTime = 0; p.dodgeCd = 1.05; p.invincible = .35; p.attack = null;
-      this.event('dodge', { actor: p.id }); return;
+      p.dodgeY = (input.y || 0) / length; p.action = 'dodge'; p.actionTime = 0; p.dodgeCd = BALANCE.dodge.cooldown * p.bonuses.dodge;
+      p.invincible = Math.max(p.invincible, BALANCE.dodge.invincible); p.attack = null; p.dodgeBuffer = 0;
+      p.vx = p.dodgeX * BALANCE.dodge.speedX; p.vy = p.dodgeY * BALANCE.dodge.speedY;
+      this.event('dodge', { actor: p.id, x: p.x, y: p.y, facing: Math.sign(p.dodgeX) || p.facing }); return;
     }
     if (pressed.jump && p.z === 0 && !p.attack) { p.vz = 490; p.z = .1; p.action = 'jump'; p.actionTime = 0; this.event('jump', { actor: p.id }); }
     if (!p.attack && p.cooldown <= 0) {
-      if (pressed.special && p.energy >= BALANCE.specials[p.kind].cost && p.specialCd <= 0) { this.activateSpecial(p); return; }
+      if (pressed.special && !p.specialState && p.energy >= BALANCE.specials[p.kind].cost && p.specialCd <= 0) { this.activateSpecial(p); return; }
       else if (pressed.kick) this.startAttack(p, 'kick');
       else if (pressed.punch) this.startAttack(p, 'punch');
     }
@@ -264,27 +268,64 @@ export class Simulation {
       }
     }
     a.action = type; a.actionTime = 0;
-    const heavy = type === 'special' || type === 'kick' || a.comboStep === 3;
+    const heavy = type === 'special' || type === 'kick' || a.comboStep === 3 || a.specialState?.kind === 'gustavax';
     const windup = a.enemy ? (type === 'special' ? .9 : .62) * difficulty(s.difficulty).telegraph : type === 'special' ? .2 : type === 'kick' ? .14 : .075;
     const duration = a.enemy ? windup + .38 : type === 'special' ? .7 : type === 'kick' ? .43 : a.comboStep === 3 ? .38 : .27;
     a.attack = { type, elapsed: 0, windup, duration, hit: false, heavy, air: a.z > 0 };
     a.cooldown = duration + (a.enemy ? .85 * difficulty(s.difficulty).recovery * (1 - s.chapter * BALANCE.enemy.chapterRecovery) : .015);
+    if (a.enemy && a.kind === 'triso' && type === 'special') {
+      a.attack.windup = BALANCE.triso.windup * difficulty(s.difficulty).telegraph;
+      a.attack.duration = a.attack.windup + .45; a.cooldown = a.attack.duration + BALANCE.triso.recovery * difficulty(s.difficulty).recovery;
+    }
   }
 
   resolveAttack(a) {
     const s = this.state, attack = a.attack;
     if (!attack || a.hp <= 0) return;
-    if (a.enemy && attack.type === 'special' && ['guylux', 'papy_jala', 'charlingals'].includes(a.kind)) {
-      if (a.kind === 'guylux') this.hazard(a, { kind: 'card', radius: 26, vx: a.facing * 390, delay: 0, ttl: 3, damage: a.power });
-      if (a.kind === 'papy_jala') this.hazard(a, { kind: 'smoke', radius: 100, delay: .3, ttl: 2.2, damage: a.power * .6 });
-      if (a.kind === 'charlingals') { a.vx = a.facing * 850; this.hazard(a, { kind: 'impact', shape: 'line', width: 190, band: 40, delay: .1, ttl: .25, damage: a.power * 1.2 }); }
+    if (a.enemy && a.kind === 'triso' && attack.type === 'special') {
+      const b = BALANCE.triso;
+      if (s.hazards.filter(h => h.kind === 'slime').length < b.maxPuddles) {
+        this.hazard(a, { kind: 'slime', x: a.spitTarget?.x ?? a.x + a.facing * 180, y: a.spitTarget?.y ?? a.y,
+          radius: b.radius, verticalScale: 2.5, delay: b.flight, ttl: b.duration, pulse: b.pulse, damage: a.power * .65 });
+        this.event('spit', { x: a.x, y: a.y - 95 });
+      }
+      return;
+    }
+    if (a.enemy && attack.type === 'special' && ['remy', 'makouille', 'orelsan', 'guylux', 'papy_jala', 'charlingals', 'kikor_e'].includes(a.kind)) {
+      const style = a.kind === 'remy' ? 'scooter' : a.kind === 'makouille' ? 'motorcycle' : a.kind === 'orelsan' ? 'tennis' : a.kind === 'guylux' ? 'magic' : a.kind === 'papy_jala' ? 'pepper' : a.kind === 'charlingals' ? 'knife' : 'skateboard';
+      if (style === 'scooter' || style === 'motorcycle') {
+        a.vx = a.facing * (style === 'motorcycle' ? 760 : 690);
+        this.hazard(a, { kind: 'impact', shape: 'line', width: style === 'motorcycle' ? 235 : 205, band: 50, delay: .06, ttl: .25, damage: a.power * 1.35, atlas: style, cell: 4 });
+        this.event('skid', { actor: a.id, x: a.x, y: a.y });
+      } else if (style === 'pepper') {
+        this.hazard(a, { kind: 'pepper', shape: 'line', width: 285, band: 68, delay: .28, ttl: .28, damage: a.power * .35, stunDuration: .9, atlas: 'papy_jala', cell: 8 });
+      } else if (style === 'tennis') {
+        const angle = Math.atan2((a.targetY ?? a.y) - a.y, (a.targetX ?? a.x + a.facing * 480) - a.x);
+        this.hazard(a, { kind: 'tennis', radius: 25, vx: Math.cos(angle) * 440, vy: Math.sin(angle) * 440, delay: .05, ttl: 3.2, damage: a.power * 1.15, atlas: 'orelsan', cell: 9 });
+      } else if (style === 'magic') {
+        for (let i = -1; i <= 1; i++) {
+          const angle = Math.atan2((a.targetY ?? a.y) - a.y, (a.targetX ?? a.x + a.facing * 420) - a.x) + i * .16;
+          this.hazard(a, { kind: 'magicCard', radius: 25, vx: Math.cos(angle) * 360, vy: Math.sin(angle) * 360, delay: (i + 1) * .12, ttl: 3, damage: a.power * .9, atlas: 'guylux', cell: 9 });
+        }
+      } else if (style === 'knife') {
+        a.vx = a.facing * 620;
+        this.hazard(a, { kind: 'knife', shape: 'line', width: 185, band: 43, delay: .08, ttl: .22, damage: a.power * 1.35, atlas: 'charlingals', cell: 4 });
+        for (let i = -1; i <= 1; i++) this.hazard(a, { kind: 'bills', x: (a.targetX ?? a.x) + i * 88, y: (a.targetY ?? a.y) + (i % 2) * 28, radius: 58, delay: .42 + Math.abs(i) * .14, ttl: .35, damage: a.power * .55, atlas: 'charlingals', cell: 8 });
+      } else if (style === 'skateboard') {
+        for (let i = -1; i <= 1; i++) {
+          const angle = Math.atan2((a.targetY ?? a.y) - a.y, (a.targetX ?? a.x + a.facing * 400) - a.x) + i * .13;
+          this.hazard(a, { kind: 'pencil', radius: 20, vx: Math.cos(angle) * 380, vy: Math.sin(angle) * 380, delay: (i + 1) * .1, ttl: 2.8, damage: a.power * .85, atlas: 'kikor_e', cell: 5 });
+        }
+      }
       return;
     }
     const type = attack.type, special = type === 'special', technique = a.enemy ? 'blast' : fighter(a.kind).technique;
-    const radial = special && ['blast', 'spin', 'frenzy'].includes(technique);
+    const wrestling = !a.enemy && a.specialState?.kind === 'gustavax';
+    const radial = special && ['blast', 'spin', 'frenzy'].includes(technique) || wrestling && type === 'kick';
     let range = a.enemy ? (special ? 195 : a.reach) : type === 'punch' ? 108 : type === 'kick' ? 145 : radial ? 235 : technique === 'gun' ? 680 : 310;
-    const band = a.enemy ? (special ? 115 : 48) : (special ? 95 : attack.air ? 68 : 54);
-    const damage = Math.round(a.power * (special ? (a.enemy ? 1.35 : 2.5) : type === 'kick' ? 1.5 : a.comboStep === 3 ? 1.4 : 1) * (a.buff > 0 ? 1.2 : 1) * (attack.air ? 1.2 : 1));
+    if (wrestling) range = type === 'kick' ? BALANCE.wrestler.radius * a.bonuses.radius : 145;
+    const band = wrestling && type === 'kick' ? 95 : a.enemy ? (special ? 115 : 48) : (special ? 95 : attack.air ? 68 : 54);
+    const damage = Math.round((wrestling ? a.specialPower : a.power) * (special ? (a.enemy ? 1.35 : 2.5) : type === 'kick' ? 1.5 : a.comboStep === 3 ? 1.4 : 1) * (a.buff > 0 ? 1.2 : 1) * (attack.air ? 1.2 : 1));
     let hits = 0;
     for (const target of a.enemy ? s.players : s.enemies) {
       if (target.hp <= 0 || target.invincible > 0 || (a.enemy && target.z > 28)) continue;
@@ -296,10 +337,8 @@ export class Simulation {
     if (!a.enemy) {
       for (const prop of s.props) {
         if (prop.kind === 'easel' && !prop.enemy) continue;
-        if (prop.hp <= 0 || Math.abs(prop.x - a.x) > range || Math.abs(prop.y - a.y) > band || (!radial && (prop.x - a.x) * a.facing < -28)) continue;
-        prop.hp -= attack.heavy ? 2 : 1;
-        this.event('break', { x: prop.x, y: prop.y - 24, broken: prop.hp <= 0 });
-        if (prop.hp <= 0) { if (prop.drop) s.pickups.push({ id: this.nextId++, x: prop.x, y: prop.y, kind: prop.drop }); s.score += 50; }
+        if (prop.hp <= 0 || Math.abs(prop.x - a.x) > range + (prop.halfWidth || 0) || Math.abs(prop.y - a.y) > band || (!radial && (prop.x - a.x) * a.facing < -28 - (prop.halfWidth || 0))) continue;
+        this.hitProp(prop, attack.heavy ? 2 : 1, a);
       }
       if (special && ['charge', 'roll'].includes(technique)) a.vx = a.facing * 600;
       if (hits) { a.energy = Math.min(100, a.energy + hits * (special ? 0 : 7)); s.combo += hits; s.comboTime = 2.2; s.bestCombo = Math.max(s.bestCombo, s.combo); }
@@ -313,11 +352,12 @@ export class Simulation {
     if (!target.enemy) amount = Math.max(1, Math.round(amount * difficulty(s.difficulty).damage * (1 - target.bonuses.defense)));
     if (target.pattern?.healing) { target.pattern = null; target.cooldown = 1.1; target.recovering = 1.1; this.event('opening', { x: target.x, y: target.y - 160, label: 'RÉCUPÉRATION INTERROMPUE !' }); }
     target.hp = Math.max(0, target.hp - amount); target.flash = .12;
+    if (target.elite) this.eliteHit(target, heavy);
     target.stun = target.boss ? .09 : heavy ? .34 : .23;
     // Boss wind-ups remain readable and cannot be stun-locked indefinitely.
     if (!target.boss || !target.attack) { target.attack = null; target.action = 'hurt'; target.actionTime = 0; }
     target.vx = (Math.sign(target.x - source.x) || source.facing) * (target.boss ? 65 : heavy ? 340 : 110);
-    if (!target.enemy) { target.invincible = .65; target.comboStep = 0; s.combo = 0; target.energy = Math.min(100, target.energy + 4); }
+    if (!target.enemy) { target.sitting = null; target.seatHold = 0; target.invincible = .65; target.comboStep = 0; s.combo = 0; target.energy = Math.min(100, target.energy + 4); }
     this.event('hit', { x: target.x, y: target.y - 72 - target.z, amount, heavy, enemy: target.enemy, actor: target.id });
     if (target.hp <= 0) {
       if (target.vehicle) {
@@ -327,11 +367,10 @@ export class Simulation {
         this.hazard(target, { kind: 'wreck', damage: 0, radius: 100, delay: 0, ttl: 1.1 }); return;
       }
       target.attack = null; target.action = 'dead'; target.actionTime = 0; target.deadTime = 0; target.downTime = 0; target.revive = 0;
-      target.specialState = null; target.pattern = null;
+      this.endSpecial(target); target.pattern = null;
       this.event('ko', { x: target.x, y: target.y, actor: target.id, enemy: target.enemy, boss: target.boss });
       if (target.enemy) {
         s.kills++; s.score += target.value + Math.min(10, Math.floor(s.combo / 3)) * 20;
-        this.awardXp(target.boss ? BALANCE.xp.boss + s.chapter * 45 : BALANCE.xp[target.kind] || 8);
         if (target.boss) { s.hazards = s.hazards.filter(h => h.owner !== target.id); for (const e of s.enemies) if (e.owner === target.id) { e.hp = 0; e.deadTime = 0; } }
         if (this.random() < .18) s.pickups.push({ id: this.nextId++, x: target.x, y: target.y, kind: 'food' });
       }
@@ -340,25 +379,31 @@ export class Simulation {
 
   updateEnemy(e, dt) {
     this.tickActor(e, dt);
+    if (e.elite) { this.updateElite(e, dt); return; }
     if (e.hp > 0 && e.boss) { this.updateBoss(e, dt); return; }
-    if (e.hp <= 0 || e.attack || e.stun > 0 || this.state.phase !== 'fight') return;
+    if (e.hp <= 0 || e.attack || e.stun > 0 || !['fight', 'surprise'].includes(this.state.phase)) return;
     if (e.boss && e.hp < e.maxHp * .4 && !e.enraged) { e.enraged = true; e.speed *= 1.25; this.event('rage', { actor: e.id, label: `${fighter(e.kind).name} s’énerve !` }); }
     const targets = this.state.players.filter(alive);
     if (!targets.length) return;
     const target = targets.length === 1 ? targets[0] : targets[e.id % targets.length];
     const dx = target.x - e.x, dy = target.y - e.y;
+    e.targetX = target.x; e.targetY = target.y;
     e.facing = Math.sign(dx) || e.facing;
     const attacking = this.state.enemies.filter(other => other.hp > 0 && (other.pattern || other.attack && !other.attack.hit)).length;
     const limit = targets.length === 2 ? BALANCE.waves.attackersDuo : BALANCE.waves.attackersSolo;
-    if (e.kind === 'guylux' && Math.abs(dx) < 500 && Math.abs(dy) < 35 && e.cooldown <= 0 && attacking < limit) { this.startAttack(e, 'special'); return; }
+    if (e.kind === 'triso' && Math.abs(dx) < BALANCE.triso.range && Math.abs(dy) < 100 && e.cooldown <= 0 && attacking < limit && this.state.hazards.filter(h => h.kind === 'slime').length < BALANCE.triso.maxPuddles) {
+      e.spitTarget = { x: target.x, y: target.y }; this.startAttack(e, 'special'); return;
+    }
+    if (['guylux', 'orelsan', 'papy_jala', 'charlingals', 'kikor_e'].includes(e.kind) && Math.abs(dx) >= e.reach - 12 && Math.abs(dx) < (e.kind === 'orelsan' ? 620 : 500) && Math.abs(dy) < 70 && e.cooldown <= 0 && attacking < limit) { this.startAttack(e, 'special'); return; }
+    if (['remy', 'makouille'].includes(e.kind) && Math.abs(dx) < 430 && Math.abs(dy) < 75 && e.cooldown <= 0 && attacking < limit && e.attackCount % 3 === 2) { e.attackCount++; this.startAttack(e, 'special'); return; }
     if (Math.abs(dx) < e.reach - 12 && Math.abs(dy) < 38 && e.cooldown <= 0 && attacking < limit) {
       if (e.boss) e.attackCount++;
-      e.attackCount++; this.startAttack(e, ['papy_jala', 'charlingals'].includes(e.kind) && e.attackCount % 3 === 0 ? 'special' : 'punch');
+      e.attackCount++; this.startAttack(e, 'punch');
       return;
     }
     const flanking = e.kind === 'orelsan' && this.state.chapter > 0;
     const side = flanking ? (e.id % 2 ? -1 : 1) : (e.x < target.x ? -1 : 1);
-    const desiredX = clamp(target.x + side * (e.kind === 'guylux' ? 290 : e.reach - 23), FLOOR.left, FLOOR.right);
+    const desiredX = clamp(target.x + side * (e.kind === 'triso' ? BALANCE.triso.distance : e.kind === 'guylux' ? 290 : e.reach - 23), FLOOR.left, FLOOR.right);
     const length = Math.max(1, Math.hypot(desiredX - e.x, dy * 1.5));
     if (Math.abs(desiredX - e.x) > 5 || Math.abs(dy) > 9) {
       e.x += (desiredX - e.x) / length * e.speed * dt;
@@ -392,19 +437,21 @@ export class Simulation {
     s.pickups = s.pickups.filter(item => {
       const player = s.players.find(p => alive(p) && p.z < 20 && distance(p, item) < 42 && (item.kind === 'food' ? p.hp < p.maxHp : p.energy < 98));
       if (!player) return true;
-      if (item.kind === 'food') player.hp = Math.min(player.maxHp, player.hp + 35);
-      else player.energy = Math.min(100, player.energy + 40);
-      s.score += 25; this.event('pickup', { x: item.x, y: item.y - 45, kind: item.kind, actor: player.id }); return false;
+      const before = item.kind === 'food' ? player.hp : player.energy;
+      if (item.kind === 'food') player.hp = Math.min(player.maxHp, player.hp + BALANCE.scenery.food + player.bonuses.food);
+      else player.energy = Math.min(100, player.energy + BALANCE.scenery.energy + player.bonuses.drink);
+      const amount = Math.round((item.kind === 'food' ? player.hp : player.energy) - before);
+      s.score += 25; this.event('pickup', { x: item.x, y: item.y - 45, kind: item.kind, actor: player.id, amount }); return false;
     });
   }
 
   revivePlayer(p, fraction) {
+    this.endSpecial(p);
     p.hp = Math.round(p.maxHp * fraction); p.invincible = 2.5; p.stun = 0; p.attack = null;
     p.downTime = 0; p.deadTime = 0; p.revive = 0; p.action = 'idle'; p.actionTime = 0; p.vx = 0;
-    p.specialState = null;
     this.event('revive', { actor: p.id, x: p.x, y: p.y });
   }
 
   snapshot() { return JSON.parse(JSON.stringify(this.state)); }
 }
-Object.assign(Simulation.prototype, combat);
+Object.assign(Simulation.prototype, combat, streetEvents, elites);

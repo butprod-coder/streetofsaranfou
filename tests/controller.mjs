@@ -12,7 +12,7 @@ const context = await browser.newContext({ viewport: { width: 1440, height: 900 
 await context.addInitScript(() => {
   window.testPad = { connected: true, id: 'Xbox standard / DualSense standard test fixture', mapping: 'standard', index: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })) };
   Object.defineProperty(navigator, 'getGamepads', { value: () => [window.testPad] });
-  if (!localStorage.getItem('saranfou-progression-v1')) localStorage.setItem('saranfou-progression-v1', JSON.stringify({ karonux: { totalXp: 600, stats: {} } }));
+  localStorage.setItem('saranfou-talents-v1', JSON.stringify({ karonux: { completed: [0, 1, 2], talents: ['matelas'] } }));
 });
 await mkdir('test-results', { recursive: true });
 const page = await context.newPage(), errors = [];
@@ -42,12 +42,11 @@ try {
   await focus('[data-fighter=karonux]'); await pad(0);
   await choose('[data-action=evolution]'); await screen('evolution');
   await page.screenshot({ path: 'test-results/evolution.png' });
-  await focus('[data-stat=life]'); await pad(0, 850);
-  let saved = await page.evaluate(() => JSON.parse(localStorage.getItem('saranfou-progression-v1')));
-  assert.equal(saved.karonux.stats.life, 1, 'Held A spends exactly one point');
+  await focus('[data-talent=matelas]'); await pad(0, 850);
+  assert.equal(await page.evaluate(() => localStorage.getItem('saranfou-talents-v1')), null, 'A new session clears old talent storage');
   await pad(1); await screen('select');
   await choose('[data-fighter=yanu]'); await choose('[data-action=evolution]');
-  assert.match(await page.locator('#evolution-level').textContent(), /NIVEAU 1 /);
+  assert.match(await page.locator('#talent-progress').textContent(), /0\/6 CHAPITRES/);
   await pad(1); await choose('[data-fighter=karonux]');
   await focus('#difficulty-select'); await pad(15); assert.equal(await page.locator('#difficulty-select').inputValue(), 'hard'); await pad(14);
   await choose('[data-action=play]'); await screen(null);
@@ -61,16 +60,16 @@ try {
   await pad(3); assert.equal((await inspect()).state.players[0].action, 'kick'); await page.waitForTimeout(500);
   await pad(5); assert.ok((await inspect()).state.players[0].dodgeCd > 0);
   await page.waitForTimeout(350); await pad(1); assert.equal((await inspect()).state.players[0].specialState.kind, 'karonux');
-  await page.waitForTimeout(550); assert.equal((await inspect()).state.players[0].action, 'sleep');
+  await page.waitForFunction(() => window.saranfou.inspect().state.players[0].action === 'sleep', null, { timeout: 5000 });
   await pad(9, 700); await screen('pause');
   const tick = (await inspect()).state.tick; await page.waitForTimeout(200); assert.equal((await inspect()).state.tick, tick);
-  await choose('[data-action=evolution]'); await screen('evolution'); await focus('[data-stat=attack]'); await pad(0);
-  assert.equal((await inspect()).state.players[0].progression.stats.attack, 1);
+  await choose('[data-action=evolution]'); await screen('evolution'); await focus('[data-talent=souffle]'); await pad(0);
+  assert.equal((await inspect()).state.players[0].progression.talents.includes('souffle'), false);
   await pad(1); await screen('pause'); await choose('[data-action=controls]'); await pad(1); await screen('pause');
   await pad(1); await screen(null); await pad(9); await choose('[data-action=quit]'); await screen('home');
-  await page.reload(); await screen('home'); saved = await page.evaluate(() => JSON.parse(localStorage.getItem('saranfou-progression-v1')));
-  assert.equal(saved.karonux.stats.attack, 1); assert.equal(saved.yanu.level, 1);
-  console.log('PASS controller: character selection, analog + dpad, all attacks, pause, controls, RPG, held buttons, persistence.');
+  await page.reload(); await screen('home');
+  assert.equal(await page.evaluate(() => localStorage.getItem('saranfou-talents-v1')), null);
+  console.log('PASS controller: character selection, analog + dpad, all attacks, pause, controls and per-run talent reset.');
 
   // Entire host flow uses only the virtual controller. Guest represents another real browser.
   await choose('[data-action=online]'); await choose('[data-action=host]'); await screen('lobby');
@@ -80,15 +79,15 @@ try {
   await guest.waitForFunction(() => window.saranfou?.inspect().screen === 'lobby');
   await choose('[data-action=ready]'); await guest.locator('#ready-button').click(); await screen(null);
   const room = server.rooms.get(code);
-  room.sim.awardXp(250); await pad(9); await screen('pause'); await choose('[data-action=evolution]');
-  const previous = room.sim.state.players[0].progression.stats.defense;
-  await focus('[data-stat=defense]'); await pad(0, 800); assert.equal(room.sim.state.players[0].progression.stats.defense, previous + 1);
+  room.sim.state.chapter = 0; room.sim.awardChapterTalent(); room.sim.state.chapter = 1; room.sim.awardChapterTalent(); await pad(9); await screen('pause'); await choose('[data-action=evolution]');
+  const previous = room.sim.state.players[0].progression.talents.length;
+  await focus('[data-talent=matelas]'); await pad(0); await focus('[data-talent=micro-sieste]'); await pad(0, 800); assert.equal(room.sim.state.players[0].progression.talents.length, previous + 2);
   await pad(1); await screen('pause'); await pad(1); await screen(null);
   room.sim.state.phase = 'over'; room.sim.pause(false);
   // Ping recovers the final state even when simulation ticking has stopped.
   await screen('result'); await choose('[data-action=evolution]'); await pad(1); await screen('result');
   await choose('[data-action=retry]'); await screen('lobby');
-  assert.equal(room.players[0].profile.stats.defense, previous + 1, 'Retry retains RPG');
+  assert.equal(room.players[0].profile.talents.length, 0, 'Retry resets talents');
   await choose('[data-action=leave]'); await screen('home');
   // Join a fresh lobby with a code entered entirely via controller, no on-screen keyboard dependency.
   await guest.goto(url); await guest.getByRole('button', { name: /Ramener un pote/ }).click(); await guest.getByRole('button', { name: /Créer un salon/ }).click();
@@ -104,7 +103,7 @@ try {
   await pad(13); await pad(0); await screen('lobby'); assert.equal((await inspect()).slot, 1);
   await choose('[data-action=leave]'); await screen('home');
   await guestContext.close();
-  console.log('PASS controller: online hosting and code entry/join, ready, shared RPG allocation, Game Over / Continue, retry and return.');
+  console.log('PASS controller: online hosting and code entry/join, ready, shared talents allocation, Game Over / Continue, retry and return.');
 
   // Render deterministic boss / transformation fixtures through the actual production renderer.
   await choose('[data-action=solo]'); await choose('[data-action=play]'); await screen(null); await pad(9); await screen('pause');

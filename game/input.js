@@ -6,6 +6,7 @@ export class Input {
     this.pause = pause; this.onMenu = menu; this.wake = wake;
     addEventListener('keydown', e => {
       if (e.code === 'Escape' && !e.repeat) { e.preventDefault(); pause(); return; }
+      if (!this.enabled && e.target.type === 'range' && ['ArrowUp', 'ArrowDown'].includes(e.code)) { e.preventDefault(); if (!e.repeat) this.onMenu(KEYMAP[e.code]); return; }
       if (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
       if (!this.enabled && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) { e.preventDefault(); if (!e.repeat) this.onMenu(KEYMAP[e.code]); return; }
       const action = KEYMAP[e.code];

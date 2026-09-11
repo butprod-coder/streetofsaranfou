@@ -4,7 +4,7 @@ import { Simulation } from '../game/simulation.js';
 import { FIGHTERS, CHAPTERS, STEP, FLOOR, blankInput } from '../game/data.js';
 import { BALANCE } from '../game/balance.js';
 import { wavePlan } from '../game/encounters.js';
-import { normalizeProfile, gainXp, spendPoint, maxXp, xpNeeded, applyProfile } from '../game/progression.js';
+import { normalizeProfile, completeChapter, spendPoint, TALENTS, bonuses, applyProfile } from '../game/progression.js';
 const run = (g, seconds, input = blankInput()) => { for (let i = 0; i < seconds / STEP; i++) g.step([input]); };
 function bossArena(chapter, mode = 'normal') {
   const g = new Simulation(['karonux'], chapter, 556, { difficulty: mode });
@@ -16,7 +16,7 @@ test('all 36 streets have varied multi-wave plans, delayed reinforcement and loc
     const waves = wavePlan(c, street); assert.ok(waves.length >= 2);
     assert.ok(new Set(waves.map(w => JSON.stringify(w.kinds))).size > 1);
     assert.equal(waves.at(-1).boss, street === 5);
-    const g = new Simulation(['jo'], c, 1); g.state.stage = street; g.enterStreet(); g.spawnWave();
+    const g = new Simulation(['jo'], c, 1); g.state.stage = street; g.enterStreet(); g.state.surpriseDone = true; g.spawnWave();
     g.state.players[0].x = 1200; g.state.players[0].invincible = 999;
     assert.ok(g.state.spawnQueue.length > 0); assert.equal(g.state.enemies.length, 1);
     for (let wave = 0; wave < waves.length; wave++) {
@@ -33,24 +33,39 @@ test('difficulty changes aggression and telegraphs without HP inflation', () => 
   assert.equal(a.hp, b.hp); assert.ok(b.speed > a.speed);
   easy.startAttack(a, 'punch'); hard.startAttack(b, 'punch'); assert.ok(a.attack.windup > b.attack.windup); assert.ok(a.cooldown > b.cooldown);
 });
-test('RPG curve, stat limits, malformed profiles and maximum level are bounded', () => {
-  let p = normalizeProfile({ totalXp: Infinity, stats: { attack: 999 } }); assert.equal(p.level, 1); assert.equal(p.stats.attack, 0);
-  p = gainXp(p, xpNeeded(1)); assert.equal(p.level, 2); assert.equal(p.points, 2); assert.equal(p.xp, 0);
-  p = spendPoint(p, 'attack'); assert.equal(p.points, 1); assert.equal(p.stats.attack, 1); assert.equal(spendPoint(p, '__proto__'), null);
-  p = normalizeProfile({ totalXp: maxXp * 9, stats: { attack: 999, life: 999, defense: 999, special: 999 } });
-  assert.equal(p.level, BALANCE.rpg.maxLevel); assert.equal(p.totalXp, maxXp); assert.equal(p.nextXp, 0);
-  assert.ok(Object.values(p.stats).reduce((a, b) => a + b) <= 38); assert.ok(Object.values(p.stats).every(n => n <= 12));
+test('the same enemy becomes tougher and stronger in later chapters', () => {
+  const early = new Simulation(['jo'], 0, 5), late = new Simulation(['jo'], 5, 5);
+  early.state.enemies = []; late.state.enemies = [];
+  const a = early.spawnEnemy('remy'), b = late.spawnEnemy('remy');
+  assert.equal(b.hp, Math.round(a.hp * 1.7));
+  assert.equal(b.power, a.power * 1.5);
+  assert.ok(b.speed > a.speed);
 });
-test('XP rewards are shared in duo, independent by fighter and stats spend only in safe states', () => {
-  const g = new Simulation(['jo', 'yanu'], 0, 1, { profiles: [{ totalXp: 120 }, {}] });
-  assert.equal(g.state.players[0].progression.level, 2); assert.equal(g.state.players[1].progression.level, 1);
-  assert.ok(g.spendStat(0, 'life')); assert.equal(g.state.players[0].maxHp, Math.round(120 * 1.03));
-  g.spawnWave(); assert.equal(g.spendStat(0, 'attack'), false); g.pause(true); assert.ok(g.spendStat(0, 'attack'));
-  const totals = g.state.players.map(p => p.progression.totalXp); g.awardXp(100);
-  g.state.players.forEach((p, i) => assert.equal(p.progression.totalXp, totals[i] + 100));
-  const enemy = g.state.enemies[0], xp = g.state.players[0].progression.totalXp;
-  g.damage(enemy, 999, g.state.players[0], true); g.damage(enemy, 999, g.state.players[0], true);
-  assert.equal(g.state.players[0].progression.totalXp, xp + BALANCE.xp[enemy.kind]);
+test('talent trees have six bounded nodes per fighter, prerequisites and no XP conversion', () => {
+  assert.equal(normalizeProfile({ totalXp: Infinity, stats: { attack: 999 } }).points, 0);
+  for (const f of FIGHTERS) {
+    const nodes = TALENTS[f.id]; assert.equal(nodes.length, 6); assert.equal(new Set(nodes.map(n => n.branch)).size, 2);
+    let p = normalizeProfile({ completed: [0, 1, 2, 3, 4, 5, 5, -1, 6, '2'], talents: ['__proto__'] }, f.id);
+    assert.equal(p.points, 6); assert.equal(spendPoint(p, nodes[1].id), null);
+    for (const node of nodes) { p = spendPoint(p, node.id); assert.ok(p); }
+    assert.equal(p.points, 0); assert.equal(spendPoint(p, nodes[0].id), null);
+    assert.equal(completeChapter(p, 5).points, 0);
+    const b = bonuses(p);
+    assert.ok(b.special >= 1.45 || b.defense >= .2 || b.attack >= 1.3 || b.life >= 1.3 || b.speed >= 1.18 || b.energyRegen >= 1.6);
+  }
+});
+test('chapter talents are shared in duo, independent by fighter and spend only in safe states', () => {
+  const g = new Simulation(['jo', 'yanu'], 0, 1, { profiles: [{ completed: [1, 2] }, {}] });
+  assert.equal(g.state.players[0].progression.points, 2); assert.equal(g.state.players[1].progression.points, 0);
+  assert.ok(g.spendStat(0, 'savonnette')); g.spawnWave(); assert.equal(g.spendStat(0, 'agite'), false);
+  g.pause(true); assert.ok(g.spendStat(0, 'agite')); assert.equal(g.spendStat(1, 'agite'), false);
+  g.awardChapterTalent(); g.awardChapterTalent();
+  assert.deepEqual(g.state.players.map(p => p.progression.points), [1, 1]);
+  const profiles = g.state.players.map(p => structuredClone(p.progression));
+  const enemy = g.state.enemies[0]; g.damage(enemy, 999, g.state.players[0], true);
+  assert.deepEqual(g.state.players.map(p => p.progression), profiles);
+  assert.equal(g.state.events.filter(e => e.type === 'talent').length, 2);
+  assert.ok(!g.state.events.some(e => ['xp', 'levelup'].includes(e.type)));
 });
 test('every boss has monotonic visible phases, different patterns and recovery windows', () => {
   for (let chapter = 0; chapter < 6; chapter++) {
@@ -80,10 +95,10 @@ test('each playable special is distinct, expires, respects cooldown, and stays i
     const g = new Simulation([f.id], 0, 42); g.spawnWave(); g.state.spawnQueue = [];
     const p = g.state.players[0], e = g.state.enemies[0]; e.hp = e.maxHp = 10000; e.speed = 0; e.cooldown = 999; e.invincible = 0; e.x = p.x + 75; e.y = p.y;
     g.step([{ ...blankInput(), special: true }]); assert.equal(p.specialState.kind, f.id); assert.ok(p.specialCd > 0);
-    run(g, .7); if (f.id === 'karonux') assert.equal(p.action, 'sleep');
+    run(g, .7); if (f.id === 'karonux') assert.equal(p.action, 'special');
     if (f.id === 'kikor') { assert.equal(g.state.allies.length, 1); assert.ok(g.state.props.some(p => p.kind === 'easel')); }
-    if (f.id === 'lorenzo') assert.equal(g.state.hazards.filter(h => h.kind === 'fire').length, 3);
-    run(g, 3); assert.equal(p.specialState, null); const energy = p.energy;
+    if (f.id === 'lorenzo') assert.equal(g.state.hazards.filter(h => h.kind === 'fire').length, BALANCE.embers.count);
+    run(g, f.id === 'gustavax' ? 6 : 3); assert.equal(p.specialState, null); const energy = p.energy;
     g.step([{ ...blankInput(), special: true }]); assert.ok(p.energy >= energy); assert.equal(p.specialState, null);
     assert.ok(p.x >= FLOOR.left && p.x <= FLOOR.right && p.y >= FLOOR.top && p.y <= FLOOR.bottom);
     run(g, 12); assert.equal(g.state.allies.length, 0);
@@ -98,19 +113,30 @@ test('boss summons are finite, paintings breakable, boss death cleans owned haza
   g.hazard(e, { kind: 'fire', ttl: 5 }); g.damage(e, 9999, p, true);
   assert.equal(g.state.hazards.filter(h => h.owner === e.id).length, 0);
 });
-test('defense and special investment are modest and do not refill existing health', () => {
-  const g = new Simulation(['yanu']), p = g.state.players[0]; p.hp = 30;
-  applyProfile(p, { totalXp: maxXp, stats: { defense: 12, special: 12 } }); assert.equal(p.hp, 30);
-  const before = p.hp; g.damage(p, 20, { x: 0, facing: 1 }, false); assert.equal(before - p.hp, 15);
-  assert.ok(p.bonuses.special < 1.5); assert.ok(p.bonuses.cooldown > .8);
+test('talents preserve health, cannot resurrect, and actually affect combat', () => {
+  const g = new Simulation(['gustavax']), p = g.state.players[0]; p.hp = 30;
+  applyProfile(p, { completed: [0, 1, 2, 3, 4, 5], talents: TALENTS.gustavax.map(n => n.id) }); assert.equal(p.hp, 30);
+  const before = p.hp; g.damage(p, 20, { x: 0, facing: 1 }, false); assert.equal(before - p.hp, 16);
+  p.hp = 0; applyProfile(p, p.progression); assert.equal(p.hp, 0);
 });
-
-test('level-up feedback reports multiple levels correctly and XP stops at the cap', () => {
-  const g = new Simulation(['kikor']); g.awardXp(600);
-  const event = g.state.events.find(e => e.type === 'levelup'); assert.equal(event.pointsGained, 6); assert.equal(event.level, 4);
-  g.awardXp(maxXp); const seq = g.state.eventSeq; g.awardXp(99); assert.equal(g.state.eventSeq, seq);
+test('chapter reward includes the final boss, but ordinary streets and replay do not grant points', () => {
+  const g = new Simulation(['kikor'], 5); g.state.stage = 4; g.clearStreet(); assert.equal(g.state.players[0].progression.points, 0);
+  g.state.stage = 5; g.clearStreet(); assert.equal(g.state.players[0].progression.points, 1);
+  g.clearStreet(); assert.equal(g.state.players[0].progression.points, 1);
+  assert.deepEqual(g.state.players[0].progression.completed, [5]);
 });
-
+test('Gustavax can move, punch and slam in wrestler form, then returns to ordinary combat', () => {
+  const g = new Simulation(['gustavax']), p = g.state.players[0]; g.spawnWave(); g.state.spawnQueue = []; g.state.enemies = [];
+  g.spawnEnemy('remy', { hp: 10000, maxHp: 10000, x: p.x + 80, y: p.y, cooldown: 999, speed: 0, invincible: 0 });
+  g.step([{ ...blankInput(), special: true }]); assert.equal(p.specialState.duration, 6);
+  const x = p.x; run(g, .4, { ...blankInput(), x: 1 }); assert.ok(p.x > x + 40);
+  const enemy = g.state.enemies[0]; enemy.x = p.x - 90; enemy.y = p.y; enemy.invincible = 0; const hp = enemy.hp;
+  g.step([{ ...blankInput(), kick: true }]); assert.equal(p.attack.type, 'kick'); run(g, .3);
+  assert.ok(enemy.hp < hp, 'Wrestler ground slam also hits behind');
+  p.invincible = 0; const health = p.hp; g.damage(p, 20, enemy, false); assert.equal(health - p.hp, 14);
+  run(g, 6); assert.equal(p.specialState, null);
+  g.startAttack(p, 'punch'); assert.equal(p.attack.heavy, false);
+});
 test('ordinary attackers share the telegraph budget with bosses', () => {
   for (const team of [['jo'], ['jo', 'yanu']]) {
     const g = new Simulation(team, 4, 900); g.spawnWave(); g.state.spawnQueue = []; g.state.enemies = [];

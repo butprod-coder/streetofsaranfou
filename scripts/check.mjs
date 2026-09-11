@@ -10,7 +10,7 @@ for (const c of FIGHTERS) {
   for (const action of ['idle', 'walk', 'punch', 'kick', 'special', 'jump', 'hurt', 'dead', 'dodge']) for (const f of animation(c.id, action)) urls.add(f.url);
 }
 for (const id of Object.keys(ENEMIES)) for (const action of ['idle', 'walk', 'punch', 'special', 'hurt', 'dead']) for (const f of animation(id, action, true)) urls.add(f.url);
-for (const f of ['shared/levels/titlebg.jpg', 'shared/decor/crate0.png', 'shared/decor/obj_baril.png', 'shared/pickups/chicken.png']) urls.add('/assets/' + f);
+urls.add('/assets/shared/levels/titlebg.jpg');
 const missing = [];
 for (const url of urls) { try { await access(new URL('..' + url, import.meta.url)); } catch { missing.push(url); } }
 if (missing.length) { console.error('Assets manquants :\n' + missing.join('\n')); process.exitCode = 1; }

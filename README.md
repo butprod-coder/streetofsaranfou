@@ -2,7 +2,7 @@
 
 Refonte du beat’em up dans les rues de Saran : **solo et coopération à deux en ligne**, sept combattants, six quartiers et 36 rues. Les décors et les personnages d’origine sont conservés.
 
-**Mise à jour v3 — Évolution arcade** : 2 à 4 vagues par rue, six boss à phases, six spéciaux distincts, trois difficultés, XP et statistiques persistantes par personnage, menus entièrement navigables à la manette. Voir [GAMEPLAY.md](GAMEPLAY.md) pour les règles, les valeurs d’équilibrage et les points de réglage.
+**Mise à jour v3 — Évolution arcade** : 2 à 4 vagues par rue, bestiaire aléatoire dès le premier quartier, six boss à phases, sept spéciaux distincts dont le catcheur de Gustavax, trois difficultés et arbres de six talents propres à chaque partie. Voir [GAMEPLAY.md](GAMEPLAY.md) pour les règles, les valeurs d’équilibrage et les points de réglage.
 
 ## Jouer
 
@@ -45,7 +45,7 @@ Les deux joueurs partagent la pause. Une coupure réseau met le combat en pause 
 
 Manette standard : stick/croix pour bouger, X = poing, Y = pied, B = spécial, A = saut, RB = esquive, LB = relever, Start = pause. Les menus se parcourent à la croix, A valide et B revient ; gauche/droite changent les listes sélectionnées. L’affectation dépend du mapping standard du navigateur. Les commandes tactiles s’affichent sur écran tactile ; le paysage est recommandé.
 
-Les zones rouges annoncent les attaques ennemies. Les caisses et barils se cassent et libèrent soins ou énergie. Une fois tous les ennemis battus, avancer à droite ; en duo, les deux joueurs doivent rejoindre la sortie. Chaque quartier se termine par un boss. Les vies de réserve permettent de revenir après un KO ; à deux, le partenaire peut relever le joueur avant ce retour automatique. Le score record, le personnage et le dernier chapitre sont conservés uniquement sur l’appareil.
+Les animations et projectiles annoncent les attaques ennemies ; seuls les bidons inflammables détruits conservent une zone rouge d’alerte. Les caisses et poubelles libèrent soins ou énergie. Une fois tous les ennemis battus, avancer à droite ; en duo, les deux joueurs doivent rejoindre la sortie. Chaque quartier se termine par un boss. Les vies de réserve permettent de revenir après un KO ; à deux, le partenaire peut relever le joueur avant ce retour automatique. Le score record, le personnage et le dernier chapitre sont conservés uniquement sur l’appareil.
 
 ## Hébergement Internet
 
@@ -77,7 +77,9 @@ Les tests couvrent dégâts/portée, protection, déplacements, soins, KO, coop�
 
 `pnpm run test:controller` ajoute les parcours manette et RPG sur un serveur de test isolé (aucun serveur à démarrer au préalable). Le Gamepad API standard est simulé : cela ne remplace pas un essai avec du matériel physique.
 
-`pnpm run build` produit `dist/` avec le client, le serveur et uniquement les images référencées (336 dans la v3). Ce dossier est une distribution **Node**, pas un export statique : y installer les dépendances de production avant lancement. Docker peut aussi être construit directement depuis ce dossier. La construction Docker nécessite Docker et n’est pas exécutée par les tests Node.
+`pnpm run build` produit `dist/` avec le client, le serveur et les images référencées (118 actuellement). Ce dossier est une distribution **Node**, pas un export statique : y installer les dépendances de production avant lancement. Docker peut aussi être construit directement depuis ce dossier. La construction Docker nécessite Docker et n’est pas exécutée par les tests Node.
+
+`pnpm run test:heroes` vérifie les 127 poses des sept héros, de la création/du chevalet de Kikor et de la Golf blanche : transparence, découpage et scènes réelles de combat. Les planches sont dans `assets/heroes/`, leurs prompts et leur préparation technique dans `PROMPTS.md` et `packing.json` de ce dossier. Les anciens sprites restent disponibles mais ne sont plus chargés pour les animations normales des héros.
 
 ## Organisation
 

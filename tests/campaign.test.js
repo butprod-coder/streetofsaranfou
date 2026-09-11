@@ -2,19 +2,21 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Simulation } from '../game/simulation.js';
 import { FIGHTERS, blankInput, STEP } from '../game/data.js';
+import { TALENTS } from '../game/progression.js';
 
 // A player bot uses only normal input. It cannot change health, skip waves or deal damage directly.
 function bot(state, player) {
   const input = blankInput();
   if (player.hp <= 0) return input;
   if (state.phase === 'clear') { input.x = 1; return input; }
-  if (state.phase !== 'fight') return input;
+  if (!['fight', 'surprise'].includes(state.phase)) return input;
   const distance = target => Math.hypot(target.x - player.x, (target.y - player.y) * 1.5);
   const down = state.players.find(p => p.hp <= 0);
   if (down && distance(down) < 100) { input.revive = true; return input; }
   const food = state.pickups.filter(p => p.kind === 'food').sort((a, b) => distance(a) - distance(b))[0];
   const enemies = state.enemies.filter(e => e.hp > 0).sort((a, b) => distance(a) - distance(b));
-  const target = player.hp < player.maxHp * .6 && food ? food : enemies[0];
+  const bonus = state.phase === 'surprise' ? state.props.filter(p => p.bonus && p.hp > 0).sort((a, b) => distance(a) - distance(b))[0] : null;
+  const target = player.hp < player.maxHp * .6 && food ? food : enemies[0] || bonus;
   if (!target) return input;
   const dx = target.x - player.x, dy = target.y - player.y;
   const stop = target === food ? 10 : 74;
@@ -27,6 +29,15 @@ function bot(state, player) {
     input.special = player.energy >= 50 && (enemies.filter(e => distance(e) < 240).length >= 2 || target.boss);
   }
   return input;
+}
+
+function spendRunTalents(game) {
+  for (const [slot, player] of game.state.players.entries()) {
+    if (!player.progression?.points) continue;
+    const next = TALENTS[player.kind].find(node => !player.progression.talents.includes(node.id)
+      && (!node.requires || player.progression.talents.includes(node.requires)));
+    if (next) game.spendStat(slot, next.id);
+  }
 }
 
 test('every fighter can complete a six-street chapter through ordinary controls', () => {
@@ -45,7 +56,10 @@ test('solo and duo complete the entire campaign without skipping encounters', ()
   for (const team of [['karonux'], ['yanu', 'jualos']]) {
     const game = new Simulation(team, 0, 789);
     let ticks = 0;
-    while (ticks++ < 60 * 2000 && !['over', 'won'].includes(game.state.phase)) game.step(game.state.players.map(p => bot(game.state, p)));
+    while (ticks++ < 60 * 2000 && !['over', 'won'].includes(game.state.phase)) {
+      spendRunTalents(game);
+      game.step(game.state.players.map(p => bot(game.state, p)));
+    }
     console.log('Campaign:', team.join('+'), game.state.phase, `chapter ${game.state.chapter + 1}, street ${game.state.stage + 1}`, `${Math.round(ticks * STEP)}s`, `${game.state.kills} KOs`);
     assert.equal(game.state.phase, 'won', team.join('+'));
     assert.ok(game.state.kills > 100);

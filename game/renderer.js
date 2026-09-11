@@ -1,6 +1,9 @@
 import { W, H, FLOOR, CHAPTERS, fighter, ENEMIES, clamp } from './data.js';
 import { VISUALS, PATTERN_LABELS, TRANSFORM_ROWS } from './visuals.js';
 import { BALANCE } from './balance.js';
+import { ELITES, ELITE_LABELS } from './elite-data.js';
+import { CLASSIC_SPRITES } from './classic-sprites.js';
+import { ENCORE_ELITES, ENCORE_RULES } from './elite-encore-data.js';
 const $ = s => document.querySelector(s);
 const TAU = Math.PI * 2;
 const scoreText = n => String(Math.floor(n)).padStart(6, '0').replace(/(\d{3})$/, ' $1');
@@ -31,13 +34,23 @@ export class Renderer {
           this.effects.push({ type: 'spark', x: e.x, y: e.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, ttl: .2 + Math.random() * .18, life: .4, color: i % 3 ? '#ffcd6e' : '#fff8df' });
         }
       }
-      if (e.type === 'special') { this.shake = 7; this.effects.push({ ...e, type: 'special', ttl: .7, life: .7 }); }
+      if (e.type === 'special') { if (e.kind === 'thunder') this.effects.push({ type: 'announcement', text: e.label.toUpperCase(), color: '#bfeeff', ttl: .9, life: .9 }); else { this.shake = 7; this.effects.push({ ...e, type: 'special', ttl: .7, life: .7 }); } }
+      if (e.type === 'thunder') this.shake = Math.max(this.shake, 5);
+      if (e.type === 'ember') { this.shake = Math.max(this.shake, 2); this.effects.push({ ...e, type: 'ember', ttl: .48, life: .48 }); }
       if (e.type === 'break') for (let i = 0; i < 10; i++) this.effects.push({ type: 'spark', x: e.x, y: e.y, vx: (Math.random() - .5) * 260, vy: -Math.random() * 200, ttl: .6, life: .6, color: '#d2a36c' });
-      if (e.type === 'pickup') this.effects.push({ type: 'number', x: e.x, y: e.y, text: e.kind === 'food' ? '+35 PV' : '+40 ÉNERGIE', color: '#98efc9', ttl: .9, life: .9 });
+      if (e.type === 'dodge') this.effects.push({ ...e, type: 'dash', ttl: .32, life: .32 });
+      if (e.type === 'skid') { this.shake = Math.max(this.shake, 3); this.effects.push({ ...e, type: 'dash', ttl: .45, life: .45 }); }
+      if (e.type === 'golf') this.audio.effect({ ...e, type: 'skid' });
+      if (e.type === 'explosion') { this.shake = 7; this.effects.push({ ...e, type: 'special', label: 'BOUM !', ttl: .5, life: .5 }); }
+      if (e.type === 'pickup') this.effects.push({ type: 'number', x: e.x, y: e.y, text: e.kind === 'food' ? `+${e.amount ?? BALANCE.scenery.food} PV` : `+${e.amount ?? BALANCE.scenery.energy} ÉNERGIE`, color: '#98efc9', ttl: .9, life: .9 });
       if (e.type === 'revive') this.effects.push({ type: 'number', x: e.x, y: e.y - 130, text: 'DEBOUT, POTO !', color: '#98efc9', ttl: 1.3, life: 1.3 });
       if (e.type === 'rage') this.effects.push({ type: 'announcement', text: e.label.toUpperCase(), color: '#ff8279', ttl: 2, life: 2 });
-      if (['wave', 'breather'].includes(e.type)) this.effects.push({ type: 'announcement', text: e.label, color: '#ffdb91', ttl: 1.8, life: 1.8 });
-      if (['xp', 'heal', 'opening', 'levelup'].includes(e.type)) this.effects.push({ type: 'number', x: e.x, y: e.y, text: e.type === 'xp' ? `+${e.amount} XP` : e.type === 'heal' ? `+${e.amount} PV` : e.type === 'levelup' ? `LEVEL UP · NIV. ${e.level} · +${e.pointsGained} POINTS` : e.label, color: e.type === 'levelup' ? '#ffe084' : '#9feecb', ttl: e.type === 'levelup' ? 2.3 : 1.1, life: e.type === 'levelup' ? 2.3 : 1.1 });
+      if (e.type === 'elite') this.effects.push({ type: 'announcement', text: `ÉLITE · ${e.label.toUpperCase()}`, color: '#d6b4ff', ttl: 1.5, life: 1.5 });
+      if (e.type === 'taunt') this.effects.push({ type: 'number', x: e.x, y: e.y, text: e.label, color: '#ffe5a7', ttl: 1.7, life: 1.7 });
+      if (e.type === 'spectacle') { this.shake = Math.max(this.shake, 5); this.effects.push({ ...e, type: 'atlasFX', ttl: .5, life: .5 }); }
+      if (['wave', 'breather'].includes(e.type) || e.type === 'surprise' && state.phase !== 'surprise') this.effects.push({ type: 'announcement', text: e.label, color: e.type === 'surprise' ? '#94efdb' : '#ffdb91', ttl: 1.8, life: 1.8 });
+      if (['heal', 'opening'].includes(e.type)) this.effects.push({ type: 'number', x: e.x, y: e.y, text: e.type === 'heal' ? `+${e.amount} PV` : e.label, color: '#9feecb', ttl: 1.1, life: 1.1 });
+      if (e.type === 'talent' && !this.effects.some(f => f.type === 'announcement' && f.text === e.label && f.ttl > 0)) this.effects.push({ type: 'announcement', text: e.label, color: '#ffe084', ttl: 4, life: 4 });
     }
     if (this.effects.length > 200) this.effects.splice(0, this.effects.length - 200);
   }
@@ -62,13 +75,14 @@ export class Renderer {
     this.livingScenery(state);
     for (const h of state.hazards || []) this.drawHazard(h, state.time);
     if (state.phase === 'clear') this.exit(state);
+    for (const p of state.props.filter(p => p.hp <= 0 && p.rubble > 0)) this.prop(p);
     const entities = [...state.props.filter(p => p.hp > 0).map(p => ({ ...p, prop: true })), ...state.pickups.map(p => ({ ...p, pickup: true })), ...state.enemies, ...state.players, ...(state.allies || [])].sort((a, b) => a.y - b.y || Number(a.enemy) - Number(b.enemy));
     for (const entity of entities) {
       if (entity.prop) this.prop(entity);
       else if (entity.pickup) this.pickup(entity, state.time);
       else {
         let targetX = entity.x, targetY = entity.y;
-        if (online && entity.id === slot + 1 && !entity.specialState && !state.paused && ['fight', 'rest', 'clear'].includes(state.phase) && entity.hp > 0 && entity.stun <= 0) {
+        if (online && entity.id === slot + 1 && entity.action !== 'dodge' && !entity.specialState && !state.paused && ['fight', 'surprise', 'rest', 'clear'].includes(state.phase) && entity.hp > 0 && entity.stun <= 0) {
           const factor = entity.attack ? .32 : 1, norm = Math.max(1, Math.hypot(input.x || 0, input.y || 0));
           targetX = clamp(targetX + (input.x || 0) / norm * entity.speed * factor * Math.min(.13, age + ping / 2000), FLOOR.left, FLOOR.right);
           targetY = clamp(targetY + (input.y || 0) / norm * entity.speed * .68 * factor * Math.min(.13, age + ping / 2000), FLOOR.top, FLOOR.bottom);
@@ -82,6 +96,7 @@ export class Renderer {
     }
     this.drawEffects(state.paused ? 0 : dt);
     c.fillStyle = this.vignette; c.fillRect(0, 0, W, H);
+    if (state.phase === 'surprise') this.surprisePanel(state);
     if (state.combo > 1 && state.comboTime > 0) {
       c.save(); c.translate(63, 217); c.rotate(-.06); c.fillStyle = '#ffbe5c'; c.shadowColor = '#060c16'; c.shadowBlur = 6;
       c.font = 'italic 52px Impact, sans-serif'; c.fillText(`${state.combo}`, 0, 0); c.font = '16px Impact, sans-serif'; c.fillText('HITS', 8, 22); c.restore();
@@ -102,6 +117,36 @@ export class Renderer {
     c.restore();
   }
   ellipse(x, y, rx, ry, color) { const c = this.ctx; c.fillStyle = color; c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, TAU); c.fill(); }
+  arcadeSprite(key, x, y, frame = 0, height, facing = 1) {
+    const asset = this.assets.arcadeFrame(key, frame); if (!asset) return;
+    const c = this.ctx, [sx, sy, sw, sh] = asset.rect, scale = (height || asset.height) / asset.base[3];
+    c.save(); c.translate(x, y); c.scale(facing, 1); c.imageSmoothingEnabled = false;
+    c.drawImage(asset.image, sx, sy, sw, sh, -sw * scale / 2, -sh * scale, sw * scale, sh * scale); c.restore();
+  }
+  classicFX(key, cell, x, y, width, facing = 1) {
+    const asset = this.assets.arcadeFrame(key, cell); if (!asset) return;
+    const [sx, sy, sw, sh] = asset.rect, c = this.ctx, scale = width / sw;
+    c.save(); c.translate(x, y); c.scale(facing, 1); c.imageSmoothingEnabled = false;
+    c.drawImage(asset.image, sx, sy, sw, sh, -width / 2, -sh * scale / 2, width, sh * scale); c.restore();
+  }
+  fireSprite(frame, x, y, width) {
+    const asset = this.assets.arcadeFrame('fireFX', frame), base = this.assets.arcadeFrame('fireFX', Math.floor(frame / 4) * 4);
+    if (!asset || !base) return;
+    const [sx, sy, sw, sh] = asset.rect, scale = width / base.rect[2], c = this.ctx;
+    c.imageSmoothingEnabled = false; c.drawImage(asset.image, sx, sy, sw, sh, x - sw * scale / 2, y - sh * scale, sw * scale, sh * scale);
+  }
+  surprisePanel(s) {
+    const e = s.surprise, c = this.ctx;
+    const left = e.kind === 'ambush' ? s.spawnQueue.length + s.enemies.filter(a => a.hp > 0).length : s.props.filter(p => e.targetIds.includes(p.id)).reduce((n, p) => n + (e.kind === 'car' ? p.hp : Number(p.hp > 0)), 0);
+    const name = { car: 'LA CASSE DU SIÈCLE', delivery: 'LIVRAISON EXPRESS', ambush: 'EMBUSCADE' }[e.kind];
+    const hint = { car: 'Détruis la voiture · Poings, pieds et spéciaux', delivery: `Brise les ${e.total} caisses cerclées de vert`, ambush: 'Élimine le gang avant son repli' }[e.kind];
+    c.save(); c.translate(0, 28); c.fillStyle = '#081621ed'; c.fillRect(374, 89, 532, 91); c.fillStyle = '#91efcf'; c.fillRect(374, 89, 3, 91);
+    c.textAlign = 'left'; c.font = '20px Impact, sans-serif'; c.fillText(name, 394, 116);
+    c.font = '12px monospace'; c.fillStyle = '#d1dfdc'; c.fillText(hint, 394, 139);
+    c.textAlign = 'right'; c.font = '26px Impact, sans-serif'; c.fillStyle = e.remaining < 6 ? '#ff9b82' : '#f5d894';
+    c.fillText(e.warning > 0 ? 'PRÊTS ?' : `${Math.ceil(e.remaining)}s`, 889, 118);
+    c.fillStyle = '#274039'; c.fillRect(394, 154, 492, 5); c.fillStyle = '#91efcf'; c.fillRect(394, 154, 492 * clamp(1 - left / e.total, 0, 1), 5); c.restore();
+  }
   bitmap(key, x, y, height, time = 0, facing = 1, luminous = false) {
     const list = VISUALS[key], image = list && this.assets.get(list[Math.floor(time * 8) % list.length]);
     if (!image) return;
@@ -134,20 +179,77 @@ export class Renderer {
     c.restore();
   }
   drawHazard(h, time) {
-    const c = this.ctx, warning = h.delay > 0, color = h.enemy ? '#ff696b' : '#83e6ca';
-    c.save(); c.strokeStyle = color; c.fillStyle = color; c.lineWidth = 2; c.globalAlpha = warning ? .18 + Math.sin(time * 14) * .06 : h.enemy ? .28 : .13;
-    if (h.shape === 'line') { c.fillRect(h.facing > 0 ? h.x : h.x - h.width, h.y - h.band, h.width, h.band * 2); c.globalAlpha = .8; c.strokeRect(h.facing > 0 ? h.x : h.x - h.width, h.y - h.band, h.width, h.band * 2); }
-    else { this.ellipse(h.x, h.y, h.radius, h.radius / 1.45, color); c.globalAlpha = .7; c.beginPath(); c.ellipse(h.x, h.y, h.radius, h.radius / 1.45, 0, 0, TAU); c.stroke(); }
-    c.globalAlpha = 1;
+    const c = this.ctx, warning = h.delay > 0, color = h.enemy || h.both ? '#ff696b' : '#83e6ca';
+    c.save();
+    // Ground warnings are reserved exclusively for explosive barrels.
+    if (h.kind === 'barrelBlast') {
+      c.strokeStyle = color; c.lineWidth = 2; c.globalAlpha = warning ? .22 : .28;
+      this.ellipse(h.x, h.y, h.radius, h.radius / 1.45, color);
+      c.globalAlpha = .7; c.beginPath(); c.ellipse(h.x, h.y, h.radius, h.radius / 1.45, 0, 0, TAU); c.stroke();
+      c.globalAlpha = 1; c.font = 'bold 15px monospace'; c.textAlign = 'center'; c.fillStyle = color;
+      if (warning) c.fillText('!', h.x, h.y - 8);
+    }
     if (warning) {
-      c.font = 'bold 15px monospace'; c.textAlign = 'center'; c.fillStyle = color; c.fillText(h.kind === 'fire' ? '🔥' : '!', h.x, h.y - 8);
-      if (h.kind === 'fire') { const arc = Math.max(0, 1 - h.delay / .85); c.save(); c.translate(h.x, h.y - 120 * Math.sin(arc * Math.PI) - 8); c.rotate(arc * 8); c.fillStyle = '#eee3cf'; c.fillRect(-8, -2, 16, 4); c.fillStyle = '#ff7a37'; c.fillRect(5, -2, 3, 4); c.restore(); }
-    } else if (h.kind === 'fire') {
-      for (let i = 0; i < 8; i++) {
-        const x = h.x + Math.sin(i * 2.4) * h.radius * .75, y = h.y + Math.cos(i * 2.4) * h.radius * .35;
-        const height = 21 + 19 * (.5 + Math.sin(time * 12 + i) * .5);
-        c.fillStyle = i % 2 ? '#ffa647d9' : '#ff643bba'; c.beginPath(); c.moveTo(x - 9, y); c.quadraticCurveTo(x - 13, y - height * .6, x + Math.sin(time * 9 + i) * 8, y - height); c.quadraticCurveTo(x + 18, y - 8, x + 9, y); c.fill();
+      if (h.kind === 'plant') {
+        this.arcadeSprite(h.atlas, h.x, h.y, 10, 35 + 65 * clamp(1 - h.delay / ENCORE_RULES.plantDelay, 0, 1));
+      } else if (h.kind === 'shotPut') {
+        const t = clamp(1 - h.delay / h.flight, 0, 1);
+        this.arcadeSprite(h.atlas, h.fromX + (h.x - h.fromX) * t, h.fromY + (h.y - h.fromY) * t - Math.sin(t * Math.PI) * 145, 9, 40);
+      } else if (h.kind === 'fire' || h.kind === 'slime') {
+        const progress = clamp(1 - h.delay / (h.flight || .85), 0, 1);
+        const x = (h.fromX ?? h.x) + (h.x - (h.fromX ?? h.x)) * progress;
+        const y = (h.fromY ?? h.y - 80) + (h.y - (h.fromY ?? h.y - 80)) * progress - Math.sin(progress * Math.PI) * 85;
+        if (h.kind === 'fire') { c.save(); c.translate(x, y); c.rotate(progress * 5 * h.facing); if (h.atlas) this.arcadeSprite(h.atlas, 0, 8, h.cell, 40); else this.fireSprite(Math.floor(time * 12) % 4, 0, 8, 40); c.restore(); }
+        else { const image = this.assets.get(VISUALS.spit[2]); if (image) c.drawImage(image, 511, 17, 105, 110, x - 18, y - 22, 36, 38); }
       }
+    } else if (h.kind === 'plant') {
+      c.globalAlpha = clamp(h.ttl / .35, 0, 1);
+      this.arcadeSprite(h.atlas, h.x, h.y, (h.activeAge || 0) % ENCORE_RULES.plantCycle < ENCORE_RULES.plantBite ? 11 : 10, 100);
+    } else if (h.kind === 'encoreProjectile') {
+      this.arcadeSprite(h.atlas, h.x, h.y - 20, 9, 48, h.vx < 0 ? -1 : 1);
+    } else if (h.kind === 'encoreFX' || h.kind === 'shotPut') {
+      c.globalAlpha = clamp(h.ttl / .1, 0, 1);
+      this.arcadeSprite(h.atlas, h.x + (h.shape === 'line' ? h.facing * h.width / 2 : 0), h.y, h.kind === 'shotPut' ? 10 : h.cell, 85, h.facing);
+    } else if (h.kind === 'barrelBlast') {
+      this.ellipse(h.x, h.y - 20, h.radius, 60, '#ffaf4980');
+      this.arcadeSprite('dash', h.x, h.y, 1, 95);
+    } else if (h.kind === 'fire') {
+      c.globalAlpha = clamp(h.ttl / .6, 0, 1);
+      this.fireSprite(4 + Math.floor((h.activeAge || 0) * 9 + h.id) % 4, h.x, h.y + h.radius * .3, h.radius * 2);
+    } else if (h.kind === 'slime') {
+      const image = this.assets.get(VISUALS.spit[2]);
+      c.globalAlpha = clamp(h.ttl / .8, 0, 1); c.imageSmoothingEnabled = false;
+      if (image) c.drawImage(image, 345, 265, 394, 74, h.x - h.radius, h.y - h.radius * .32, h.radius * 2, h.radius * .64);
+    } else if (h.kind === 'golfImpact') {
+      c.globalAlpha = clamp(h.ttl / .18, 0, 1); this.arcadeSprite('dash', h.x, h.y, 2, 72, h.facing);
+    } else if (h.kind === 'thunder') {
+      c.globalAlpha = clamp(h.ttl / .14, 0, 1); c.lineJoin = 'bevel';
+      for (const offset of [-.7, 0, .7]) {
+        const x = clamp(h.x + offset * h.radius, FLOOR.left, FLOOR.right), y = h.y + (offset ? 8 : -10);
+        c.beginPath(); c.moveTo(x - 25, y - 410);
+        for (let j = 1; j < 8; j++) c.lineTo(x + Math.sin(j * 2.7 + h.id + offset) * (j === 7 ? 0 : 24), y - 410 + j * 410 / 7);
+        c.strokeStyle = '#519dff'; c.lineWidth = 11; c.stroke(); c.strokeStyle = '#e3faff'; c.lineWidth = 3; c.stroke();
+      }
+    } else if (h.kind === 'magic' || h.kind === 'cigar') {
+      this.arcadeSprite(h.atlas, h.x, h.y - 25, h.cell, h.kind === 'cigar' ? 85 : 60, h.vx < 0 ? -1 : 1);
+    } else if (['tennis', 'magicCard', 'pencil'].includes(h.kind)) {
+      const key = { tennis: 'orelsan', magicCard: 'guylux', pencil: 'kikor_e' }[h.kind];
+      c.save(); c.translate(h.x, h.y - 26); c.rotate(Math.atan2(h.vy, h.vx));
+      this.classicFX(key, 9, 0, 0, h.kind === 'tennis' ? 72 : 54); c.restore();
+    } else if (h.kind === 'pepper') {
+      c.globalAlpha = clamp(h.ttl / .15, 0, .9);
+      this.classicFX('papy_jala', 9, h.x + h.facing * h.width / 2, h.y - 28, h.width, h.facing);
+    } else if (h.kind === 'bills') {
+      c.globalAlpha = clamp(h.ttl / .2, 0, 1);
+      this.classicFX('charlingals', 10, h.x, h.y - 25, h.radius * 2, h.facing);
+    } else if (h.kind === 'knife') {
+      // The knife is part of the attack pose, avoiding a second floating weapon.
+    } else if (h.kind === 'eliteSwipe') {
+      if (h.atlas !== 'fouine') this.arcadeSprite(h.atlas, h.x, h.y - 12, h.cell, 72, h.facing);
+    } else if (h.kind === 'shock' || h.kind === 'impact') {
+      // Dust at the actual impact, never a pre-hit area overlay.
+      c.strokeStyle = '#e8d5ad'; c.lineWidth = 3;
+      for (let i = 0; i < 6; i++) { const dx = (i - 2.5) * 12; c.beginPath(); c.moveTo(h.x + dx, h.y - 3); c.lineTo(h.x + dx * 1.4, h.y - 15 - (i % 3) * 8); c.stroke(); }
     } else if (h.kind === 'ball') { const g = c.createRadialGradient(h.x - 5, h.y - 16, 2, h.x, h.y - 10, 15); g.addColorStop(0, '#e9edf3'); g.addColorStop(1, '#505e75'); this.ellipse(h.x, h.y - 10, 15, 15, g); }
     else if (['card', 'paint'].includes(h.kind)) this.bitmap(h.kind, h.x, h.y - 10, 35, time, h.facing);
     else if (h.kind === 'fist') {
@@ -162,59 +264,92 @@ export class Renderer {
     const color = a.enemy ? '#ec6569' : a.id === 1 ? '#ffbf66' : '#91c6ff';
     if (a.boss && a.pattern) {
       const p = a.pattern;
-      if (!p.hit && !p.healing) {
-        if (p.charge) {
-          c.save(); c.strokeStyle = '#ff68684d'; c.lineWidth = a.vehicle ? 135 : 105; c.lineCap = 'round';
-          c.beginPath(); c.moveTo(p.x, p.y); c.lineTo(clamp(p.x + p.dx * p.speed * p.active, FLOOR.left, FLOOR.right), clamp(p.y + p.dy * p.speed * p.active, FLOOR.top, FLOOR.bottom)); c.stroke();
-          c.strokeStyle = '#ff9999'; c.lineWidth = 2; c.setLineDash([8, 9]); c.stroke(); c.restore();
-        } else {
-          const fist = ['longFist', 'doubleFist', 'sweepFist'].includes(p.kind);
-          this.drawHazard({ x: fist ? p.x : p.targetX, y: fist ? p.y : p.targetY, radius: 95, width: p.kind === 'sweepFist' ? 360 : 550, band: p.kind === 'sweepFist' ? 65 : 32, shape: fist ? 'line' : 'circle', facing: p.facing, enemy: true, delay: p.windup - p.elapsed, kind: 'warning' }, state.time);
-        }
-      }
-      c.fillStyle = p.healing ? '#a3ecc6' : '#ffab95'; c.font = 'bold 12px monospace'; c.textAlign = 'center'; c.fillText((PATTERN_LABELS[p.kind] || '').toUpperCase(), clamp(a.x, 180, 1100), a.y - 203);
+      c.fillStyle = p.healing ? '#a3ecc6' : '#ffab95'; c.font = 'bold 12px monospace'; c.textAlign = 'center'; c.fillText((PATTERN_LABELS[p.kind] || '').toUpperCase(), clamp(a.x, 180, 1100), a.y - 228 - (a.z || 0));
     }
-    if (a.recovering > 0 && !dead) { c.fillStyle = '#b9f2ce'; c.font = 'bold 13px monospace'; c.textAlign = 'center'; c.fillText('VULNÉRABLE', a.x, a.y - 185); }
-    if (a.enemy && a.attack && !a.attack.hit) {
-      const special = a.attack.type === 'special', charge = clamp(a.attack.elapsed / a.attack.windup, 0, 1);
-      c.save(); c.globalAlpha = .18 + charge * .22;
-      if (special) this.ellipse(a.x, a.y, 195, 115, '#ff4d54');
-      else { c.fillStyle = '#ff4d54'; c.fillRect(a.facing > 0 ? a.x : a.x - a.reach, a.y - 34, a.reach, 68); }
-      c.globalAlpha = .65; c.strokeStyle = '#ff8585'; c.lineWidth = 2;
-      c.beginPath(); c.ellipse(a.x, a.y, special ? 195 : 35, special ? 115 : 13, 0, 0, TAU); c.stroke();
-      c.restore();
-    }
+    if (a.recovering > 0 && !dead) { c.fillStyle = '#b9f2ce'; c.font = 'bold 13px monospace'; c.textAlign = 'center'; c.fillText('VULNÉRABLE', a.x, a.y - (ELITES[a.kind]?.height || 176) - 52 - (a.z || 0)); }
     this.ellipse(a.x + 5, a.y + 3, dead ? 49 : a.boss ? 39 : 28, dead ? 11 : 9, '#02060aa6');
     if (!a.enemy && !dead) {
       c.strokeStyle = color; c.globalAlpha = .65; c.lineWidth = 1.6; c.beginPath(); c.ellipse(a.x, a.y + 2, 29, 9, 0, 0, TAU); c.stroke(); c.globalAlpha = 1;
     }
+    if (a.enemy && !dead) this.enemyBar(a);
     let action = a.action;
-    if (a.kind === 'creation') { this.bitmap('creation', a.x, a.y, 96, state.time); if (a.ally) { c.fillStyle = '#9ef5b6'; c.font = '11px monospace'; c.textAlign = 'center'; c.fillText(`ALLIÉ · ${Math.ceil(a.ttl)}s`, a.x, a.y + 20); } return; }
+    if (a.elite) { this.drawElite(a, state); return; }
+    if (a.enemy && !a.boss && CLASSIC_SPRITES[a.kind]) { this.drawClassic(a, state); return; }
+    if (!dead && a.specialState?.kind === 'karonux') {
+      const b = BALANCE.specials.karonux;
+      if (a.specialState.elapsed >= b.golfAt && a.specialState.elapsed < b.sleepAt) {
+        const braking = Math.abs(a.specialState.elapsed - b.turnAt) < .16 || a.specialState.elapsed > b.sleepAt - .12;
+        this.arcadeSprite('golf', a.x, a.y, braking ? 2 : Math.floor(state.time * 9) % 2, 115, a.facing);
+        this.arcadeSprite('dash', a.x - a.facing * 95, a.y, Math.floor(state.time * 10) % 3, 35, a.facing);
+        c.fillStyle = '#ffdb91'; c.font = 'bold 11px monospace'; c.textAlign = 'center'; c.fillText('GOLF BLANCHE !', a.x, a.y - 190);
+        return;
+      }
+    }
+    if (!dead && a.pattern?.signature) {
+      const p = a.pattern, windup = !p.hit;
+      const key = { rainbowStorm: 'princesse', preciousHunt: 'precieux', kayakRush: 'kayak', sofaDrop: 'canape', ferretHunt: 'fouine', finalRing: 'wrestler' }[p.kind];
+      const cell = { rainbowStorm: windup ? 3 : 8, preciousHunt: windup ? 7 : 8, kayakRush: windup ? 3 : 8, sofaDrop: windup ? 2 : 3, ferretHunt: windup ? 3 : 8 + Math.floor(state.time * 10) % 2, finalRing: windup ? 11 : 6 }[p.kind];
+      this.arcadeSprite(key, p.kind === 'sofaDrop' ? p.targetX : a.x, (p.kind === 'sofaDrop' ? p.targetY : a.y) - (p.kind === 'sofaDrop' && windup ? 410 * (1 - p.elapsed / p.windup) : 0), cell, 176, a.facing);
+      return;
+    }
+    if (a.kind === 'creation') {
+      let cell = a.action === 'walk' ? 1 + Math.floor(state.time * 8) % 2 : 0;
+      if (a.attack) cell = a.attack.hit ? 4 : 3;
+      if (a.striking > 0) cell = 4;
+      if (a.emerging > 0) cell = 5;
+      if (a.stun > 0) cell = 6;
+      if (dead) cell = 7;
+      c.save(); c.globalAlpha = a.emerging > 0 ? clamp(1 - a.emerging / BALANCE.specials.kikor.emergeDuration, .15, 1) : dead ? clamp((1.2 - a.deadTime) / .4, 0, 1) : 1;
+      this.arcadeSprite('creation', a.x, a.y - a.z, cell, 96, a.facing); c.restore();
+      if (a.ally) { c.fillStyle = '#9ef5b6'; c.font = '11px monospace'; c.textAlign = 'center'; c.fillText(`ALLIÉ · ${Math.ceil(a.ttl)}s`, a.x, a.y + 20); }
+      return;
+    }
     if (!dead && a.vehicle) { this.bitmap('car', a.x, a.y, 174, state.time, a.facing); return; }
     if (!dead && a.pattern?.kind === 'bike') { this.bitmap('bike', a.x, a.y, 188, state.time, a.facing); return; }
     if (!dead && a.pattern?.kind === 'smoke') { this.bitmap('smokeHeal', a.x, a.y, 176, state.time, a.facing); return; }
-    if (!dead && (a.pattern?.kind === 'paint' || a.specialState?.kind === 'kikor')) { this.bitmap('painter', a.x, a.y, 155, state.time, a.facing); return; }
+    if (!dead && a.specialState?.kind === 'gustavax') {
+      let cell = Math.floor(state.time * 3) % 2;
+      if (a.action === 'walk' || a.action === 'dodge') cell = 2 + Math.floor(state.time * 7) % 2;
+      if (a.z > 0) cell = a.vz > 0 ? 8 : 9;
+      if (a.attack) cell = (a.attack.type === 'kick' ? 6 : 4) + Number(a.attack.elapsed >= a.attack.windup);
+      if (a.stun > 0) cell = 10;
+      if (a.specialState.elapsed < .3) cell = 11;
+      c.save();
+      if (a.flash > 0) c.filter = 'brightness(2)';
+      this.arcadeSprite('wrestler', a.x, a.y - a.z, cell, 177 * (.94 + (a.y - FLOOR.top) / (FLOOR.bottom - FLOOR.top) * .12), a.facing);
+      c.restore(); c.fillStyle = '#9acbff'; c.textAlign = 'center'; c.font = 'bold 11px monospace';
+      c.fillText(`J${a.id} · CATCHEUR +30 % · ${Math.max(0, Math.ceil(a.specialState.duration - a.specialState.elapsed))}s`, a.x, a.y + 24);
+      return;
+    }
     if (!dead && a.specialState && ['jualos', 'yanu', 'jo'].includes(a.kind)) {
       this.bitmap(({ jualos: 'pig', yanu: 'wolf', jo: 'tornado' })[a.kind], a.x, a.y, a.kind === 'jualos' ? 112 : 147, state.time, a.facing, true);
       if (a.kind === 'yanu') { c.strokeStyle = '#b8ffee'; c.lineWidth = 4; c.globalAlpha = .5; for (let i = 0; i < 3; i++) { c.beginPath(); c.ellipse(a.x, a.y - 55, 130 + i * 10, 42 + i * 7, -.3, state.time * 5, state.time * 5 + 1.7); c.stroke(); } c.globalAlpha = 1; }
       return;
     }
-    if (action === 'sleep') { action = 'dead'; c.fillStyle = '#c8e2ff'; c.font = 'bold 20px monospace'; c.fillText('Z z z', a.x + 28, a.y - 70 - Math.sin(state.time * 2) * 8); }
+    if (action === 'sleep') { c.fillStyle = '#c8e2ff'; c.font = 'bold 20px monospace'; c.textAlign = 'center'; c.fillText('Z z z', a.x + 28, a.y - 70 - Math.sin(state.time * 2) * 8); }
+    if (a.sitting) action = 'jump';
     if (a.pattern?.kind === 'whisky') { this.bitmap('bottle', a.x + a.facing * 32, a.y - 95, 43); }
     let progress = action === 'idle' ? (state.time * 1.3) % 1 : action === 'walk' || action === 'dodge' ? (state.time * 2.1) % 1 : clamp(t / (a.attack?.duration || (dead ? .65 : .45)), 0, .999);
+    if ((!a.enemy || a.boss) && a.attack) progress = a.attack.hit ? .75 : .25;
+    if (a.specialState?.kind === 'kikor') progress = a.specialState.elapsed < BALANCE.specials.kikor.paintAt ? .25 : .75;
+    if (a.specialState?.kind === 'karonux' && action !== 'sleep') progress = .25;
+    if (a.sitting) progress = .2;
     if (a.z > 0 && !a.attack && !dead) { action = 'jump'; progress = clamp(1 - a.vz / 490, 0, .999); }
     const frame = this.assets.frame(a.kind, action, progress, a.enemy && !a.boss) || this.assets.frame(a.kind, 'idle', 0, a.enemy && !a.boss);
     if (!frame) return;
     const base = this.assets.frame(a.kind, 'idle', 0, a.enemy && !a.boss);
     const height = (a.boss ? 176 : 144) * (.94 + (a.y - FLOOR.top) / (FLOOR.bottom - FLOOR.top) * .12);
     const [sx, sy, sw, sh] = frame.rect;
-    const scale = height / (base?.rect[3] || sh), dw = sw * scale, dh = sh * scale;
+    const scale = height / (frame.referenceHeight || base?.rect[3] || sh), dw = sw * scale, dh = sh * scale;
     c.save();
     if (dead && a.enemy) c.globalAlpha = clamp((1.2 - a.deadTime) / .4, 0, 1);
     else if (a.invincible > .2 && Math.floor(state.time * 14) % 2 === 0) c.globalAlpha = .63;
-    c.translate(a.x, a.y - a.z); c.scale(a.facing, 1);
+    c.translate(a.x, a.y - a.z - (a.sitting ? 25 : 0)); c.scale(a.facing, 1);
     c.imageSmoothingEnabled = false;
-    if (a.action === 'dodge' && !dead) { c.globalAlpha = .25; c.drawImage(frame.image, sx, sy, sw, sh, -dw / 2 - a.facing * 28, -dh, dw, dh); c.globalAlpha = .82; }
+    if (a.action === 'dodge' && !dead) {
+      for (let i = 3; i > 0; i--) { c.globalAlpha = .24 / i; c.drawImage(frame.image, sx, sy, sw, sh, -dw / 2 - a.facing * a.dodgeX * i * 27, -dh - a.dodgeY * i * 16, dw, dh); }
+      c.globalAlpha = .9;
+    }
     if (a.flash > 0) { c.filter = 'brightness(2.6) saturate(.3)'; }
     else if (a.boss && a.enraged) c.filter = 'sepia(.2) saturate(1.5)';
     c.drawImage(frame.image, sx, sy, sw, sh, -dw / 2, -dh, dw, dh);
@@ -224,13 +359,13 @@ export class Renderer {
       c.strokeStyle = a.attack.type === 'special' ? fighter(a.kind).color : '#fff0b0'; c.lineWidth = a.attack.heavy ? 7 : 4; c.globalAlpha = .7;
       c.beginPath(); c.ellipse(10, 0, a.attack.heavy ? 94 : 68, a.attack.heavy ? 62 : 40, -.2, -1.25, 1.1); c.stroke(); c.restore();
     }
-    if (a.enemy && !a.boss && a.hp < a.maxHp && !dead) {
-      c.fillStyle = '#090c14c9'; c.fillRect(a.x - 27, a.y - height - a.z - 17, 54, 4);
-      c.fillStyle = '#ef8b81'; c.fillRect(a.x - 27, a.y - height - a.z - 17, 54 * a.hp / a.maxHp, 4);
-    }
     if (a.enemy && a.attack && !a.attack.hit) {
       c.font = 'bold 25px sans-serif'; c.textAlign = 'center'; c.fillStyle = '#ff9e91'; c.shadowColor = '#210507'; c.shadowBlur = 6;
-      c.fillText(a.attack.type === 'special' ? '!!' : '!', a.x, a.y - height - 27); c.shadowBlur = 0;
+      c.fillText(a.attack.type === 'special' ? '!!' : '!', a.x, a.y - height - 46); c.shadowBlur = 0;
+      if (a.attack.type === 'special') {
+        const cue = { remy: 'DÉRAPAGE', makouille: 'ROUE AVANT', papy_jala: 'POIVRE !', orelsan: 'SMATCH', charlingals: 'FAUX BILLETS', guylux: 'CARTES', kikor_e: 'CRAYONS' }[a.kind];
+        if (cue) { c.font = 'bold 10px monospace'; c.fillStyle = '#ffe1a4'; c.fillText(cue, a.x, a.y - height - 70); }
+      }
     }
     if (!a.enemy) {
       c.textAlign = 'center'; c.font = 'bold 11px monospace'; c.fillStyle = color;
@@ -241,20 +376,87 @@ export class Renderer {
       } else { c.fillText(a.id === slot + 1 ? `J${a.id} · TOI` : `J${a.id}`, a.x, a.y + 24); }
     }
   }
+  enemyBar(a) {
+    const c = this.ctx, config = ELITES[a.kind] || ENEMIES[a.kind];
+    const name = ELITES[a.kind]?.firstName || (a.kind === 'bolorouet' ? 'Julio' : config?.name?.split(' ·')[0]) || (a.kind === 'creation' ? 'Création' : fighter(a.kind).name);
+    const height = ELITES[a.kind]?.height || CLASSIC_SPRITES[a.kind]?.height || (a.boss ? 176 : a.kind === 'creation' ? 96 : 144);
+    c.save(); c.font = 'bold 12px monospace'; c.textAlign = 'center';
+    const width = Math.max(104, c.measureText(name).width + 22), x = clamp(a.x, width / 2 + 8, W - width / 2 - 8), y = a.y - height - (a.z || 0) - 34;
+    c.fillStyle = '#080e19'; c.fillRect(x - width / 2 - 2, y - 2, width + 4, 24);
+    c.fillStyle = '#293345'; c.fillRect(x - width / 2, y, width, 20);
+    c.fillStyle = config?.color || '#ed968b'; c.fillRect(x - width / 2, y + 15, width * clamp(a.hp / a.maxHp, 0, 1), 5);
+    c.fillStyle = '#ffffff'; c.fillText(name, x, y + 12); c.restore();
+  }
+  drawClassic(a, state) {
+    const c = this.ctx, config = CLASSIC_SPRITES[a.kind], dead = a.hp <= 0;
+    let cell = a.moving ? 1 + Math.floor(state.time * 7) % 2 : 0;
+    if (a.attack) cell = (a.attack.type === 'special' ? 7 : 3) + Number(a.attack.hit);
+    if (a.kind === 'makouille' && a.attack?.type === 'special' && a.attack.hit) cell = 4;
+    if (a.stun > 0) cell = 5;
+    if (dead) cell = 6;
+    c.save();
+    if (dead) c.globalAlpha = clamp((1.2 - a.deadTime) / .4, 0, 1);
+    else if (a.invincible > .2 && Math.floor(state.time * 14) % 2 === 0) c.globalAlpha = .63;
+    if (a.flash > 0) c.filter = 'brightness(2)';
+    this.arcadeSprite(a.kind, a.x, a.y - a.z, cell, config.height, a.facing);
+    c.restore();
+    if (dead) return;
+    const y = a.y - config.height - a.z - 14;
+    if (a.attack && !a.attack.hit) {
+      const cue = { remy: 'DÉRAPAGE', makouille: 'ROUE AVANT', papy_jala: 'POIVRE !', orelsan: 'SMASH', charlingals: 'FAUX BILLETS', guylux: 'CARTES', kikor_e: 'CRAYONS' }[a.kind];
+      c.font = 'bold 12px monospace'; c.textAlign = 'center'; c.fillStyle = '#ffe1a4';
+      c.fillText(a.attack.type === 'special' ? cue : '!', clamp(a.x, 90, 1190), y - 28);
+    }
+  }
+  drawElite(a, state) {
+    const c = this.ctx, config = ELITES[a.kind], q = a.eliteState, p = a.pattern, dead = a.hp <= 0;
+    let cell = a.action === 'walk' ? 1 + Math.floor(state.time * 8) % 2 : 0;
+    if (p) cell = p.hit ? 4 : 3;
+    if (ENCORE_ELITES[a.kind]) cell = p ? (p.secondary ? 7 : 3) + Number(p.hit) : a.recovering > .6 && a.kind !== 'carnivore' ? 11 : cell;
+    if (a.kind === 'precieux' && p?.hit) cell = 8;
+    if (a.kind === 'kayak' && p?.hit) cell = Math.floor(state.time * 8) % 2 ? 4 : 8;
+    if (a.kind === 'fouine' && p?.hit) cell = 8 + Math.floor(state.time * 11) % 2;
+    if (a.stun > 0) cell = a.kind === 'fouine' && !p?.hit ? 11 : 5;
+    if (dead) cell = 6;
+    if (a.kind === 'canape') cell = dead ? 5 : q.landing > 0 ? 2 : q.seated ? p ? 3 : Math.floor(state.time * 2) % 2 : a.enraged ? p?.hit ? 11 : 7 : 6;
+    c.save();
+    if (dead) c.globalAlpha = clamp((1.2 - a.deadTime) / .4, 0, 1);
+    if (a.flash > 0) c.filter = 'brightness(2)';
+    this.arcadeSprite(a.kind, a.x, a.y - a.z, cell, config.height, a.facing);
+    c.restore();
+    if (dead) return;
+    const y = a.y - config.height - a.z - 14;
+    c.textAlign = 'center'; c.font = 'bold 10px monospace'; c.fillStyle = config.color;
+    if (p && !p.hit) { c.fillStyle = '#ffe5aa'; c.font = 'bold 11px monospace'; c.fillText(ELITE_LABELS[p.kind] || 'ATTENTION !', clamp(a.x, 145, 1135), y - 27); }
+    if (q.landing > 0) { c.fillStyle = '#ffd376'; c.font = 'bold 14px monospace'; c.fillText('CANAPÉ EN APPROCHE !', clamp(a.x, 140, 1140), a.y - 30); }
+  }
   prop(p) {
-    if (p.kind === 'easel') { this.bitmap('easel', p.x, p.y, 125, 0); const c = this.ctx; c.fillStyle = p.enemy ? '#ff9789' : '#95e8b8'; c.font = '11px monospace'; c.textAlign = 'center'; c.fillText(p.enemy ? `TABLEAU · ${p.hp} COUPS` : 'TOILE ALLIÉE', p.x, p.y + 15); return; }
-    const c = this.ctx, img = this.assets.get(`/assets/shared/decor/${p.kind === 'crate' ? 'crate0' : 'obj_baril'}.png`);
-    if (!img) return;
-    const h = p.kind === 'crate' ? 61 : 75, w = img.width / img.height * h;
-    this.ellipse(p.x + 3, p.y + 1, w / 2, 8, '#0007'); c.drawImage(img, p.x - w / 2, p.y - h, w, h);
-    if (p.hp === 1) { c.fillStyle = '#ffc477'; c.fillRect(p.x - 16, p.y - h - 9, 16, 3); }
+    if (p.kind === 'sofa') {
+      this.arcadeSprite('canape', p.x, p.y, p.hp > 3 ? 8 : 10, 128);
+      if (p.hp > 0) { const c = this.ctx; c.fillStyle = '#ffdf8c'; c.font = 'bold 11px monospace'; c.textAlign = 'center'; c.fillText('E / LB · S’ASSEOIR', p.x, p.y + 18); }
+      return;
+    }
+    if (p.kind === 'easel') {
+      const cell = p.enemy ? 11 : (p.paintTime || 0) < .25 ? 9 : p.paintTime < .55 ? 10 : 11;
+      this.arcadeSprite('creation', p.x, p.y, cell, 114);
+      const c = this.ctx; c.fillStyle = p.enemy ? '#ff9789' : '#95e8b8'; c.font = '11px monospace'; c.textAlign = 'center'; c.fillText(p.enemy ? `TABLEAU · ${p.hp} COUPS` : 'TOILE ALLIÉE', p.x, p.y + 15); return;
+    }
+    const c = this.ctx, broken = p.hp <= 0, max = p.maxHp || 3, frame = broken ? 2 : p.hp < max ? 1 : 0;
+    c.save();
+    if (broken) c.globalAlpha = Math.min(.8, p.rubble / 2);
+    this.ellipse(p.x + 3, p.y + 1, p.kind === 'car' ? 155 : 36, p.kind === 'car' ? 15 : 9, '#0008');
+    if (p.bonus && !broken) { c.strokeStyle = '#8fefc8'; c.lineWidth = 2; c.beginPath(); c.ellipse(p.x, p.y + 2, p.kind === 'car' ? 167 : 43, 13, 0, 0, TAU); c.stroke(); }
+    if (p.flash > 0) c.filter = 'brightness(1.7)';
+    this.arcadeSprite(p.kind, p.x + (p.flash > 0 ? Math.sin(p.flash * 90) * 3 : 0), p.y, frame);
+    c.filter = 'none';
+    if (!broken && p.hp < max) { c.fillStyle = '#12202b'; c.fillRect(p.x - 26, p.y + 15, 52, 4); c.fillStyle = '#ffcf7c'; c.fillRect(p.x - 26, p.y + 15, 52 * p.hp / max, 4); }
+    c.restore();
   }
   pickup(p, time) {
     const c = this.ctx, bob = Math.sin(time * 4 + p.id) * 3, food = p.kind === 'food';
     this.ellipse(p.x, p.y + 3, 25, 7, food ? '#98e7ad28' : '#ffba5830');
     c.save(); c.shadowBlur = 16; c.shadowColor = food ? '#8cf7b9' : '#ffba58';
-    if (food) { const img = this.assets.get('/assets/shared/pickups/chicken.png'); if (img) c.drawImage(img, p.x - 18, p.y - 30 + bob, 36, 30); }
-    else { c.fillStyle = '#ffc76f'; c.font = 'bold 35px sans-serif'; c.textAlign = 'center'; c.fillText('ϟ', p.x, p.y - 5 + bob); }
+    this.arcadeSprite(p.kind, p.x, p.y - 5 + bob);
     c.restore();
   }
   exit(state) {
@@ -282,7 +484,10 @@ export class Renderer {
       e.ttl -= dt;
       if (e.ttl <= 0) continue;
       c.save(); c.globalAlpha = clamp(e.ttl / (e.life * .5), 0, 1);
+      if (e.type === 'atlasFX') this.arcadeSprite(e.atlas, e.x, e.y, e.cell, 110 + (1 - e.ttl / e.life) * 30);
+      if (e.type === 'dash' && !this.reducedMotion) this.arcadeSprite('dash', e.x, e.y, Math.min(2, Math.floor((1 - e.ttl / e.life) * 3)), 34, e.facing);
       if (e.type === 'number') { e.y -= 35 * dt; c.font = `bold ${e.text.length > 3 ? 13 : 24}px monospace`; c.textAlign = 'center'; c.fillStyle = e.color; c.strokeStyle = '#07101b'; c.lineWidth = 4; c.strokeText(e.text, e.x, e.y); c.fillText(e.text, e.x, e.y); }
+      if (e.type === 'ember') this.fireSprite(8 + Math.min(3, Math.floor((1 - e.ttl / e.life) * 4)), e.x, e.y + e.radius * .3, e.radius * 1.9);
       if (e.type === 'spark') { e.x += e.vx * dt; e.y += e.vy * dt; e.vy += 400 * dt; c.fillStyle = e.color; c.translate(e.x, e.y); c.rotate(Math.atan2(e.vy, e.vx)); c.fillRect(0, 0, 7, 2.5); }
       if (e.type === 'special') {
         const progress = 1 - e.ttl / e.life;
@@ -301,25 +506,37 @@ export class Renderer {
       this.hudKey = key;
       for (let i = 0; i < 2; i++) {
         const el = $(`#hud-p${i + 1}`), p = s.players[i];
-        if (!p) { el.innerHTML = '<div class="player-bars"><div><b>SCORE</b></div><strong class="solo-score"></strong></div>'; continue; }
+        if (!p) { el.innerHTML = '<div class="player-bars solo-score-panel"><div><b>SCORE DE LA BANDE</b></div><strong class="solo-score"></strong></div>'; continue; }
         const f = fighter(p.kind);
-        el.innerHTML = `<img src="/assets/${f.id}/${f.id}_p.png" alt=""><div class="player-bars"><div><b>${f.name}</b><small>J${i + 1}${i === slot ? ' · TOI' : ''}</small></div><div class="health-bar"><i></i></div><div class="energy-bar"><i></i></div><div class="xp-bar"><i></i></div><div class="credits"></div><div class="xp-caption"></div></div>`;
+        el.style.setProperty('--fighter-color', f.color);
+        el.innerHTML = `<div class="hud-portrait"><img src="/assets/${f.id}/${f.id}_p.png" alt=""><span>J${i + 1}</span></div><div class="player-bars"><div class="player-identity"><b>${f.name}</b><small>${i === slot ? 'TOI' : online ? 'ALLIÉ' : 'COMBATTANT'}</small></div><div class="hud-meter health-bar"><span>VIE</span><i></i><output></output></div><div class="hud-meter energy-bar"><span>SP</span><i></i><output></output></div><div class="hud-meta"><span class="credits"></span><span class="dodge-caption"></span></div><div class="talent-caption"></div></div>`;
       }
     }
     for (let i = 0; i < s.players.length; i++) {
       const p = s.players[i], el = $(`#hud-p${i + 1}`);
       el.querySelector('.health-bar i').style.transform = `scaleX(${p.hp / p.maxHp})`;
       el.querySelector('.energy-bar i').style.transform = `scaleX(${p.energy / 100})`;
+      el.querySelector('.health-bar output').textContent = p.hp > 0 ? `${Math.ceil(p.hp)} / ${p.maxHp}` : 'À TERRE';
+      el.querySelector('.energy-bar output').textContent = `${Math.floor(p.energy)} / 100`;
+      el.classList.toggle('critical', p.hp > 0 && p.hp / p.maxHp <= .3);
+      el.classList.toggle('down', p.hp <= 0);
       const cost = BALANCE.specials[p.kind].cost;
-      el.querySelector('.credits').textContent = `${'◆'.repeat(p.lives)} · ${p.hp > 0 ? `${Math.ceil(p.hp)} PV` : 'À TERRE'} · ${p.specialCd > 0 ? `SP ${Math.ceil(p.specialCd)}s` : p.energy >= cost ? 'SPÉCIAL PRÊT' : `ÉNERGIE < ${cost}`}`;
-      const r = p.progression; if (r) { el.querySelector('.xp-bar i').style.transform = `scaleX(${r.nextXp ? r.xp / r.nextXp : 1})`; el.querySelector('.xp-caption').textContent = `NIV. ${r.level} · ${r.nextXp ? `${r.xp}/${r.nextXp} XP` : 'MAX'}${r.points ? ` · ${r.points} PT · PAUSE` : ''}`; }
+      el.querySelector('.dodge-caption').textContent = p.dodgeCd > 0 ? `ESQUIVE ${p.dodgeCd.toFixed(1)}s` : 'ESQUIVE ✓';
+      el.querySelector('.credits').textContent = `${'◆'.repeat(p.lives) || '◇'} VIE${p.lives > 1 ? 'S' : ''}`;
+      const specialState = p.specialCd > 0 ? `RECHARGE ${Math.ceil(p.specialCd)}s` : p.energy >= cost ? 'SPÉCIAL PRÊT' : `${cost - Math.floor(p.energy)} ÉNERGIE MANQUANTE`;
+      el.querySelector('.energy-bar').classList.toggle('ready', p.specialCd <= 0 && p.energy >= cost);
+      const r = p.progression;
+      if (!el.querySelector('.special-caption')) el.querySelector('.player-bars').insertAdjacentHTML('beforeend', '<span class="special-caption"></span>');
+      el.querySelector('.special-caption').textContent = specialState;
+      if (r) el.querySelector('.talent-caption').innerHTML = `<span>TALENTS ${r.talents.length}/6</span><span class="talent-pips">${Array.from({ length: 6 }, (_, n) => `<i class="${n < r.talents.length ? 'active' : n < r.talents.length + r.points ? 'point' : ''}"></i>`).join('')}</span><small>${r.points ? `${r.points} À CHOISIR · PAUSE` : ''}</small>`;
     }
     const soloScore = $('.solo-score'); if (soloScore) soloScore.textContent = scoreText(s.score);
-    $('#mission-chapter').textContent = `CHAPITRE ${String(s.chapter + 1).padStart(2, '0')} / 06${online ? ' · ' + scoreText(s.score) : ''}`;
+    $('#mission-chapter').textContent = `CHAPITRE ${String(s.chapter + 1).padStart(2, '0')} / 06 · MENACE ${s.chapter + 1}/6${online ? ' · ' + scoreText(s.score) : ''}`;
     $('#mission-title').textContent = CHAPTERS[s.chapter].name;
     $('#street-progress').innerHTML = CHAPTERS[s.chapter].backgrounds.map((_, i) => `<i class="${i <= s.stage ? 'done' : ''}"></i>`).join('');
     const count = s.enemies.filter(e => e.hp > 0).length;
     $('#objective').textContent = s.phase === 'clear' ? (s.players.length === 2 ? 'Rue dégagée · Tous les deux à droite →' : 'Rue dégagée · Avance à droite →') : s.phase === 'intro' ? 'La nuit ne fait que commencer.' : s.phase === 'rest' ? `On souffle · Renforts dans ${Math.ceil(s.phaseTime)}s` : `VAGUE ${s.wave + 1}/${s.waves.length} · ${count} ennemis${s.spawnQueue.length ? ` + ${s.spawnQueue.length} renforts` : ''} · RUE ${s.stage + 1}/6`;
+    if (s.phase === 'surprise') $('#objective').textContent = 'DÉFI BONUS · Réussis pour gagner du score · Échec sans blocage';
     $('#ping').textContent = online ? `${Math.round(ping)} ms · EN LIGNE` : 'SOLO';
     const boss = s.enemies.find(e => e.boss && e.hp > 0);
     $('#boss-hud').classList.toggle('hidden', !boss);

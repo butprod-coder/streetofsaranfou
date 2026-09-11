@@ -1,0 +1,38 @@
+/* High-contrast arcade HUD. Keep combat space clear below the cards. */
+.hud{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:18px}
+.hud .hud-meter>output{grid-column:3;text-align:right}.hud .hud-meter{grid-template-columns:35px 1fr auto;transform:none}.hud .hud-meter>span,.hud .hud-meter>output{transform:none}
+.hud .player-bars,.hud .second .player-bars{clip-path:none;background:none;border:0;padding:0;flex:1}
+.hud .credits,.hud .dodge-caption{font-size:10px}.hud .talent-caption small{display:inline}
+.evolution-modal .talent-node::before{position:absolute;top:-9px;left:32px;width:2px;height:8px}.evolution-modal .talent-track{gap:10px}.evolution-modal .talent-node{flex:none;clip-path:none}
+.hud .player-hud{background:#08101ef2;border:1px solid #53627a;border-top:3px solid var(--fighter-color,#ffc875);padding:10px;gap:10px;box-shadow:0 5px 20px #0008;border-radius:5px;min-width:0}
+.hud .player-bars{width:clamp(190px,21vw,290px);min-width:0}
+.hud .hud-portrait{width:64px;height:90px;flex-shrink:0;border-color:var(--fighter-color)}
+.hud .player-identity{margin-bottom:7px;gap:8px}
+.hud .player-identity b{font-size:20px;letter-spacing:.4px;color:#fff}
+.hud .player-identity small{font-size:10px;color:#d3e1f3}
+.hud .hud-meter{height:24px;margin-bottom:5px;border:1px solid #6b7d96;background:#192236}
+.hud .hud-meter span,.hud .hud-meter output{font-size:12px;font-weight:900;color:white;text-shadow:0 1px 3px #000,1px 0 #000,-1px 0 #000;line-height:22px}
+.hud .energy-bar{height:18px}.hud .energy-bar span,.hud .energy-bar output{line-height:16px;font-size:10px}
+.hud .hud-meta{font-size:11px;color:#e3ecf9;margin-top:6px;gap:8px}
+.hud .talent-caption{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-top:7px;color:#ffdf92;font-size:10px}
+.hud .talent-caption small{font-size:10px;color:#ffe2a0}.hud .talent-pips i{width:11px;height:7px}
+.hud .special-caption{display:block;font-size:10px;color:#bceadf;margin-top:4px;letter-spacing:.2px}
+.hud .critical{border-color:#ff7777}.hud .critical .health-bar{outline:1px solid #ff9797}
+.hud .solo-score-panel{width:230px}.hud .mission{padding:8px;min-width:130px}
+.pause-modal{width:min(640px,94vw);max-height:calc(100dvh - 110px);overflow-y:auto;padding:24px}
+.pause-modal h2{font-size:42px;margin:8px 0 12px}.pause-modal .button{min-height:46px;padding:12px 16px}
+.pause-modal .pause-talents{display:flex;align-items:center;gap:14px;text-align:left;white-space:normal;background:#152136;border:2px solid #8396b2;padding:16px;margin:12px 0;color:white}
+.pause-talents.has-points{background:linear-gradient(110deg,#47351c,#142238);border-color:#ffce73;box-shadow:0 0 18px #ffc46222}
+.pause-talent-icon{color:var(--fighter-color);width:44px;flex-shrink:0}.pause-talent-icon svg{width:44px;height:44px}
+.pause-talent-copy{display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}.pause-talent-copy b{font-size:18px;letter-spacing:1px}
+.pause-talent-copy small{font-size:13px;font-weight:500;color:#d5e2f2}
+#pause-talent-branches{display:flex;gap:12px;flex-wrap:wrap}#pause-talent-branches span{display:flex;align-items:center;gap:5px;font-size:11px;color:#e2e9f5}
+#pause-talent-branches svg{width:18px;height:18px;color:var(--fighter-color)}
+#pause-talent-points{display:flex;flex-direction:column;align-items:center;font-size:34px;line-height:1;color:#ffe099}#pause-talent-points small{font-size:10px;margin-top:7px;letter-spacing:1px}
+.talent-branch-title{display:flex;align-items:center;gap:12px;padding-bottom:14px}.talent-branch-title h3{font-size:21px;margin:3px 0 0}.talent-branch-title .branch-count{margin-left:auto;font-size:17px;color:#edf4ff}
+.branch-icon{display:grid;place-items:center;flex-shrink:0;width:46px;height:46px;color:var(--fighter-color);background:#0b1425;border:1px solid #647691;border-radius:8px}.branch-icon svg{width:32px;height:32px}
+.evolution-modal .talent-node{min-height:112px}.evolution-modal .talent-node.locked{opacity:.82}.evolution-modal .talent-copy>span{font-size:14px;line-height:1.5;color:#e3eaf6}.evolution-modal .talent-copy b{font-size:17px}
+.evolution-modal .talent-node.available{border:2px solid #ffd380;background:#302a20}.evolution-modal .talent-node:focus-visible,.pause-talents:focus-visible{outline:3px solid white;outline-offset:3px}
+@media(max-width:1000px){.hud .hud-portrait{display:none}.hud .player-bars{width:clamp(160px,25vw,240px)}.hud .player-identity b{font-size:17px}.hud .solo-score-panel{width:180px}}
+@media(max-width:650px){.hud{gap:6px!important;grid-template-columns:repeat(2,minmax(0,1fr))}.hud .player-hud{padding:7px;flex:1}.hud .player-bars{width:100%}.hud .mission{display:none}.hud .player-identity small{font-size:8px}.hud .player-identity b{font-size:16px}.hud .hud-meta{font-size:9px;gap:4px}.hud .talent-caption{font-size:9px}.hud .talent-caption small{font-size:9px}.hud .solo-score-panel{width:100%}.pause-modal{padding:18px}.pause-talent-icon{display:none}.pause-talent-copy b{font-size:15px}.talent-branch-title h3{font-size:18px}}
+@media(max-height:520px){.pause-modal{max-height:calc(100dvh - 70px)}.hud .player-hud{padding:5px}.hud .hud-portrait{display:none}.hud .hud-meta,.hud .special-caption{margin-top:2px}.hud .talent-caption{margin-top:3px}.hud .player-identity{margin-bottom:3px}}

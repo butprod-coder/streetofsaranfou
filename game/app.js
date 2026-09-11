@@ -5,9 +5,10 @@ import { Input } from './input.js';
 import { Audio } from './audio.js';
 import { Renderer } from './renderer.js';
 import { Network } from './network.js';
-import { normalizeProfile, spendPoint, bonuses } from './progression.js';
+import { normalizeProfile, spendPoint, bonuses, TALENT_SAVE_KEY } from './progression.js';
 import { BALANCE } from './balance.js';
-import { installEvolutionUI, renderEvolution } from './evolution-ui.js';
+import { installEvolutionUI, renderEvolution, renderPauseTalents } from './evolution-ui.js';
+import { installAudioUI, renderAudioUI } from './audio-settings.js';
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -22,9 +23,10 @@ class Game {
     this.input = new Input({ pause: () => this.togglePause(), blur: () => this.focusLost(), menu: action => this.gamepadMenu(action), wake: () => this.audio.wake() });
     this.state = null; this.simulation = null; this.mode = 'solo'; this.screen = 'home'; this.accumulator = 0;
     this.lastFrame = performance.now(); this.lastSnapshot = 0; this.lastInputSend = 0; this.loadingGeneration = 0; this.currentChapter = -1; this.resultShown = false;
-    this.profiles = {}; try { const raw = JSON.parse(localStorage.getItem('saranfou-progression-v1') || '{}'); for (const f of FIGHTERS) this.profiles[f.id] = normalizeProfile(raw?.[f.id]); } catch {}
-    for (const f of FIGHTERS) this.profiles[f.id] ||= normalizeProfile();
+    this.profiles = {};
+    this.resetProgression();
     installEvolutionUI();
+    installAudioUI(this);
     this.bind(); this.renderSelection(); this.updateRecord(); this.updateSound();
     const orientationHint = document.createElement('p'); orientationHint.className = 'orientation-hint'; orientationHint.textContent = '↻ Tourne ton téléphone : la rue se joue en paysage.'; $('#app').append(orientationHint);
     requestAnimationFrame(now => this.frame(now));
@@ -48,7 +50,7 @@ class Game {
     $$('[data-action]').forEach(button => button.addEventListener('click', () => { this.audio.confirm(); this.action(button.dataset.action).catch(e => this.toast(e.message)); }));
     $('#join-form').addEventListener('submit', event => { event.preventDefault(); this.audio.confirm(); this.join().catch(e => this.setNetworkError(e.message)); });
     $('#online-fighter').addEventListener('change', () => {
-      this.selected = $('#online-fighter').value; this.network.send({ type: 'select', character: this.selected, profile: this.profiles[this.selected] }); this.setLobbyPortrait();
+      this.selected = $('#online-fighter').value; this.network.send({ type: 'select', character: this.selected }); this.setLobbyPortrait();
     });
     $('#online-chapter').addEventListener('change', () => this.network.send({ type: 'select', chapter: Number($('#online-chapter').value) }));
     $('#online-difficulty').addEventListener('change', () => this.network.send({ type: 'select', difficulty: $('#online-difficulty').value }));
@@ -77,6 +79,8 @@ class Game {
     this.input.enabled = playing && !screen && !this.state.paused;
     $('#touch-controls').classList.toggle('hidden', !this.input.enabled || !matchMedia('(pointer: coarse)').matches);
     this.input.clear();
+    if (screen === 'select') this.select(this.selected);
+    if (screen === 'pause') renderPauseTalents(this.state?.players[this.mode === 'online' ? this.network.slot : 0]);
     if (screen) requestAnimationFrame(() => { if (this.screen === screen) this.focusables()[0]?.focus({ preventScroll: true }); });
     else if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   }
@@ -93,13 +97,16 @@ class Game {
     $$('[data-fighter]').forEach(el => { el.classList.toggle('selected', el.dataset.fighter === this.selected); el.setAttribute('aria-pressed', String(el.dataset.fighter === this.selected)); });
     $('#fighter-title').textContent = c.title; $('#fighter-name').textContent = c.name; $('#fighter-description').textContent = c.description;
     const profile = this.profiles[c.id], special = BALANCE.specials[c.id];
-    $('#fighter-special').textContent = `NIV. ${profile.level} · ${profile.points} PT   /   ${Math.round(c.hp * bonuses(profile).life)} PV   /   L · ${c.special.toUpperCase()} · ${special.cost} ÉNERGIE`;
+    $('#fighter-special').textContent = `${profile.talents.length}/6 TALENTS · ${profile.points} PT   /   ${Math.round(c.hp * bonuses(profile).life)} PV   /   L · ${c.special.toUpperCase()} · ${special.cost} ÉNERGIE`;
     $('#online-fighter').value = this.selected; this.preferences.character = this.selected; this.save();
   }
   updateRecord() { $('#record').textContent = number(this.preferences.record); }
   updateSound() { const b = $('#sound-button'); b.textContent = this.preferences.muted ? '♪̸' : '♪'; b.setAttribute('aria-label', this.preferences.muted ? 'Activer le son' : 'Couper le son'); b.setAttribute('aria-pressed', String(!this.preferences.muted)); }
   toast(message, duration = 4000) { $('#toast').textContent = message; $('#toast').classList.remove('hidden'); clearTimeout(this.toastTimer); this.toastTimer = setTimeout(() => $('#toast').classList.add('hidden'), duration); }
   async action(action) {
+    if (action === 'sound') { this.soundReturn = this.screen || 'pause'; if (this.state && !this.state.paused && !this.resultShown) this.setPause(true); this.show('sound'); renderAudioUI(this.audio); }
+    if (action === 'close-sound') this.show(this.soundReturn || 'home');
+    if (action === 'sound-test') { this.audio.wake(); this.audio.effect({ type: 'pickup' }); }
     if (action === 'evolution') { this.evolutionReturn = this.screen || 'pause'; if (this.state && !this.state.paused && !this.resultShown) this.setPause(true); this.syncProgression(); this.show('evolution'); this.renderEvolution(); }
     if (action === 'close-evolution') this.show(this.evolutionReturn || 'select');
     if (action === 'solo') { this.mode = 'solo'; this.show('select'); }
@@ -139,6 +146,7 @@ class Game {
   }
   async startSolo(chapter) {
     this.network.close(true); this.mode = 'solo'; this.resultShown = false; this.state = null; this.simulation = null;
+    this.resetProgression();
     await this.load(chapter, () => {
       this.simulation = new Simulation([this.selected], chapter, Date.now(), { difficulty: $('#difficulty-select').value, profiles: [this.profiles[this.selected]] }); this.state = this.simulation.state;
       this.renderer.reset(); this.input.resetRun(); this.accumulator = 0; this.show(null); this.audio.wake();
@@ -152,13 +160,15 @@ class Game {
     finally { $$('#online-form button').forEach(b => { b.disabled = false; }); }
   }
   async host() {
-    try { await this.connectOnline(); this.network.send({ type: 'create', character: this.selected, profile: this.profiles[this.selected], difficulty: $('#difficulty-select').value }); }
+    this.resetProgression();
+    try { await this.connectOnline(); this.network.send({ type: 'create', character: this.selected, difficulty: $('#difficulty-select').value }); }
     catch (error) { this.setNetworkError(error.message); }
   }
   async join() {
     const code = $('#room-input').value.trim().toUpperCase();
     if (!/^[A-Z2-9]{6}$/.test(code)) { this.setNetworkError('Entre les 6 caractères du code de ton pote.'); return; }
-    await this.connectOnline(); this.network.send({ type: 'join', code, character: this.selected, profile: this.profiles[this.selected] });
+    this.resetProgression();
+    await this.connectOnline(); this.network.send({ type: 'join', code, character: this.selected });
   }
   async resumeConnection(session) {
     this.mode = 'online'; this.show('online'); $('#network-status').textContent = 'Reconnexion à ta partie…';
@@ -170,7 +180,7 @@ class Game {
     if (message.type === 'joined') { $('#network-status').textContent = ''; this.mode = 'online'; }
     if (message.type === 'lobby') {
       this.lobby = message;
-      if (message.phase === 'lobby') { this.syncProgression(); this.state = null; this.simulation = null; this.resultShown = false; if (this.screen !== 'evolution') this.show('lobby'); }
+      if (message.phase === 'lobby') { this.resetProgression(); this.state = null; this.simulation = null; this.resultShown = false; if (this.screen !== 'evolution') this.show('lobby'); }
       this.renderLobby(message);
     }
     if (message.type === 'prepare') {
@@ -235,6 +245,7 @@ class Game {
     else this.network.send({ type: 'input', input: this.input.neutral() });
   }
   togglePause() {
+    if (this.screen === 'sound') { this.show(this.soundReturn || 'home'); return; }
     if (this.screen === 'evolution') { this.show(this.evolutionReturn || 'select'); return; }
     if (this.screen === 'controls') { this.show(this.controlsReturn || 'home'); return; }
     if (!this.state || this.resultShown) { if (this.screen !== 'home') this.quit(); return; }
@@ -286,13 +297,24 @@ class Game {
   quit() {
     this.syncProgression();
     ++this.loadingGeneration; this.network.close(true); this.state = null; this.simulation = null; this.resultShown = false; this.mode = 'solo';
+    this.resetProgression();
     this.renderer.reset(); this.pendingLoad = null; this.updateRecord(); this.show('home');
     if (location.search) history.replaceState(null, '', location.pathname);
   }
   gamepadMenu(action) {
+    if (this.screen === 'sound' && action === 'back') { this.show(this.soundReturn || 'home'); return; }
+    if (this.screen === 'sound' && document.activeElement?.type === 'range' && ['left', 'right', 'accept'].includes(action)) {
+      const slider = document.activeElement;
+      if (action !== 'accept') { slider.value = clamp(Number(slider.value) + (action === 'left' ? -5 : 5), 0, 100); slider.dispatchEvent(new Event('input')); }
+      return;
+    }
     if (action === 'back') { if (this.screen === 'evolution') this.show(this.evolutionReturn || 'select'); else if (this.screen === 'controls') this.show(this.controlsReturn || 'home'); else if (this.screen === 'pause') this.togglePause(); else this.quit(); return; }
     const items = this.focusables(); if (!items.length) return;
     const index = items.indexOf(document.activeElement);
+    if (this.screen === 'evolution' && document.activeElement?.dataset.talent && ['left', 'right'].includes(action)) {
+      const nodes = [...document.querySelectorAll('[data-talent]')], n = nodes.indexOf(document.activeElement);
+      nodes[(n + 3) % 6]?.focus(); return;
+    }
     if (action === 'accept') { if (document.activeElement instanceof HTMLInputElement) { const el = document.activeElement; el.value = el.value.toUpperCase().padEnd(6, 'A'); this.codeCursor = ((this.codeCursor ?? -1) + 1) % 6; el.setSelectionRange(this.codeCursor, this.codeCursor + 1); this.toast(`Code · caractère ${this.codeCursor + 1}/6 : ← → pour changer, A pour avancer. ↓ pour Rejoindre.`); } else document.activeElement?.click(); return; }
     if (document.activeElement?.id === 'room-input' && ['left', 'right'].includes(action)) {
       const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', el = document.activeElement, chars = el.value.padEnd(6, 'A').split(''), cursor = this.codeCursor ?? 0;
@@ -308,16 +330,20 @@ class Game {
     if (!p?.progression) return;
     const profile = normalizeProfile(p.progression);
     if (JSON.stringify(profile) === JSON.stringify(this.profiles[p.kind])) return;
-    this.profiles[p.kind] = profile; this.saveProfiles();
+    if (profile.completed.length > (this.profiles[p.kind]?.completed.length || 0)) this.toast('Chapitre terminé ! +1 point · Pause → Talents pour choisir ton amélioration.', 7000);
+    this.profiles[p.kind] = profile;
     if (this.screen === 'evolution') this.renderEvolution();
   }
-  saveProfiles() { try { localStorage.setItem('saranfou-progression-v1', JSON.stringify(this.profiles)); } catch { if (!this.storageWarning) { this.storageWarning = true; this.toast('Sauvegarde locale indisponible : garde cette page ouverte pour conserver ton XP.'); } } }
+  resetProgression() {
+    this.profiles = Object.fromEntries(FIGHTERS.map(f => [f.id, normalizeProfile({}, f.id)]));
+    try { localStorage.removeItem(TALENT_SAVE_KEY); } catch {}
+  }
   renderEvolution() {
     const p = this.state?.players[this.mode === 'online' ? this.network.slot : 0], kind = p?.kind || this.selected;
     renderEvolution(kind, p?.progression || this.profiles[kind], stat => {
       if (this.state && this.mode === 'online') { this.network.send({ type: 'spend', stat }); return; }
       if (this.simulation) { if (!this.simulation.spendStat(0, stat)) return; this.syncProgression(); }
-      else { const next = spendPoint(this.profiles[kind], stat); if (!next) return; this.profiles[kind] = next; this.saveProfiles(); if (this.mode === 'online' && this.network.code) this.network.send({ type: 'select', character: kind, profile: next }); }
+      else { const next = spendPoint(this.profiles[kind], stat); if (!next) return; this.profiles[kind] = next; }
       this.audio.confirm(); this.renderEvolution();
     });
   }
@@ -338,7 +364,9 @@ class Game {
     }
     if (this.mode === 'online' && this.state && now - this.lastInputSend > 1000 / 30) { this.lastInputSend = now; this.network.send({ type: 'input', input }); }
     this.renderer.draw(this.state, dt, { online: this.mode === 'online', slot: this.mode === 'online' ? this.network.slot : 0, input, age: (now - this.lastSnapshot) / 1000, ping: this.network.ping });
-    this.audio.update(!!this.state && !this.state.paused && !this.screen, this.state?.chapter || 0);
+    this.audio.update(!!this.state && !this.screen, this.state?.chapter || 0,
+      this.state?.enemies.some(e => e.boss && e.hp > 0),
+      document.hidden || (!!this.state?.paused && ['pause', 'evolution', 'loading', 'controls', 'sound', null].includes(this.screen)));
   }
 }
 
