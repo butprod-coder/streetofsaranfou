@@ -2,25 +2,36 @@
 
 Cette version enrichit le moteur Reborn existant. Le client solo et le serveur coopératif exécutent les mêmes règles à 60 Hz ; ni le rendu ni la fréquence d’affichage ne déterminent les dégâts. Les personnages, 36 fonds de niveaux, animations normales (sauf Gustavax redessiné), ennemis, menus et reprise réseau sont conservés. Les anciens objets de premier plan et ramassables sont remplacés par les sprites du pack `assets/shared/arcade/`.
 
+## Décors thématiques, édition et rues interactives
+
+- **Décors** : chaque quartier possède une planche générée de 12 objets décoratifs, sans collision, dégâts ni loot. Le jeu en place automatiquement quelques-uns dans chaque rue ; ils restent visuels et sont indépendants des objets destructibles.
+- **Éditeur de niveaux** : le bouton présent dans le menu et l’écran de sélection ouvre une bibliothèque de 12 objets du quartier, avec une vue de la rue. Cliquer un objet puis la rue le place librement ; glisser, hauteur, miroir, duplication, suppression, annulation/rétablissement, remise à zéro et export/import JSON sont disponibles. Jusqu’à 40 placements par rue sont conservés sous `saranfou_reborn_layouts_v1`. En coopération, l’hôte partage le résultat validé par le serveur.
+- **Planches jouables** : `assets/shared/scenery/residential.png`, `estate.png`, `stadium.png`, `village.png`, `night.png` et `school.png` contiennent chacune 12 cases transparentes. La planche `weapons.png` fournit les icônes de couteau, batte et armes à feu.
+
 ## Esquive et rues interactives
 
 - **Esquive** : Maj gauche/droite au clavier, RB/R1 sur une manette standard, bouton ⇧ tactile. Direction du déplacement ou direction du regard à l'arrêt. Départ dès la première frame, durée 0,26 s, protection 0,22 s, recharge 0,95 s, sans coût en énergie. Une pression doit être relâchée avant la suivante : maintenir ne permet plus d'esquiver en boucle. Une pression dans les dernières 0,14 s de récupération est mémorisée. Une attaque normale peut être annulée, mais pas une transformation spéciale en cours, sauf le catcheur de Gustavax qui conserve ses commandes. Indicateur de recharge sous les barres, silhouettes de traînée et poussière animée.
-- **Caisses** : 3 unités de résistance, sandwich (+35 PV). **Poubelles** : 4 unités, boisson (+40 énergie). Un poing enlève 1 unité, un pied ou dernier poing de combo 2. Les spéciaux endommagent aussi les objets. Trois états graphiques : intact, endommagé, débris. Chaque objet ne donne son ramassable et ses 50 points qu'une fois.
-- **Barils rouges** : 3 unités. Après destruction, cercle d'alerte pendant 0,8 s, explosion de rayon 170 et 45 dégâts de base. Elle touche les deux camps ; reculer, sauter ou esquiver permet de l'éviter. Réactions en chaîne possibles, chaque baril conservant son propre avertissement. Les débris disparaissent après 7 s. Les objets n'agissent pas comme des murs : ils ne peuvent coincer un joueur ni bloquer une sortie.
+- **Caisses** : 3 unités de résistance, sandwich (+35 PV). **Poubelles** : 4 unités, boisson (+40 énergie). **Barils rouges** : 3 unités, sans loot. Il ne reste que quatre objets destructibles ordinaires par chapitre, avec des rues d’événement dégagées ; les soins automatiques entre vagues et les drops ennemis sont fortement réduits. Un poing enlève 1 unité, un pied ou dernier poing de combo 2. Les spéciaux endommagent aussi les objets. Trois états graphiques : intact, endommagé, débris. Chaque objet ne donne son ramassable et ses 50 points qu'une fois.
+- **Barils rouges** : 3 unités. Après destruction, cercle d’alerte pendant 0,8 s, explosion de rayon 170 et 45 dégâts de base. Elle touche les deux camps ; reculer, sauter ou esquiver permet de l’éviter. Réactions en chaîne possibles, chaque baril conservant son propre avertissement. Les débris disparaissent après 7 s. Les objets n’agissent pas comme des murs : ils ne peuvent coincer un joueur ni bloquer une sortie.
+
+### Prise et armes
+
+- **Prise** : automatique au contact d’un ennemi au sol. Poing + direction arrière pendant la prise le projette à 420 pixels ; il retombe après 0,72 s et peut toucher un second adversaire. Les boss ne sont saisissables que pendant leur récupération, les élites lorsqu’ils sont étourdis. Une prise est annulée par un dégât, un KO ou un changement de rue.
+- **Armes** : F (RT/R2) près d’une arme pour la ramasser ou l’échanger ; sans nouvelle arme à portée, F dépose celle tenue. J (X) utilise une charge : couteau (10), batte (8), pistolet (8), fusil à pompe (5) ou pistolet-mitrailleur (18). Les armes à feu respectent la direction, la ligne et la portée ; une arme épuisée disparaît. Une arme portée est déposée au KO. Le fusil à pompe repousse physiquement le tireur. Les ennemis lourds retombent sur place et infligent 25 dégâts de base d’écrasement au joueur resté à proximité.
 
 ## Séquences surprises
 
 Deux événements par chapitre, après toutes les vagues des rues 2 et 4. Aucun dans la première rue d'apprentissage ni dans les arènes de boss. Ils restent intégrés au même état de partie, donc synchronisés en coopération et gelés par la pause partagée.
 
 - **La casse du siècle** : rue 2 des chapitres 1, 3, 5 ; voiture blanche à détruire en 25 s, résistance 24 en solo, multiplicateur 1,55 en duo. Les attaques normales et spéciales fonctionnent. Trois états de carrosserie dessinés pour l'événement.
-- **Livraison express** : rue 2 des chapitres 2, 4, 6 ; quatre caisses cerclées de vert à briser en 22 s. Elles déposent des soins et boissons.
+- **Livraison express** : rue 2 des chapitres 2, 4, 6 ; deux caisses cerclées de vert à briser en 22 s. La première seulement dépose un soin ou une boisson.
 - **Embuscade** : rue 4 ; gang aléatoire de 5 ennemis (+2 en duo, +1 en difficile), pioché dans tout le bestiaire avec au maximum une élite. Éliminer le gang avant son repli à 30 s. Les limites habituelles d'ennemis et d'attaquants simultanés restent appliquées.
 
 Chaque événement est annoncé 2,2 s avant le départ du chrono. Réussite : +650 score partagé. Échec : pas de prime, mais la sortie se débloque quand même et les ennemis/dangers de l'événement sont nettoyés. Une mort collective suit les règles habituelles de vies/Game Over ; le chronomètre ne ressuscite pas une équipe éliminée.
 
 ### Réglages centralisés
 
-- `game/balance.js` : `dodge` (durée, protection, recharge, vitesse, buffer), `scenery` (résistance, débris, explosion, soins), `surprises` (chronos, résistance voiture, nombre de caisses/assaillants, récompenses).
+- `game/balance.js` : `dodge` (durée, protection, recharge, vitesse, buffer), `scenery` (résistance, débris, explosion, soins), `surprises` (chronos, résistance voiture, nombre de caisses/assaillants).
 - `game/street-events.js` : `surprisePlan` (rues et types), `streetProps` (placements/variantes), compositions de l'embuscade.
 - `game/visuals.js` : `ARCADE_SPRITES` (fichiers, disposition des cases, taille à l'écran). Les rectangles utiles sont calculés une seule fois depuis l'alpha, sans réécrire les fichiers générés.
 - `assets/shared/arcade/PROMPTS.md` : prompts de génération intégrés ; sept PNG originaux transparents, générés avec l'outil imagegen intégré. Personnages réutilisés pour l'esquive et ennemis existants pour l'embuscade.
@@ -50,10 +61,10 @@ Chaque rue possède 2 à 4 vagues différentes. Les deux premières rues commenc
 
 Les renforts apparaissent progressivement à l’intérieur de la zone navigable, du côté le plus éloigné des joueurs. L’apparition initiale offre un court répit. Le moteur attend également la fin de la file de renforts : tuer les premiers ennemis ne débloque pas prématurément la sortie.
 
-Entre les vagues : 2,5 ou 4 secondes, +7 PV et +12 énergie aux personnages debout ; les longues pauses déposent un soin. Les dernières vagues de certaines rues combinent un ennemi lourd et des soutiens. À la fin de la rue, un partenaire à terre est relevé et les joueurs doivent tous rejoindre la droite.
+Entre les vagues : 2,5 ou 4 secondes, +7 PV et +12 énergie aux personnages debout, sans soin automatique supplémentaire. Les dernières vagues de certaines rues combinent un ennemi lourd et des soutiens. À la fin de la rue, un partenaire à terre est relevé et les joueurs doivent tous rejoindre la droite.
 
 - **Balade** : dégâts ennemis ×0,72, vitesse ×0,9, préparations plus longues, récupération plus longue, 4 vies de réserve initiales.
-- **Arcade** : valeurs de référence, 2 vies de réserve initiales.
+- **Arcade** : dégâts ennemis ×0,85, vitesse ×1, préparations et récupérations de référence, 5 vies de réserve initiales.
 - **Sans quartier** : dégâts ×1,2, vitesse ×1,12, préparations légèrement plus courtes, récupération plus courte, un renfort supplémentaire par vague.
 
 La difficulté choisie ne change pas les PV ennemis, mais la progression de la campagne oui : par chapitre, les ennemis ordinaires gagnent 14 % de PV, 10 % de puissance et 2,5 % de vitesse, tandis que leur récupération diminue de 6,5 %. Au sixième chapitre, un même ennemi possède ainsi 70 % de PV et 50 % de puissance de plus qu’au début. En duo : PV ordinaires ×1,18, PV boss ×1,6, compositions renforcées.
@@ -99,23 +110,27 @@ Les commandes restent **L / B Xbox / ○ PlayStation**. Coût : 50 énergie, plu
 
 Les transformations porc/loup/tourbillon utilisent une nouvelle planche transparente. Elle remplace uniquement, dans le moteur Reborn, les anciens extraits de storyboard qui comportaient un fond et des flèches. Les autres ressources d’origine ne sont pas écrasées.
 
-## Arbres de talents
+## Arbres de talents et progression Rogue Like
 
-L’XP, les niveaux de personnage et les rangs de statistiques ont disparu du jeu actif. Chaque personnage possède **deux branches de trois talents**, soit six achats uniques. On gagne **un point à la première fin de chaque chapitre avec ce personnage**, après la dernière vague du boss, y compris au chapitre final. Une rue, une vague, une élimination ou un bonus ne donne aucun point. Rejouer le même chapitre ne permet pas de cumuler des points supplémentaires. Aucun multiplicateur de difficulté.
+Chaque héros dispose de **3 branches de 12 talents**, soit 36 talents uniques : six paliers de deux choix, avec deux ultimes mutuellement exclusifs par branche. Les noms et effets sont propres à chaque personnage. Gustavax est désormais **Gustavax le Sheitan** : sa branche dédiée remplace l’ancien philosophe par la malédiction, le feu noir, les chaînes et la Porte des Enfers.
 
-Chaque achat coûte un point ; le talent précédent de la même branche est requis. Les deux branches sont disponibles dès le premier point, le joueur choisit donc son ordre de progression. Les effets sont volontairement très marqués : jusqu’à +30–35 % de vie, +30 % de dégâts normaux, +45–60 % de puissance spéciale, −35–40 % de recharge ou plusieurs secondes supplémentaires pour les transformations et invocations.
+L’XP est gagnée principalement par les vagues (60 %), puis les éliminations (25 %) et les objectifs/boss (15 %). Elle est partagée équitablement en coopération et les invocations ne peuvent pas générer d’XP. Chaque personnage progresse séparément du niveau 1 au niveau 20 ; chaque niveau donne deux points de caractéristiques. Vitalité, Force, Mobilité, Endurance et Maîtrise des armes ont dix rangs maximum.
 
-- **Karonux** : La sieste (vie, sommeil raccourci, soin au retour de la Golf) / Le garage (portée, puissance, recharge).
-- **Jualos** : Le roc (vie, défense, meilleurs sandwichs) / Le sanglier (vitesse de charge, dégâts, durée).
-- **Yanu** : Le sportif (vitesse, esquive, endurance) / La meute (rayon des griffes, dégâts, durée de loup).
-- **Lorenzo** : Le dur à cuire (défense, coups normaux, boissons) / Le pyromane (durée des braises, rayon, puissance).
-- **Jo** : L’insaisissable (esquive, déplacement, vie) / Le cyclone (rayon, durée, dégâts).
-- **Kikor** : L’artisan (énergie, recharge, défense) / Le créateur (durée, puissance, fréquence d’attaque du bonhomme vert).
-- **Gustavax** : Le philosophe (défense, coups, recharge) / Le champion (durée du catcheur, rayon du marteau-pilon, puissance).
+Les points de talent arrivent aux niveaux impairs à partir du niveau 3, ainsi qu’après les cinq premiers boss. Une branche avance seulement si un talent du palier précédent est acquis ; un seul ultime peut être pris par branche et les ultimes demandent trois boss vaincus. Une sortie complète donne 14 points de talent au maximum. Une nouvelle sortie remet la puissance de combat à zéro, tandis que les records et les victoires permanentes restent mémorisés par personnage.
 
-Menu **Arbre de talents** à la sélection, dans le salon, en pause et au résultat. Flèches/stick/croix pour naviguer, gauche/droite pour changer de branche, Entrée/A/✕ pour acheter, Échap/B/○ pour revenir. Les talents verrouillés restent consultables mais ne dépensent rien. Un message, un son et l’indicateur du HUD annoncent le point gagné. La pause est partagée en ligne ; chaque joueur dépense ses propres points.
+Le menu **Progression** contient uniquement les caractéristiques et l’arbre complet des talents. Il est accessible à la souris, au clavier et à la manette, y compris en pause et en coopération. Les rues ne donnent plus de bonus de fin de niveau : l’XP provient des vagues, des éliminations et des objectifs.
 
-Les talents appartiennent uniquement à la partie en cours. **Toute nouvelle partie — solo, nouveau salon ou relance après un résultat — remet les arbres à zéro.** Une reconnexion à une partie coopérative encore active retrouve néanmoins ses choix grâce à l’état autoritaire du serveur. L’ancienne clé locale `saranfou-talents-v1` est supprimée au chargement et n’est plus écrite. Le record, le personnage choisi et le chapitre restent dans `saranfou-v2`.
+## Vagues, bestiaire et intelligence ennemie
+
+Une rue comporte 3 à 8 vagues selon le quartier, quatre vagues dans l’arène du boss. Le bestiaire est tiré avec un sac de mélange sérialisé : chaque identité non-boss a la même fréquence sur la durée, les apparitions restent espacées et le plafond d’ennemis actifs augmente de 3 à 5 en solo, avec deux places supplémentaires en duo. Les vagues tardives contiennent plus d’ennemis et les PV, la puissance et la vitesse augmentent progressivement jusqu’au sixième chapitre.
+
+Les ennemis lisent les attaques proches : une esquive latérale, un sprint télégraphié, un recul ou un déplacement de flanc peut interrompre leur approche. Ces réactions restent limitées dans le temps et conservent une ouverture lisible afin de ne pas donner une difficulté imprévisible. Les boss et les élites gardent leurs séquences propres et leur budget d’attaquants partagé.
+
+## Sauvegarde compatible avec Render
+
+Un checkpoint local est écrit entre les vagues, dans les pauses de repos et à la fin d’une rue. Il contient uniquement une version bornée de l’état de progression : graine, rue, vague, profils, vie, arme, décor cassé et compteurs. **Exporter** produit un JSON de 64 Ko maximum ; **Importer** vérifie les personnages, les armes, les limites numériques et les talents avant de reconstruire la simulation.
+
+La mémoire du WebService Render peut donc être perdue après un redémarrage sans rendre la sortie injouable : **Reprendre la sortie** restaure un run solo, et l’hôte peut restaurer un checkpoint coopératif quand les deux joueurs sont présents. Les états terminés ne sont pas restaurés. Les victoires, records, niveaux atteints et titres permanents restent dans le navigateur par personnage. Une sortie complète vise environ 75 à 100 minutes, avec une limite de difficulté qui reste jouable en moins de deux heures.
 
 ## Lecture des impacts et nouveaux sprites
 
@@ -179,6 +194,6 @@ Réglages centralisés dans `game/music-score.js` : `THEMES` contient les tempos
 
 Les captures sont dans `test-results/`, non versionné. Les commandes navigateur acceptent `BROWSER_PATH` vers Chrome/Edge. **Aucune manette physique ni liaison entre deux connexions Internet distinctes n’a été utilisée** : le mapping standard est testé, pas les pilotes Bluetooth/USB d’un appareil réel. Une manette non standard peut nécessiter un mapping fourni par le navigateur.
 
-`npm run test:talents` : deux clients, récompense de chapitre, allocation clavier, remise à zéro/reconnexion, mobile, catcheur pilotable et expiration, contrôle du rendu des avertissements et capture des 28 poses de Gustavax.
+`npm run test:talents` : deux clients, attribution des points de chapitre, allocation clavier, remise à zéro/reconnexion, mobile, catcheur pilotable et expiration, contrôle du rendu des avertissements et capture des 28 poses de Gustavax.
 
 Autre planche conservée : `assets/shared/specials/transformations-v3.png`, créée avec le skill **imagegen** et l’outil intégré. Le prompt complet est conservé dans `assets/shared/specials/transformations-v3.prompt.md`. Aucun appel d’API payante externe ou déploiement public n’a été effectué par cette mise à jour.

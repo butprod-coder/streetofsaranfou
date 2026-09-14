@@ -1,14 +1,14 @@
 // All progression and encounter tuning lives here. Multipliers never alter input or hit detection.
 export const DIFFICULTIES = {
   easy: { name: 'Balade', damage: .72, speed: .9, recovery: 1.25, telegraph: 1.18, extra: 0, lives: 4 },
-  normal: { name: 'Arcade', damage: 1, speed: 1, recovery: 1, telegraph: 1, extra: 0, lives: 2 },
-  hard: { name: 'Sans quartier', damage: 1.2, speed: 1.12, recovery: .82, telegraph: .92, extra: 1, lives: 2 },
+  normal: { name: 'Arcade', damage: .85, speed: 1, recovery: 1, telegraph: 1, extra: 0, lives: 5 },
+  hard: { name: 'Sans quartier', damage: 1.2, speed: 1.12, recovery: .82, telegraph: .92, extra: 1, lives: 3 },
 };
 export const difficulty = id => DIFFICULTIES[id] || DIFFICULTIES.normal;
 export const BALANCE = {
   dodge: { duration: .26, invincible: .22, cooldown: .95, speedX: 690, speedY: 460, buffer: .14 },
-  scenery: { crateHp: 3, binHp: 4, barrelHp: 3, explosionDelay: .8, explosionRadius: 170, explosionDamage: 45, debrisTime: 7, food: 35, energy: 40 },
-  surprises: { carTime: 25, carHp: 24, carDuoHp: 1.55, deliveryTime: 22, deliveryCount: 4, ambushTime: 30, ambushCount: 5, duoExtra: 2, score: 650, warning: 2.2 },
+  scenery: { crateHp: 3, binHp: 4, barrelHp: 3, explosionDelay: .8, explosionRadius: 170, explosionDamage: 45, debrisTime: 7, food: 35, energy: 40, enemyFoodChance: .04, bossReliefHealth: .4 },
+  surprises: { carTime: 25, carHp: 24, carDuoHp: 1.55, deliveryTime: 22, deliveryCount: 2, ambushTime: 30, ambushCount: 5, duoExtra: 2, score: 650, warning: 2.2 },
   waves: { early: 2, standard: 3, late: 4, rest: 2.5, calmRest: 4, spawnDelay: .85, activeSolo: 5, activeDuo: 7, attackersSolo: 2, attackersDuo: 3 },
   enemy: { chapterHp: .14, chapterPower: .1, duoHp: 1.18, chapterSpeed: .025, chapterRecovery: .065, eliteChance: .09, eliteChapterChance: .02 },
   wrestler: { statBonus: .3, radius: 180 },

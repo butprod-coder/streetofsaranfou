@@ -15,5 +15,11 @@ const art = {
   book: '<path d="M16 8C10 4 5 5 3 6v19c4-2 9-1 13 2 4-3 9-4 13-2V6c-2-1-7-2-13 2ZM16 8v19M7 11l5 1m8 0 5-1"/>',
   belt: '<path d="M3 11h7l3-4h6l3 4h7v12h-7l-3 4h-6l-3-4H3Z"/><path d="m16 11 2 4 4 1-3 3v4l-3-2-3 2v-4l-3-3 4-1Z"/>',
 };
-export const BRANCH_ICONS = { karonux: ['sleep', 'car'], jualos: ['rock', 'boar'], yanu: ['shoe', 'wolf'], lorenzo: ['shield', 'fire'], jo: ['dodge', 'storm'], kikor: ['brush', 'palette'], gustavax: ['book', 'belt'] };
+export const BRANCH_ICONS = { karonux: ['car', 'sleep', 'dodge'], jualos: ['shield', 'boar', 'rock'], yanu: ['shoe', 'wolf', 'dodge'], lorenzo: ['rock', 'fire', 'shield'], jo: ['dodge', 'storm', 'belt'], kikor: ['brush', 'palette', 'book'], gustavax: ['rock', 'belt', 'fire'] };
 export const branchIcon = (kind, branch = 0) => `<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${art[BRANCH_ICONS[kind]?.[branch] || 'shield']}</svg>`;
+
+export function talentIcon(kind, node) {
+  const index = Number(node.id.split('_').at(-1));
+  const symbols = [BRANCH_ICONS[kind]?.[node.branchIndex] || 'shield', 'dodge', 'storm', 'fire', 'shield', 'shoe', 'rock', 'wolf', 'belt', 'book', 'fire', 'belt'];
+  return '<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + art[symbols[index % symbols.length]] + '</svg>';
+}

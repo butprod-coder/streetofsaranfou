@@ -27,6 +27,9 @@ body.playing .topbar{height:40px;padding:0 18px;background:#090d1680}.playing .b
 .sound-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; margin: 24px 0; color: #ffe2ad; }
 .sound-row input { grid-column: 1 / -1; width: 100%; accent-color: #ffbf66; min-height: 30px; cursor: pointer; }
 .sound-row input:focus-visible { outline: 2px solid #ffbf66; outline-offset: 5px; }
+.screen :is(input,select,a):focus { outline: 2px solid var(--gold); outline-offset: 3px; }
+#play-button > span:last-child { font-size: 12px; font-weight: 650; white-space: nowrap; }
+#select-hint { line-height: 1.7; }
 
 /* Combat HUD — dense arcade cards with explicit values and readable states. */
 .player-hud{position:relative;gap:0;align-items:stretch;filter:drop-shadow(0 8px 15px #0009)}

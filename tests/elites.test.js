@@ -17,24 +17,10 @@ test('audio defaults are quiet, persisted values are bounded and malformed setti
   assert.deepEqual(audioSettings(null), AUDIO_DEFAULTS);
   assert.deepEqual(audioSettings({ master: -1, music: 9, effects: '100' }), { master: 0, music: 1, effects: .65 });
 });
-test('the complete enemy roster is available from chapter one, with at most one elite per wave', () => {
-  const values = Object.keys(ELITES).map((_, i) => randomEnemyKinds(0, 1, (() => {
-    const sequence = [.01, (i + .2) / Object.keys(ELITES).length];
-    return () => sequence.shift() ?? .5;
-  })())[0]);
-  assert.deepEqual(new Set(values), new Set(Object.keys(ELITES)));
-  const regulars = Object.keys(ENEMIES).filter(kind => !ELITES[kind]);
-  const regularValues = regulars.map((_, i) => randomEnemyKinds(0, 1, (() => {
-    const sequence = [.99, (i + .2) / regulars.length];
-    return () => sequence.shift() ?? .5;
-  })())[0]);
-  assert.deepEqual(new Set(regularValues), new Set(regulars));
-
-  let seed = 17;
-  const random = () => ((seed = Math.imul(seed, 1664525) + 1013904223 >>> 0) / 4294967296);
-  for (let chapter = 0; chapter < 6; chapter++) for (let stage = 0; stage < 6; stage++) for (const wave of wavePlan(chapter, stage, 2, 'hard', random)) {
-    assert.ok(wave.kinds.filter(k => ELITES[k]).length <= 1);
-  }
+test('the complete enemy roster appears equally from chapter one across consecutive bags', () => {
+  const sim = new Simulation(['jo'], 0, 17), bag = [];
+  const values = randomEnemyKinds(0, Object.keys(ENEMIES).length * 3, () => sim.random(), bag);
+  for (const kind of Object.keys(ENEMIES)) assert.equal(values.filter(v => v === kind).length, 3);
 });
 test('each elite executes its ability, respects bounds and finite hazards, and is killable', () => {
   for (const kind of Object.keys(ELITES)) {
@@ -74,7 +60,7 @@ test('elites share the attack budget, pause is deterministic and snapshots prese
 });
 test('every boss introduces a signature after phase change and leaves a counterattack window', () => {
   for (let chapter = 0; chapter < 6; chapter++) {
-    const sim = new Simulation(['gustavax'], chapter, 9); sim.state.stage = 5; sim.enterStreet(); sim.state.wave = 1; sim.spawnWave();
+    const sim = new Simulation(['gustavax'], chapter, 9); sim.state.stage = 5; sim.enterStreet(); sim.state.wave = sim.state.waves.length - 2; sim.spawnWave();
     const boss = sim.state.enemies.find(x => x.boss), p = sim.state.players[0];
     boss.vehicle = false; boss.hp = boss.maxHp * .25; boss.cooldown = 0;
     for (let i = 0; i < 500; i++) { p.hp = p.maxHp; p.invincible = 10; sim.step([blankInput()]); if (boss.pattern?.signature) break; }

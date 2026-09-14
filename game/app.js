@@ -9,6 +9,11 @@ import { normalizeProfile, spendPoint, bonuses, TALENT_SAVE_KEY } from './progre
 import { BALANCE } from './balance.js';
 import { installEvolutionUI, renderEvolution, renderPauseTalents } from './evolution-ui.js';
 import { installAudioUI, renderAudioUI } from './audio-settings.js';
+import { LevelEditor } from './level-editor.js';
+import { layoutFor } from './level-layouts.js';
+import { installInteractionUI } from './interaction-ui.js';
+import { installRogueUI, renderAttributes } from './rogue-ui.js';
+import { checkpoint, restoreCheckpoint, readCheckpoint, validateCheckpoint, recordRun, RUN_SAVE_KEY, RECORDS_KEY } from './run-save.js';
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -20,14 +25,27 @@ class Game {
     this.assets = new Assets(); this.audio = new Audio(this.preferences.muted);
     this.renderer = new Renderer($('#game'), this.assets, this.audio);
     this.network = new Network(message => this.onNetwork(message), (status, message) => this.networkStatus(status, message));
+    installInteractionUI();
     this.input = new Input({ pause: () => this.togglePause(), blur: () => this.focusLost(), menu: action => this.gamepadMenu(action), wake: () => this.audio.wake() });
     this.state = null; this.simulation = null; this.mode = 'solo'; this.screen = 'home'; this.accumulator = 0;
     this.lastFrame = performance.now(); this.lastSnapshot = 0; this.lastInputSend = 0; this.loadingGeneration = 0; this.currentChapter = -1; this.resultShown = false;
     this.profiles = {};
     this.resetProgression();
     installEvolutionUI();
+    installRogueUI();
     installAudioUI(this);
+    this.editor = new LevelEditor(this);
     this.bind(); this.renderSelection(); this.updateRecord(); this.updateSound();
+    this.updateRunStatus();
+    $('#run-import').addEventListener('change', async event => {
+      try {
+        const file = event.target.files[0]; if (!file) return;
+        if (file.size > 64000) throw new Error('Fichier trop volumineux (64 Ko maximum).');
+        const save = validateCheckpoint(JSON.parse(await file.text()));
+        localStorage.setItem(RUN_SAVE_KEY, JSON.stringify(save)); this.updateRunStatus(); this.toast('Sauvegarde importée. Reprends en solo ou restaure-la dans un nouveau salon coop.');
+      } catch (error) { this.toast(error.message); }
+      event.target.value = '';
+    });
     const orientationHint = document.createElement('p'); orientationHint.className = 'orientation-hint'; orientationHint.textContent = '↻ Tourne ton téléphone : la rue se joue en paysage.'; $('#app').append(orientationHint);
     requestAnimationFrame(now => this.frame(now));
     // Read-only diagnostics support bug reports and end-to-end verification; no cheats or mutable game state.
@@ -69,8 +87,11 @@ class Game {
     });
     addEventListener('beforeunload', () => { if (this.mode === 'online' && this.state) this.network.send({ type: 'pause', value: true }); });
   }
-  focusables() { return this.screen ? [...$(`#${this.screen}`).querySelectorAll('button:not(:disabled), input, select:not(:disabled), a[href]')].filter(el => el.offsetParent !== null) : []; }
+  focusables() { return this.screen ? [...$(`#${this.screen}`).querySelectorAll('button:not(:disabled), input:not(:disabled):not([type=hidden]):not([type=file]), select:not(:disabled), a[href]')].filter(el => el.offsetParent !== null && !el.closest('[inert]')) : []; }
   show(screen) {
+    const previousScreen = this.screen;
+    this.menuFocus ??= new Map();
+    if (this.screen && this.focusables().includes(document.activeElement)) this.menuFocus.set(this.screen, document.activeElement);
     this.screen = screen;
     $$('.screen').forEach(el => { const active = el.id === screen; el.classList.toggle('active', active); el.inert = !active; });
     const playing = !!this.state && !['home', 'select', 'online', 'lobby'].includes(screen);
@@ -81,7 +102,15 @@ class Game {
     this.input.clear();
     if (screen === 'select') this.select(this.selected);
     if (screen === 'pause') renderPauseTalents(this.state?.players[this.mode === 'online' ? this.network.slot : 0]);
-    if (screen) requestAnimationFrame(() => { if (this.screen === screen) this.focusables()[0]?.focus({ preventScroll: true }); });
+    if (screen) requestAnimationFrame(() => {
+      if (this.screen !== screen) return;
+      const items = this.focusables(), remembered = this.menuFocus.get(screen);
+      const target = screen === 'select' ? $('#roster .selected')
+        : screen === 'pause' && !previousScreen ? items[0]
+        : items.includes(remembered) ? remembered : items[0];
+      target?.focus({ preventScroll: true });
+      target?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    });
     else if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   }
   renderSelection() {
@@ -97,13 +126,35 @@ class Game {
     $$('[data-fighter]').forEach(el => { el.classList.toggle('selected', el.dataset.fighter === this.selected); el.setAttribute('aria-pressed', String(el.dataset.fighter === this.selected)); });
     $('#fighter-title').textContent = c.title; $('#fighter-name').textContent = c.name; $('#fighter-description').textContent = c.description;
     const profile = this.profiles[c.id], special = BALANCE.specials[c.id];
-    $('#fighter-special').textContent = `${profile.talents.length}/6 TALENTS · ${profile.points} PT   /   ${Math.round(c.hp * bonuses(profile).life)} PV   /   L · ${c.special.toUpperCase()} · ${special.cost} ÉNERGIE`;
+    $('#fighter-special').textContent = `36 TALENTS · 3 VOIES   /   ${Math.round(c.hp * bonuses(profile).life)} PV   /   L · ${c.special.toUpperCase()} · ${special.cost} ÉNERGIE`;
+    try { const record = JSON.parse(localStorage.getItem(RECORDS_KEY) || '{}')[c.id]; if (record) $('#fighter-special').textContent += ` · ${record.title} · ${record.wins} victoire(s)`; } catch {}
     $('#online-fighter').value = this.selected; this.preferences.character = this.selected; this.save();
   }
   updateRecord() { $('#record').textContent = number(this.preferences.record); }
   updateSound() { const b = $('#sound-button'); b.textContent = this.preferences.muted ? '♪̸' : '♪'; b.setAttribute('aria-label', this.preferences.muted ? 'Activer le son' : 'Couper le son'); b.setAttribute('aria-pressed', String(!this.preferences.muted)); }
   toast(message, duration = 4000) { $('#toast').textContent = message; $('#toast').classList.remove('hidden'); clearTimeout(this.toastTimer); this.toastTimer = setTimeout(() => $('#toast').classList.add('hidden'), duration); }
   async action(action) {
+    if (action === 'resume-run') {
+      const save = readCheckpoint(); if (!save) throw new Error('Aucune sauvegarde compatible disponible.');
+      if (save.players.length !== 1) throw new Error('Cette sauvegarde est coopérative : crée un salon, invite ton pote puis restaure-la.');
+      this.network.close(true); this.mode = 'solo'; this.resultShown = false; this.state = null;
+      await this.load(save.chapter, () => { this.simulation = restoreCheckpoint(save); this.state = this.simulation.state; this.selected = save.players[0].kind; this.accumulator = 0; this.renderer.reset(); this.input.resetRun(); this.sceneryStreet = ''; this.syncProgression(); this.show(null); });
+    }
+    if (action === 'restore-coop') {
+      const save = readCheckpoint();
+      if (this.network.slot !== 0 || save?.players.length !== 2) throw new Error('L’hôte doit posséder une sauvegarde coopérative.');
+      this.network.send({ type: 'restore', checkpoint: save });
+    }
+    if (action === 'import-run') $('#run-import').click();
+    if (action === 'export-run') {
+      const save = readCheckpoint(); if (!save) throw new Error('Aucune sauvegarde à exporter.');
+      const url = URL.createObjectURL(new Blob([JSON.stringify(save, null, 2)], { type: 'application/json' }));
+      const a = document.createElement('a'); a.href = url; a.download = 'saranfou-sortie.json'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+    if (action === 'attributes') { this.rogueReturn = this.screen || 'pause'; if (this.state && !this.state.paused) this.setPause(true); this.show(action); this.renderRogue(); }
+    if (action === 'close-attributes') this.show(this.rogueReturn || 'pause');
+    if (action === 'editor') await this.editor.open();
+    if (action === 'close-editor') { this.editor.save(); this.show('home'); }
     if (action === 'sound') { this.soundReturn = this.screen || 'pause'; if (this.state && !this.state.paused && !this.resultShown) this.setPause(true); this.show('sound'); renderAudioUI(this.audio); }
     if (action === 'close-sound') this.show(this.soundReturn || 'home');
     if (action === 'sound-test') { this.audio.wake(); this.audio.effect({ type: 'pickup' }); }
@@ -144,11 +195,13 @@ class Game {
       $('#retry-load').classList.remove('hidden'); console.error(error);
     }
   }
-  async startSolo(chapter) {
+  async startSolo(chapter, stage = 0) {
     this.network.close(true); this.mode = 'solo'; this.resultShown = false; this.state = null; this.simulation = null;
-    this.resetProgression();
+    this.resetProgression(); this.clearRunSave();
     await this.load(chapter, () => {
       this.simulation = new Simulation([this.selected], chapter, Date.now(), { difficulty: $('#difficulty-select').value, profiles: [this.profiles[this.selected]] }); this.state = this.simulation.state;
+      if (stage) { this.state.stage = clamp(Math.floor(stage), 0, 5); this.simulation.enterStreet(); }
+      this.sceneryStreet = '';
       this.renderer.reset(); this.input.resetRun(); this.accumulator = 0; this.show(null); this.audio.wake();
       this.renderer.hud(this.state, 0, false, 0);
     });
@@ -160,14 +213,14 @@ class Game {
     finally { $$('#online-form button').forEach(b => { b.disabled = false; }); }
   }
   async host() {
-    this.resetProgression();
+    this.resetProgression(); this.clearRunSave();
     try { await this.connectOnline(); this.network.send({ type: 'create', character: this.selected, difficulty: $('#difficulty-select').value }); }
     catch (error) { this.setNetworkError(error.message); }
   }
   async join() {
     const code = $('#room-input').value.trim().toUpperCase();
     if (!/^[A-Z2-9]{6}$/.test(code)) { this.setNetworkError('Entre les 6 caractères du code de ton pote.'); return; }
-    this.resetProgression();
+    this.resetProgression(); this.clearRunSave();
     await this.connectOnline(); this.network.send({ type: 'join', code, character: this.selected });
   }
   async resumeConnection(session) {
@@ -189,6 +242,7 @@ class Game {
     }
     if (message.type === 'waiting') $('#loading-detail').textContent = message.message;
     if (message.type === 'start') {
+      this.sceneryStreet = '';
       this.mode = 'online'; this.simulation = null; this.state = message.state; this.lastSnapshot = performance.now();
       this.renderer.reset(); this.input.resetRun(); this.resultShown = false; this.show(null); this.audio.wake();
       this.renderer.seenEvent = this.state.eventSeq; this.renderer.hud(this.state, this.network.slot, true, this.network.ping);
@@ -201,7 +255,7 @@ class Game {
     if (message.type === 'paused') {
       if (this.state) { this.state.paused = message.value !== false; this.state.pauseReason = message.reason; }
       if (message.value === false) this.show(null);
-      else if (this.state && this.screen !== 'evolution') this.pauseScreen(message.reason, message.slot);
+      else if (this.state && !['evolution', 'attributes'].includes(this.screen)) this.pauseScreen(message.reason, message.slot);
     }
     if (message.type === 'closed') { this.quit(); this.toast(message.message); }
     if (message.type === 'error') {
@@ -245,8 +299,10 @@ class Game {
     else this.network.send({ type: 'input', input: this.input.neutral() });
   }
   togglePause() {
+    if (this.screen === 'level-editor') { this.editor.paletteKey = null; this.editor.renderPalette(); return; }
     if (this.screen === 'sound') { this.show(this.soundReturn || 'home'); return; }
     if (this.screen === 'evolution') { this.show(this.evolutionReturn || 'select'); return; }
+    if (this.screen === 'attributes') { this.show(this.rogueReturn || 'pause'); return; }
     if (this.screen === 'controls') { this.show(this.controlsReturn || 'home'); return; }
     if (!this.state || this.resultShown) { if (this.screen !== 'home') this.quit(); return; }
     if (this.screen === 'loading') return;
@@ -284,6 +340,7 @@ class Game {
   }
   finish() {
     if (this.resultShown) return;
+    this.persistRun();
     this.resultShown = true; const win = this.state.phase === 'won';
     this.preferences.record = Math.max(this.preferences.record, this.state.score); this.save(); this.updateRecord();
     $('#result-kicker').textContent = win ? 'LE JOUR SE LÈVE SUR SARAN.' : 'LA NUIT N’EST PAS FINIE.';
@@ -295,13 +352,24 @@ class Game {
     this.show('result');
   }
   quit() {
+    this.persistRun();
     this.syncProgression();
     ++this.loadingGeneration; this.network.close(true); this.state = null; this.simulation = null; this.resultShown = false; this.mode = 'solo';
     this.resetProgression();
     this.renderer.reset(); this.pendingLoad = null; this.updateRecord(); this.show('home');
+    this.updateRunStatus();
     if (location.search) history.replaceState(null, '', location.pathname);
   }
   gamepadMenu(action) {
+    if (action === 'start') {
+      if (this.screen === 'select') {
+        const highlighted = document.activeElement?.dataset.fighter;
+        if (highlighted) this.select(highlighted);
+        $('#play-button').click();
+      } else if (this.screen === 'pause') this.togglePause();
+      return;
+    }
+    if (action === 'back' && this.screen === 'attributes') { this.show(this.rogueReturn || 'pause'); return; }
     if (this.screen === 'sound' && action === 'back') { this.show(this.soundReturn || 'home'); return; }
     if (this.screen === 'sound' && document.activeElement?.type === 'range' && ['left', 'right', 'accept'].includes(action)) {
       const slider = document.activeElement;
@@ -310,10 +378,16 @@ class Game {
     }
     if (action === 'back') { if (this.screen === 'evolution') this.show(this.evolutionReturn || 'select'); else if (this.screen === 'controls') this.show(this.controlsReturn || 'home'); else if (this.screen === 'pause') this.togglePause(); else this.quit(); return; }
     const items = this.focusables(); if (!items.length) return;
-    const index = items.indexOf(document.activeElement);
+    let index = items.indexOf(document.activeElement);
+    if (index < 0) { items[0].focus(); index = 0; if (action !== 'accept') return; }
+    if (this.screen === 'select' && document.activeElement?.dataset.fighter && ['left', 'right'].includes(action)) {
+      const cards = [...$('#roster').querySelectorAll('[data-fighter]')], current = cards.indexOf(document.activeElement);
+      const next = cards[(current + (action === 'right' ? 1 : -1) + cards.length) % cards.length];
+      next.focus(); this.select(next.dataset.fighter); return;
+    }
     if (this.screen === 'evolution' && document.activeElement?.dataset.talent && ['left', 'right'].includes(action)) {
       const nodes = [...document.querySelectorAll('[data-talent]')], n = nodes.indexOf(document.activeElement);
-      nodes[(n + 3) % 6]?.focus(); return;
+      nodes[(n + (action === 'right' ? 12 : -12) + nodes.length) % nodes.length]?.focus(); return;
     }
     if (action === 'accept') { if (document.activeElement instanceof HTMLInputElement) { const el = document.activeElement; el.value = el.value.toUpperCase().padEnd(6, 'A'); this.codeCursor = ((this.codeCursor ?? -1) + 1) % 6; el.setSelectionRange(this.codeCursor, this.codeCursor + 1); this.toast(`Code · caractère ${this.codeCursor + 1}/6 : ← → pour changer, A pour avancer. ↓ pour Rejoindre.`); } else document.activeElement?.click(); return; }
     if (document.activeElement?.id === 'room-input' && ['left', 'right'].includes(action)) {
@@ -333,6 +407,7 @@ class Game {
     if (profile.completed.length > (this.profiles[p.kind]?.completed.length || 0)) this.toast('Chapitre terminé ! +1 point · Pause → Talents pour choisir ton amélioration.', 7000);
     this.profiles[p.kind] = profile;
     if (this.screen === 'evolution') this.renderEvolution();
+    if (this.screen === 'attributes') this.renderRogue();
   }
   resetProgression() {
     this.profiles = Object.fromEntries(FIGHTERS.map(f => [f.id, normalizeProfile({}, f.id)]));
@@ -347,10 +422,36 @@ class Game {
       this.audio.confirm(); this.renderEvolution();
     });
   }
+  renderRogue() {
+    const slot = this.mode === 'online' ? this.network.slot : 0, player = this.state?.players[slot];
+    renderAttributes(player, key => {
+      if (this.mode === 'online') this.network.send({ type: 'attribute', key });
+      else if (this.simulation?.spendAttribute(slot, key)) { this.syncProgression(); this.renderRogue(); }
+    });
+  }
+  updateRunStatus() {
+    const saved = readCheckpoint();
+    $('#run-status').textContent = saved ? `Sauvegarde ${saved.players.length === 2 ? 'coop' : 'solo'} · quartier ${saved.chapter + 1}, rue ${saved.stage + 1}, vague ${saved.wave + 1} · ${Math.floor(saved.time / 60)} min. Conservée dans ce navigateur.` : 'Sauvegarde automatique entre les vagues. Exporte-la pour la conserver sur un autre appareil.';
+  }
+  clearRunSave() { try { localStorage.removeItem(RUN_SAVE_KEY); } catch {} this.updateRunStatus(); }
+  persistRun() {
+    if (!this.state) return;
+    try {
+      recordRun(this.state, this.mode === 'online' ? this.network.slot : 0);
+      if (['over', 'won'].includes(this.state.phase)) {
+        const saved = readCheckpoint(); if (saved?.runId === this.state.runId) localStorage.removeItem(RUN_SAVE_KEY);
+        return;
+      }
+      const saved = checkpoint(this.simulation ? this.simulation.snapshot() : this.state);
+      if (saved) localStorage.setItem(RUN_SAVE_KEY, JSON.stringify(saved));
+    } catch (error) { if (!this.saveWarning) { this.saveWarning = true; this.toast('Sauvegarde locale indisponible : ' + error.message); } }
+  }
   frame(now) {
     requestAnimationFrame(time => this.frame(time));
     const dt = Math.min(.075, (now - this.lastFrame) / 1000); this.lastFrame = now;
     const input = this.input.sample();
+    if (this.screen === 'level-editor') return;
+    if (now - (this.lastCheckpoint || 0) > 1000) { this.lastCheckpoint = now; this.persistRun(); }
     if (now - (this.lastProgressSave || 0) > 200) { this.lastProgressSave = now; this.syncProgression(); }
     if (this.simulation && this.state && !this.state.paused) {
       this.accumulator = Math.min(.12, this.accumulator + dt);
@@ -363,10 +464,20 @@ class Game {
       if (['won', 'over'].includes(this.state.phase)) this.finish();
     }
     if (this.mode === 'online' && this.state && now - this.lastInputSend > 1000 / 30) { this.lastInputSend = now; this.network.send({ type: 'input', input }); }
+    if (this.state) {
+      const player = this.state.players[this.mode === 'online' ? this.network.slot : 0];
+      const key = `${this.state.chapter}:${this.state.stage}`;
+      if (this.sceneryStreet !== key || this.state.decor === null && this.mode === 'solo') {
+        this.sceneryStreet = key;
+        const decor = layoutFor(this.state.chapter, this.state.stage);
+        if (this.mode === 'solo') this.state.decor = decor;
+        else if (this.network.slot === 0) this.network.send({ type: 'scenery', chapter: this.state.chapter, stage: this.state.stage, items: decor.map(d => [d.key, d.x, d.y, d.height, d.facing || 1]) });
+      }
+    }
     this.renderer.draw(this.state, dt, { online: this.mode === 'online', slot: this.mode === 'online' ? this.network.slot : 0, input, age: (now - this.lastSnapshot) / 1000, ping: this.network.ping });
     this.audio.update(!!this.state && !this.screen, this.state?.chapter || 0,
       this.state?.enemies.some(e => e.boss && e.hp > 0),
-      document.hidden || (!!this.state?.paused && ['pause', 'evolution', 'loading', 'controls', 'sound', null].includes(this.screen)));
+      document.hidden || (!!this.state?.paused && ['pause', 'evolution', 'attributes', 'loading', 'controls', 'sound', null].includes(this.screen)));
   }
 }
 

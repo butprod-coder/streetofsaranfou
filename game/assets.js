@@ -62,6 +62,28 @@ export class Assets {
         // A generated sheet may need a slightly shifted gutter to keep whole feet in their row.
         const top = Math.floor((region?.[1] ?? config.rowCuts?.[row] ?? row / config.rows) * image.height), bottom = Math.floor((region?.[3] ?? config.rowCuts?.[row + 1] ?? (row + 1) / config.rows) * image.height);
         let x0 = right, y0 = bottom, x1 = left, y1 = top;
+        if (config.isolate) {
+          // Ignore disconnected atlas neighbours and alpha flecks when anchoring action poses.
+          const w = right - left, h = bottom - top, seen = new Uint8Array(w * h), queue = new Int32Array(w * h);
+          let largest = 0;
+          const solid = n => pixels[((top + Math.floor(n / w)) * image.width + left + n % w) * 4 + 3] > 32;
+          for (let n = 0; n < seen.length; n++) {
+            if (seen[n] || !solid(n)) continue;
+            let head = 0, tail = 1, lx = w, ly = h, rx = 0, by = 0;
+            queue[0] = n; seen[n] = 1;
+            while (head < tail) {
+              const p = queue[head++], x = p % w, y = Math.floor(p / w);
+              lx = Math.min(lx, x); ly = Math.min(ly, y); rx = Math.max(rx, x); by = Math.max(by, y);
+              for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+                const nx = x + dx, ny = y + dy, next = ny * w + nx;
+                if (nx < 0 || ny < 0 || nx >= w || ny >= h || seen[next] || !solid(next)) continue;
+                seen[next] = 1; queue[tail++] = next;
+              }
+            }
+            if (tail > largest) { largest = tail; x0 = left + lx; y0 = top + ly; x1 = left + rx; y1 = top + by; }
+          }
+          return [x0, y0, Math.max(1, x1 - x0 + 1), Math.max(1, y1 - y0 + 1)];
+        }
         for (let y = top; y < bottom; y++) for (let x = left; x < right; x++) if (pixels[(y * image.width + x) * 4 + 3] > 32) {
           x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
         }

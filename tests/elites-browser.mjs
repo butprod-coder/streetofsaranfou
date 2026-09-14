@@ -74,7 +74,7 @@ try {
   }
   for (let chapter = 0; chapter < 6; chapter++) {
     await page.evaluate(chapter => {
-      const { renderer: r, Simulation } = window.qaElites; const sim = new Simulation(['gustavax'], chapter, 9); sim.state.stage = 5; sim.enterStreet(); sim.state.wave = 1; sim.spawnWave();
+      const { renderer: r, Simulation } = window.qaElites; const sim = new Simulation(['gustavax'], chapter, 9); sim.state.stage = 5; sim.enterStreet(); sim.state.wave = sim.state.waves.length - 2; sim.spawnWave();
       const boss = sim.state.enemies.find(e => e.boss), p = sim.state.players[0]; boss.vehicle = false; boss.hp = boss.maxHp * .25;
       for (let i = 0; i < 300; i++) { p.invincible = 99; sim.step(); if (boss.pattern?.signature && boss.pattern.elapsed > .85) break; }
       r.reset(); r.draw(sim.state, .016);

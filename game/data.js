@@ -2,6 +2,7 @@ import { ELITES } from './elite-data.js';
 import { ENCORE_ELITES } from './elite-encore-data.js';
 import { CLASSIC_SPRITES, CLASSIC_POSES } from './classic-sprites.js';
 import { HERO_IDS, HERO_POSES } from './hero-sprites.js';
+import { STREET_ENEMIES } from './street-enemies-data.js';
 export const W = 1280;
 export const H = 720;
 export const FLOOR = { top: 448, bottom: 646, left: 55, right: 1225 };
@@ -14,7 +15,7 @@ export const FIGHTERS = [
   { id: 'lorenzo', name: 'Lorenzo', title: 'Crâne de Chmère', hp: 165, speed: 235, power: 22, color: '#ff795c', special: 'Clope infernale', technique: 'fire', description: 'Le crâne lisse, les poings lourds, le sang chaud.', stats: [5, 2, 4] },
   { id: 'jo', name: 'Jo', title: 'La Mouk', hp: 120, speed: 295, power: 17, color: '#c2a3ff', special: 'Tourbillon Mouk', technique: 'spin', description: 'Un petit grain de folie. Un très grand tourbillon.', stats: [3, 5, 3] },
   { id: 'kikor', name: 'Kikor', title: 'Le Peintre', hp: 145, speed: 260, power: 19, color: '#86b9ff', special: 'Toile vivante', technique: 'paint', description: 'Un tableau, un petit bonhomme vert. Et un allié dans la mêlée.', stats: [4, 3, 4] },
-  { id: 'gustavax', name: 'Gustavax', title: 'Le Philosophe', hp: 155, speed: 230, power: 21, color: '#e4d183', special: 'Le Catcheur', technique: 'wrestle', description: 'Short bleu : +30 % vie, force, vitesse et puissance spéciale ; 30 % de dégâts reçus en moins.', stats: [4, 2, 5] },
+  { id: 'gustavax', name: 'Gustavax le Sheitan', title: 'Le Sheitan', hp: 155, speed: 230, power: 21, color: '#e4d183', special: 'Le Catcheur', technique: 'wrestle', description: 'Short bleu : +30 % vie, force, vitesse et puissance spéciale ; 30 % de dégâts reçus en moins.', stats: [4, 2, 5] },
 ];
 export const fighter = id => FIGHTERS.find(c => c.id === id) || FIGHTERS[0];
 const chapter = (name, short, folder, prefix, quote, boss, color, padded = false) => ({ name, short, quote, boss, color, backgrounds: Array.from({ length: 6 }, (_, i) => `/assets/shared/levels/${folder}/${prefix}${padded ? String(i + 1).padStart(2, '0') : i + 1}.png`) });
@@ -28,6 +29,7 @@ export const CHAPTERS = [
 ];
 export const ENEMIES = {
   ...Object.fromEntries(Object.entries(ELITES).map(([id, data]) => [id, { ...data, elite: true }])),
+  ...STREET_ENEMIES,
   remy: { name: 'Rémy', hp: 54, speed: 145, power: 10, reach: 88, score: 115, color: '#ff8873', walk: 3, attack: 3, style: 'scooter' },
   orelsan: { name: 'Orelsan', hp: 64, speed: 154, power: 11, reach: 92, score: 150, color: '#c2a3ff', walk: 3, attack: 3, style: 'tennis' },
   charlingals: { name: 'Charlingals', hp: 82, speed: 118, power: 13, reach: 98, score: 190, color: '#ffc46e', walk: 4, attack: 4, style: 'knife' },
@@ -37,8 +39,8 @@ export const ENEMIES = {
   kikor_e: { name: 'Kikor · Ennemi', hp: 68, speed: 175, power: 12, reach: 88, score: 175, color: '#b9f56d', walk: 3, attack: 3, style: 'skateboard' },
   triso: { name: 'Triso', hp: 76, speed: 116, power: 10, reach: 86, score: 190, color: '#b6d85a', walk: 3, attack: 3 },
 };
-export const ACTIONS = ['punch', 'kick', 'special', 'jump', 'dodge'];
-export const blankInput = () => ({ x: 0, y: 0, punch: false, kick: false, special: false, jump: false, dodge: false, revive: false, seq: 0, taps: {} });
+export const ACTIONS = ['punch', 'kick', 'special', 'jump', 'dodge', 'grab', 'interact'];
+export const blankInput = () => ({ x: 0, y: 0, punch: false, kick: false, special: false, jump: false, dodge: false, grab: false, interact: false, revive: false, seq: 0, taps: {} });
 export const neutralInput = previous => ({ ...blankInput(), seq: previous?.seq || 0, taps: { ...previous?.taps } });
 export const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export function sanitizeInput(value = {}) {
@@ -49,6 +51,10 @@ export function sanitizeInput(value = {}) {
   return result;
 }
 export function animation(id, action = 'idle', enemy = false) {
+  if (enemy && STREET_ENEMIES[id]) {
+    const cells = { idle: [0], walk: [1, 2], punch: [3, 4], special: [7, 8], hurt: [5], dead: [6] }[action] || [0];
+    return cells.map(cell => ({ url: `/assets/enemies/street/${id}.png`, atlas: `street_${id}`, cell }));
+  }
   if (enemy && CLASSIC_SPRITES[id]) return (CLASSIC_POSES[action] || [0]).map(cell => ({ url: `/assets/enemies/classics/${id}.png`, atlas: id, cell }));
   if (enemy && ELITES[id]) {
     const cells = { idle: [0], walk: [1, 2], punch: [3, 4], special: [3, 4], hurt: [5], dead: [6] }[action] || [0];

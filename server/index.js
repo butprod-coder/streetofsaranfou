@@ -10,9 +10,11 @@ import { Simulation } from '../game/simulation.js';
 import { FIGHTERS, CHAPTERS, VERSION, STEP, blankInput, neutralInput, sanitizeInput } from '../game/data.js';
 import { normalizeProfile } from '../game/progression.js';
 import { DIFFICULTIES } from '../game/balance.js';
+import { validateDecor } from '../game/level-layouts.js';
+import { validateCheckpoint, restoreCheckpoint } from '../game/run-save.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.json': 'application/json', '.woff2': 'font/woff2' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.json': 'application/json', '.woff2': 'font/woff2' };
 const validCharacter = value => FIGHTERS.some(c => c.id === value);
 const validCode = value => typeof value === 'string' && /^[A-Z2-9]{6}$/.test(value);
 const send = (socket, message) => { if (socket?.readyState === WebSocket.OPEN && socket.bufferedAmount < 250_000) socket.send(JSON.stringify(message)); };
@@ -51,7 +53,7 @@ export function createGameServer({ root = ROOT, maxRooms = 100, reconnectMs = 45
       else { const stream = createReadStream(resolved); stream.on('error', () => response.destroy()); stream.pipe(response); }
     } catch { response.writeHead(404); response.end('Introuvable'); }
   });
-  const wss = new WebSocketServer({ noServer: true, maxPayload: 4096, perMessageDeflate: false });
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 64000, perMessageDeflate: false });
   server.on('upgrade', (request, socket, head) => {
     const ip = request.socket.remoteAddress;
     let originOk = true;
@@ -145,7 +147,18 @@ export function createGameServer({ root = ROOT, maxRooms = 100, reconnectMs = 45
       if (!room || player?.ws !== ws) return;
       room.lastActive = Date.now();
       if (msg.type === 'leave') { detach(ws, true); return; }
+      if (msg.type === 'restore' && !room.sim && ws.slot === 0) {
+        try {
+          const saved = validateCheckpoint(msg.checkpoint);
+          if (saved.players.length !== 2 || !room.players.every(p => p?.ws)) throw new Error('Les deux joueurs doivent être présents pour restaurer.');
+          room.checkpoint = saved; room.chapter = saved.chapter; room.difficulty = saved.difficulty;
+          room.players.forEach((p, i) => { p.character = saved.players[i].kind; p.profile = saved.players[i].profile; p.ready = false; });
+          lobby(room);
+        } catch (e) { error(ws, e.message); }
+        return;
+      }
       if (msg.type === 'select' && !room.sim) {
+        room.checkpoint = null;
         if (validCharacter(msg.character)) { player.character = msg.character; player.profile = normalizeProfile({}, player.character); player.ready = false; }
         if (ws.slot === 0 && Object.hasOwn(DIFFICULTIES, msg.difficulty)) { room.difficulty = msg.difficulty; for (const p of room.players) if (p) p.ready = false; }
         if (ws.slot === 0 && Number.isInteger(msg.chapter) && msg.chapter >= 0 && msg.chapter < CHAPTERS.length) {
@@ -156,7 +169,8 @@ export function createGameServer({ root = ROOT, maxRooms = 100, reconnectMs = 45
       if (msg.type === 'ready' && !room.sim) {
         player.ready = !!msg.value; lobby(room);
         if (room.players.every(p => p?.ws && p.ready)) {
-          room.sim = new Simulation(room.players.map(p => p.character), room.chapter, Date.now(), { difficulty: room.difficulty, profiles: room.players.map(p => p.profile) });
+          room.sim = room.checkpoint ? restoreCheckpoint(room.checkpoint) : new Simulation(room.players.map(p => p.character), room.chapter, Date.now(), { difficulty: room.difficulty, profiles: room.players.map(p => p.profile) });
+          room.checkpoint = null;
           room.sim.pause(true, 'loading');
           for (const p of room.players) p.loaded = false;
           broadcast(room, { type: 'prepare', characters: room.players.map(p => p.character), chapter: room.chapter });
@@ -173,9 +187,23 @@ export function createGameServer({ root = ROOT, maxRooms = 100, reconnectMs = 45
         return;
       }
       if (msg.type === 'input' && room.sim) { player.input = sanitizeInput(msg.input); player.lastInput = Date.now(); return; }
+      if (msg.type === 'scenery' && room.sim && ws.slot === 0) {
+        if (msg.chapter !== room.sim.state.chapter || msg.stage !== room.sim.state.stage || room.sim.state.decor !== null) return;
+        try {
+          if (!Array.isArray(msg.items)) return;
+          room.sim.state.decor = validateDecor(msg.items.map(d => ({ key: d[0], x: d[1], y: d[2], height: d[3], facing: d[4] })));
+        } catch { error(ws, 'Placements de décor invalides.'); }
+        return;
+      }
       if (msg.type === 'spend' && room.sim) {
         if (room.sim.spendStat(ws.slot, msg.stat)) { player.profile = room.sim.state.players[ws.slot].progression; broadcast(room, { type: 'state', state: room.sim.snapshot() }); }
         else error(ws, 'Amélioration impossible : mets en pause et vérifie tes points disponibles.');
+        return;
+      }
+      if (msg.type === 'attribute' && room.sim) {
+        const changed = room.sim.spendAttribute(ws.slot, msg.key);
+        if (changed) { player.profile = room.sim.state.players[ws.slot].progression; broadcast(room, { type: 'state', state: room.sim.snapshot() }); }
+        else error(ws, 'Amélioration impossible : vérifie les points disponibles.');
         return;
       }
       if (msg.type === 'pause' && room.sim && !['won', 'over'].includes(room.sim.state.phase)) {

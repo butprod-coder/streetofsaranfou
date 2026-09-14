@@ -1,8 +1,8 @@
 # Streets of SaranFou — Reborn
 
-Refonte du beat’em up dans les rues de Saran : **solo et coopération à deux en ligne**, sept combattants, six quartiers et 36 rues. Les décors et les personnages d’origine sont conservés.
+Refonte du beat’em up dans les rues de Saran : **solo et coopération à deux en ligne**, sept combattants, six quartiers et 36 rues. Les décors d’origine sont complétés par six planches thématiques de 12 objets, éditables rue par rue.
 
-**Mise à jour v3 — Évolution arcade** : 2 à 4 vagues par rue, bestiaire aléatoire dès le premier quartier, six boss à phases, sept spéciaux distincts dont le catcheur de Gustavax, trois difficultés et arbres de six talents propres à chaque partie. Voir [GAMEPLAY.md](GAMEPLAY.md) pour les règles, les valeurs d’équilibrage et les points de réglage.
+**Mise à jour v4 — Rogue Like** : vagues espacées et bestiaire équitable, ennemis adaptatifs, six boss à phases, sept spéciaux distincts, 36 talents par héros, XP niveau 1–20 et checkpoints locaux exportables. Gustavax est devenu **Gustavax le Sheitan**. Voir [GAMEPLAY.md](GAMEPLAY.md) pour les règles et les valeurs d’équilibrage.
 
 ## Jouer
 
@@ -30,7 +30,7 @@ Sur le même réseau Wi-Fi, le second appareil ouvre `http://ADRESSE_IP_DU_PC:30
 
 Pour des joueurs sur des réseaux différents, déployer le serveur sur un hébergement Node/Docker avec WebSocket, puis partager son adresse HTTPS. **Le projet n’est pas publié sur Internet automatiquement.** Le client et le serveur doivent être servis sous la même origine ; un simple hébergement de fichiers statiques ne suffit pas pour la coop.
 
-Les deux joueurs partagent la pause. Une coupure réseau met le combat en pause ; la reconnexion automatique ou le rechargement de la page permettent de retrouver le même joueur pendant environ 45 secondes. La session de reprise est propre à l’onglet. Le joueur restant peut aussi continuer en solo. Quitter explicitement libère la place ou ferme le salon ; un tiers ne peut pas reprendre une partie en cours.
+Les deux joueurs partagent la pause. Une coupure réseau met le combat en pause ; la reconnexion automatique ou le rechargement de la page permettent de retrouver le même joueur pendant environ 45 secondes. La sortie est checkpointée dans le navigateur entre les vagues. **Exporter** et **Importer** permettent de conserver le JSON ; l’hôte peut restaurer un checkpoint coopératif dans un nouveau salon après un redémarrage Render. Quitter explicitement libère la place ou ferme le salon ; un tiers ne peut pas reprendre une partie en cours.
 
 ## Commandes et combat
 
@@ -41,11 +41,16 @@ Les deux joueurs partagent la pause. Une coupure réseau met le combat en pause 
 - **Espace** : saut ; J/K en l’air donnent une attaque aérienne.
 - **Maj** : esquive invulnérable, avec une courte recharge.
 - **E maintenu** près du partenaire à terre : le relever sans consommer de vie de réserve.
+- **Saisie automatique au contact** : poing + direction opposée au regard pour projeter loin l’ennemi. Les adversaires lourds retombent sur place et écrasent le joueur resté à proximité.
+- **F** : ramasser/échanger une arme ; à vide, déposer l’arme tenue. Les armes ont un nombre d’usages limité.
+- **J avec une arme** : utiliser le couteau, la batte, le pistolet, le fusil à pompe ou le pistolet-mitrailleur ramassé.
 - **Échap** : pause. Le bouton ♪ active/coupe le son et ⛶ demande le plein écran.
 
-Manette standard : stick/croix pour bouger, X = poing, Y = pied, B = spécial, A = saut, RB = esquive, LB = relever, Start = pause. Les menus se parcourent à la croix, A valide et B revient ; gauche/droite changent les listes sélectionnées. L’affectation dépend du mapping standard du navigateur. Les commandes tactiles s’affichent sur écran tactile ; le paysage est recommandé.
+Manette standard : stick/croix pour bouger, X = poing, Y = pied, B = spécial, A = saut, RB = esquive, LB = relever, Start / Options = pause et reprise. Dans les menus, stick ou croix pour naviguer (maintenir pour défiler), A / ✕ pour valider, B / ○ pour revenir ; gauche/droite changent les listes sélectionnées. Sur le choix du personnage, gauche/droite sélectionnent le combattant et Start / Options lance directement la partie, même sans rejoindre le bouton « C’est parti ». Le retour d’un sous-menu retrouve le focus précédent ; le choix du personnage retrouve le combattant sélectionné. L’affectation dépend du mapping standard du navigateur. Les commandes tactiles s’affichent sur écran tactile ; le paysage est recommandé.
 
 Les animations et projectiles annoncent les attaques ennemies ; seuls les bidons inflammables détruits conservent une zone rouge d’alerte. Les caisses et poubelles libèrent soins ou énergie. Une fois tous les ennemis battus, avancer à droite ; en duo, les deux joueurs doivent rejoindre la sortie. Chaque quartier se termine par un boss. Les vies de réserve permettent de revenir après un KO ; à deux, le partenaire peut relever le joueur avant ce retour automatique. Le score record, le personnage et le dernier chapitre sont conservés uniquement sur l’appareil.
+
+Le bouton **Éditeur de niveaux** ouvre une planche de 12 décors adaptés au quartier courant : résidentiel, domaine, stade, bourg, nuit et collège. Clique un objet puis dans la rue pour le poser, glisse-le pour le déplacer, puis règle sa position, sa hauteur et son orientation. Annulation/rétablissement, duplication, suppression, remise à zéro, export/import JSON et bouton **Jouer cette rue** sont inclus. Les placements sont locaux ; en coop, ceux de l’hôte sont envoyés aux deux joueurs. Les sandwichs, boissons et objets destructibles ordinaires sont volontairement rares : quatre placements interactifs au maximum par chapitre.
 
 ## Hébergement Internet
 
@@ -73,11 +78,11 @@ pnpm run test:browser
 
 `BROWSER_PATH` peut indiquer un Chrome/Edge déjà installé ; `TEST_URL` permet de tester une autre adresse du serveur. Les captures des tests navigateur sont écrites dans `test-results/` (non versionné).
 
-Les tests couvrent dégâts/portée, protection, déplacements, soins, KO, coopération, pause, progression et victoire ; des joueurs automatisés parcourent les 36 rues avec les commandes normales. Les tests réseau vérifient deux clients réels, les chargements synchronisés, la reprise de session et les erreurs de protocole. Les tests navigateur parcourent solo, coop, pause, rechargement, retour solo et écrans tactiles. Ils ne remplacent pas un essai depuis deux connexions Internet distinctes ni avec une manette physique.
+Les tests couvrent dégâts/portée, protection, déplacements, soins, KO, coopération, pause, progression, vagues, 252 talents, sauvegardes et victoire ; un parcours navigateur vérifie solo, coop, pause, rechargement, retour solo et écrans tactiles. Ils ne remplacent pas un essai depuis deux connexions Internet distinctes ni avec une manette physique.
 
 `pnpm run test:controller` ajoute les parcours manette et RPG sur un serveur de test isolé (aucun serveur à démarrer au préalable). Le Gamepad API standard est simulé : cela ne remplace pas un essai avec du matériel physique.
 
-`pnpm run build` produit `dist/` avec le client, le serveur et les images référencées (118 actuellement). Ce dossier est une distribution **Node**, pas un export statique : y installer les dépendances de production avant lancement. Docker peut aussi être construit directement depuis ce dossier. La construction Docker nécessite Docker et n’est pas exécutée par les tests Node.
+`pnpm run build` produit `dist/` avec le client, le serveur et les 140 images référencées. Ce dossier est une distribution **Node**, pas un export statique : y installer les dépendances de production avant lancement. Docker peut aussi être construit directement depuis ce dossier. La construction Docker nécessite Docker et n’est pas exécutée par les tests Node.
 
 `pnpm run test:heroes` vérifie les 127 poses des sept héros, de la création/du chevalet de Kikor et de la Golf blanche : transparence, découpage et scènes réelles de combat. Les planches sont dans `assets/heroes/`, leurs prompts et leur préparation technique dans `PROMPTS.md` et `packing.json` de ce dossier. Les anciens sprites restent disponibles mais ne sont plus chargés pour les animations normales des héros.
 

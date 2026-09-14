@@ -2,6 +2,7 @@ import { BALANCE, difficulty } from './balance.js';
 import { FLOOR, fighter, clamp } from './data.js';
 import { refreshPlayerStats } from './progression.js';
 import { ENCORE_RULES } from './elite-encore-data.js';
+import { hasTalent } from './rogue-talents.js';
 const SIGNATURES = { karonux: 'rainbowStorm', kikor: 'preciousHunt', yanu: 'kayakRush', lorenzo: 'sofaDrop', jo: 'ferretHunt', gustavax: 'finalRing' };
 const live = a => a.hp > 0;
 const distance = (a, b) => Math.hypot(a.x - b.x, (a.y - b.y) * 1.4);
@@ -12,6 +13,7 @@ export const combat = {
   endSpecial(p) {
     const wrestling = p.specialState?.kind === 'gustavax';
     p.specialState = null;
+    p.rogueBlood = false;
     if (wrestling) refreshPlayerStats(p, true);
   },
   hazard(source, options) {
@@ -24,6 +26,7 @@ export const combat = {
   },
   updateWorld(dt) {
     const s = this.state;
+    this.updateRogueWorld(dt);
     for (const h of s.hazards) {
       if (h.bossOwner && !s.enemies.some(e => e.id === h.owner && live(e))) { h.ttl = 0; continue; }
       h.age += dt;
@@ -68,7 +71,7 @@ export const combat = {
           const d = Math.max(1, distance(a, target)); a.x += (target.x - a.x) / d * 255 * dt; a.y += (target.y - a.y) / d * 205 * dt;
         } else if (a.cooldown <= 0) {
           a.cooldown = .65 * owner.bonuses.allyRate; a.action = 'punch'; a.actionTime = 0; a.striking = .24;
-          if (target.invincible <= 0) this.damage(target, a.power, owner, false);
+          if (target.invincible <= 0) this.damage(target, a.power * (target.paintOwner === owner.id ? 1.3 : 1) * (hasTalent(owner, 'Portrait de famille') && owner.supportRole === 'attack' ? 1.2 : 1), a, false);
         }
       }
       this.physics(a, dt);
@@ -103,17 +106,19 @@ export const combat = {
       a.endX = clamp(a.startX + a.dx * b.golfDistance, left, right); a.hits = {}; p.facing = a.dx;
     }
     if (p.kind === 'gustavax') { p.cooldown = .3; refreshPlayerStats(p, true); }
+    this.rogueOnSpecial(p);
     this.event('special', { actor: p.id, kind: fighter(p.kind).technique, label: fighter(p.kind).special, x: p.x, y: p.y, facing: p.facing });
   },
   updateSpecial(p, input, dt) {
     const a = p.specialState, b = BALANCE.specials[p.kind], s = this.state;
     a.elapsed += dt; if (p.kind !== 'gustavax') p.action = 'special';
-    const power = fighter(p.kind).power * p.bonuses.special, radius = b.radius * p.bonuses.radius;
+    const power = p.specialPower, radius = b.radius * p.bonuses.radius;
     const pulse = () => {
       this.hazard(p, { radius, delay: 0, ttl: .08, damage: Math.round(power * b.damage), kind: 'special', pulse: .5 });
       a.nextPulse = a.elapsed + (p.kind === 'yanu' ? .6 : .4);
     };
     if (p.kind === 'karonux') {
+      if (p.rogueDrive > 0) { p.action = 'special'; p.invincible = Math.max(p.invincible, .06); return; }
       if (a.elapsed >= b.golfAt && a.elapsed < b.sleepAt) {
         const returning = a.elapsed >= b.turnAt, leg = returning ? 1 : 0, previousX = p.x;
         const progress = clamp((a.elapsed - (returning ? b.turnAt : b.golfAt)) / (returning ? b.sleepAt - b.turnAt : b.turnAt - b.golfAt), 0, 1);
@@ -128,7 +133,10 @@ export const combat = {
           const enemy = s.enemies.includes(target);
           if (enemy && target.invincible > 0) continue;
           a.hits[key] = true;
-          if (enemy) this.damage(target, Math.round(power * b.damage), p, true);
+          if (enemy) {
+            this.damage(target, Math.round(power * b.damage), p, true);
+            if (!target.boss && hasTalent(p, 'Pare-chocs aimanté')) { target.x = clamp(p.x + p.facing * 90, FLOOR.left, FLOOR.right); target.vx = returning ? p.facing * 620 : 0; }
+          }
           else this.hitProp(target, 2, p);
         }
       }
@@ -153,7 +161,7 @@ export const combat = {
       if (input.x) p.facing = Math.sign(input.x);
       if (a.elapsed >= a.nextPulse) pulse();
     } else if (p.kind === 'kikor') {
-      if (!a.easel && a.elapsed >= b.paintAt) {
+      if (!a.easel && a.elapsed >= b.paintAt * (hasTalent(p, 'Croquis rapide') ? .5 : 1)) {
         s.allies = s.allies.filter(ally => ally.owner !== p.id);
         s.props = s.props.filter(prop => prop.kind !== 'easel' || prop.owner !== p.id);
         if (p.x > FLOOR.right - 100) p.facing = -1;
@@ -161,11 +169,11 @@ export const combat = {
         a.easel = this.nextId++;
         s.props.push({ id: a.easel, kind: 'easel', x: p.x + p.facing * 83, y: p.y + 2, hp: 3, owner: p.id, enemy: false, paintTime: 0 });
       }
-      if (!a.hit && a.elapsed >= b.spawnAt) {
+      if (!a.hit && a.elapsed >= b.spawnAt * (hasTalent(p, 'Croquis rapide') ? .5 : 1)) {
         a.hit = true; const easel = s.props.find(prop => prop.id === a.easel);
         if (easel) s.allies.push({ ...this.actor('creation', this.nextId++, false), owner: p.id, ally: true, hp: 1, maxHp: 1,
           x: easel.x, y: easel.y + 3, facing: p.facing, emerging: b.emergeDuration, ttl: b.allyDuration + p.bonuses.allyDuration,
-          power: Math.round(power * b.damage) });
+          power: Math.round(power * b.damage * (hasTalent(p, 'Deuxième pinceau') ? .7 : 1)) });
       }
     } else if (!a.hit && a.elapsed >= .22) {
       a.hit = true;

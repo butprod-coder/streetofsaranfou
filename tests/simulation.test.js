@@ -67,7 +67,7 @@ test('two players can revive a teammate without spending a spare life', () => {
 });
 test('solo death uses a spare life; exhausting spares ends the run', () => {
   const game = arena(), p = game.state.players[0]; p.hp = 0;
-  run(game, 2.2); assert.ok(p.hp > 0); assert.equal(p.lives, 1);
+  run(game, 2.2); assert.ok(p.hp > 0); assert.equal(p.lives, 4);
   p.lives = 0; p.hp = 0; run(game, 2.2); assert.equal(game.state.phase, 'over');
 });
 test('shared pause freezes the whole simulation', () => {

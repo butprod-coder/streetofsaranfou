@@ -69,6 +69,9 @@ export class Audio {
     else if (event.type === 'explosion') { this.tone(90, .4, .6, 'triangle', 0, 22); this.hiss(.4, .35, 0, 180); }
     else if (event.type === 'clear') { this.tone(330, .3, .2); this.tone(440, .35, .15, 'triangle', this.context?.currentTime + .1); this.tone(660, .4, .15, 'triangle', this.context?.currentTime + .2); }
     else if (event.type === 'break') this.hiss(.15, .3, 0, 500);
+    else if (event.type === 'gunshot') { this.hiss(.10, .3, 0, 2200); this.tone(105, .1, .32, 'triangle', 0, 35); }
+    else if (event.type === 'grab' || event.type === 'throw') this.hiss(.12, .18, 0, 1100);
+    else if (event.type === 'equip') this.tone(610, .11, .16, 'triangle');
   }
   confirm() { this.wake(); this.tone(430, .075, .15, 'square', 0, 600); }
   say(text) {

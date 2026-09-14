@@ -35,7 +35,7 @@ try {
     sim.state.chapter = kind === 'delivery' ? 1 : 0; sim.state.stage = kind === 'ambush' ? 3 : 1;
     sim.enterStreet(); sim.state.phase = 'fight'; sim.state.wave = sim.state.waves.length - 1; sim.state.enemies = []; sim.state.spawnQueue = [];
     // Final wave resolution must start the event naturally on the server.
-    await host.waitForFunction(k => window.saranfou.inspect().state.surprise?.kind === k, kind);
+    await host.waitForFunction(k => window.saranfou.inspect().state.surprise?.kind === k, kind, { timeout: 3000 });
     await guest.waitForFunction(k => window.saranfou.inspect().state.surprise?.kind === k, kind);
     await Promise.all([screen(host, null), screen(guest, null)]);
     await host.waitForTimeout(2400);

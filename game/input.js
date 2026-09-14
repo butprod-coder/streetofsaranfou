@@ -1,5 +1,5 @@
 import { blankInput, ACTIONS, clamp } from './data.js';
-const KEYMAP = { KeyW: 'up', KeyZ: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyA: 'left', KeyQ: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right', KeyJ: 'punch', KeyK: 'kick', KeyL: 'special', Space: 'jump', ShiftLeft: 'dodge', ShiftRight: 'dodge', KeyE: 'revive' };
+const KEYMAP = { KeyW: 'up', KeyZ: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyA: 'left', KeyQ: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right', KeyJ: 'punch', KeyK: 'kick', KeyL: 'special', Space: 'jump', ShiftLeft: 'dodge', ShiftRight: 'dodge', KeyE: 'revive', KeyG: 'grab', KeyF: 'interact' };
 export class Input {
   constructor({ pause, blur, menu, wake }) {
     this.keys = new Set(); this.touch = {}; this.stick = { x: 0, y: 0 }; this.taps = {}; this.seq = 0; this.padPrevious = {}; this.enabled = false;
@@ -37,7 +37,7 @@ export class Input {
     });
   }
   tap(key) { this.taps[key] = (this.taps[key] || 0) + 1; }
-  clear() { this.keys.clear(); this.touch = {}; this.stick = { x: 0, y: 0 }; const knob = document.querySelector('#touch-stick i'); if (knob) knob.style.transform = ''; }
+  clear() { this.keys.clear(); this.touch = {}; this.stick = { x: 0, y: 0 }; this.menuDirection = null; this.menuNeedsNeutral = true; const knob = document.querySelector('#touch-stick i'); if (knob) knob.style.transform = ''; }
   neutral() { return { ...blankInput(), seq: ++this.seq, taps: { ...this.taps } }; }
   resetRun() { this.clear(); this.taps = {}; this.seq = 0; this.padBlocked = true; }
   sample() {
@@ -50,19 +50,36 @@ export class Input {
     if (gamepad) {
       const button = i => gamepad.buttons[i]?.pressed || false;
       const axis = i => Math.abs(gamepad.axes[i] || 0) > .2 ? gamepad.axes[i] : 0;
-      const pad = { jump: button(0), special: button(1), punch: button(2), kick: button(3), revive: button(4), dodge: button(5), pause: button(9), up: button(12) || axis(1) < -.55, down: button(13) || axis(1) > .55, left: button(14) || axis(0) < -.55, right: button(15) || axis(0) > .55, accept: button(0), back: button(1) };
+      const pad = { jump: button(0), special: button(1), punch: button(2), kick: button(3), revive: button(4), dodge: button(5), grab: button(6), interact: button(7), pause: button(9), up: button(12) || axis(1) < -.55, down: button(13) || axis(1) > .55, left: button(14) || axis(0) < -.55, right: button(15) || axis(0) > .55, accept: button(0), back: button(1) };
       const wasEnabled = this.enabled;
       if (this.previousEnabled !== wasEnabled) this.padBlocked = true;
-      if (![0, 1, 2, 3, 4, 5].some(button)) this.padBlocked = false;
+      if (![0, 1, 2, 3, 4, 5, 6, 7].some(button)) this.padBlocked = false;
       for (const action of ACTIONS) { if (wasEnabled && !this.padBlocked) { input[action] ||= pad[action]; if (pad[action] && !this.padPrevious[action]) this.tap(action); } }
       input.revive ||= pad.revive;
       input.x += axis(0) + Number(button(15)) - Number(button(14));
       input.y += axis(1) + Number(button(13)) - Number(button(12));
-      if (pad.pause && !this.padPrevious.pause) this.pause();
-      else if (!wasEnabled) for (const action of ['up', 'down', 'left', 'right', 'accept', 'back']) if (pad[action] && !this.padPrevious[action]) { this.wake(); this.onMenu(action); break; }
+      if (pad.pause && !this.padPrevious.pause) { this.wake(); if (wasEnabled) this.pause(); else this.onMenu('start'); }
+      else if (!wasEnabled) {
+        // Buttons fire once; held directions repeat only within the current menu.
+        const edge = ['back', 'accept'].find(action => pad[action] && !this.padPrevious[action]);
+        const dx = Number(button(15)) - Number(button(14)), dy = Number(button(13)) - Number(button(12));
+        const x = dx || (!dy ? axis(0) : 0), y = dy || (!dx ? axis(1) : 0);
+        const threshold = this.menuDirection ? .4 : .55;
+        const direction = Math.max(Math.abs(x), Math.abs(y)) < threshold ? null
+          : Math.abs(x) > Math.abs(y) ? (x > 0 ? 'right' : 'left') : (y > 0 ? 'down' : 'up');
+        if (!direction) { this.menuDirection = null; this.menuNeedsNeutral = false; }
+        if (edge) { this.wake(); this.onMenu(edge); }
+        else if (direction && !this.menuNeedsNeutral) {
+          const now = performance.now(), changed = direction !== this.menuDirection;
+          if (changed || now >= this.menuRepeatAt) {
+            this.menuDirection = direction; this.menuRepeatAt = now + (changed ? 350 : 120);
+            this.wake(); this.onMenu(direction);
+          }
+        }
+      }
       this.padPrevious = pad;
       this.previousEnabled = wasEnabled;
-    } else this.padPrevious = {};
+    } else { this.padPrevious = {}; this.menuDirection = null; this.menuNeedsNeutral = false; }
     input.x = clamp(input.x, -1, 1); input.y = clamp(input.y, -1, 1); input.taps = { ...this.taps };
     if (!this.enabled) { const empty = blankInput(); empty.seq = input.seq; empty.taps = input.taps; return empty; }
     return input;

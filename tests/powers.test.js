@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Simulation } from '../game/simulation.js';
 import { BALANCE } from '../game/balance.js';
 import { blankInput, FLOOR, STEP } from '../game/data.js';
-import { applyProfile } from '../game/progression.js';
+import { applyProfile, TALENTS, xpForLevel } from '../game/progression.js';
 const run = (g, seconds, input = blankInput()) => { for (let i = 0; i < seconds / STEP; i++) g.step([input]); };
 function arena(kind) {
   const g = new Simulation([kind]); g.spawnWave(); g.state.props = []; g.state.spawnQueue = [];
@@ -25,20 +25,21 @@ test('wrestler grants exactly 30 percent once, preserves health ratio and restor
   }
 });
 test('wrestler damage, death and street changes never leave a permanent buff or resurrect', () => {
-  const { g, p, e } = arena('gustavax'); g.activateSpecial(p); g.damage(p, 20, e, false); assert.equal(p.maxHp - p.hp, 14);
+  const { g, p, e } = arena('gustavax'); g.activateSpecial(p); g.damage(p, 20, e, false); assert.equal(p.maxHp - p.hp, 12);
   const ratio = p.hp / p.maxHp; g.enterStreet(); assert.equal(p.maxHp, 155); assert.equal(p.hp / p.maxHp, ratio); assert.equal(p.specialState, null);
   g.activateSpecial(p); g.damage(p, 9999, e, false); assert.equal(p.hp, 0); assert.equal(p.maxHp, 155); assert.equal(p.power, 21);
   g.revivePlayer(p, .5); assert.equal(p.hp, Math.round(155 * .5)); assert.equal(p.specialState, null);
 });
 test('Karonux drives the white Golf once before sleeping, retaining his talent benefits', () => {
-  const { g, p, e } = arena('karonux'); applyProfile(p, { completed: [0, 1, 2], talents: ['matelas', 'micro-sieste', 'reveil'] }); p.hp = 50;
+  const { g, p, e } = arena('karonux'); const names = ['Marche arrière sauvage', 'Oreiller de secours', 'Réveil difficile'];
+  applyProfile(p, { xp: xpForLevel(20), completed: [0, 1, 2, 3, 4, 5], talents: TALENTS.karonux.filter(n => names.includes(n.name)).map(n => n.id) }); p.hp = 50;
   const start = p.x; g.activateSpecial(p); run(g, .2); assert.equal(e.hp, 10000);
   run(g, .7); assert.ok(e.hp < 10000); assert.ok(p.x > start + 250); assert.equal(p.hp, 50);
   run(g, .4); assert.equal(p.facing, -1); assert.equal(p.action, 'special');
-  run(g, .6); assert.equal(p.x, start); assert.equal(p.action, 'sleep'); assert.equal(p.hp, 80);
+  run(g, .6); assert.equal(p.x, start); assert.equal(p.action, 'sleep'); assert.equal(p.hp, 50);
   const hp = e.hp; run(g, .3); assert.equal(e.hp, hp);
   assert.equal(g.state.events.filter(e => e.type === 'golf').length, 1); assert.ok(!g.state.events.some(e => e.type === 'thunder'));
-  run(g, 1); assert.equal(p.specialState, null);
+  run(g, 1.5); assert.equal(p.specialState, null);
 });
 
 test('Golf is bounded near both walls and each opponent can be hit at most once per pass', () => {

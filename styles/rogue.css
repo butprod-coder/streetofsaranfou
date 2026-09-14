@@ -1,0 +1,39 @@
+.evolution-modal{width:min(1320px,96vw);max-width:1320px}.evolution-modal #talent-tree{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}.talent-track{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.talent-node{min-height:155px!important;padding:12px!important;align-items:flex-start!important}.talent-node:before,.talent-node:after{display:none!important}.talent-node .talent-rank{font-size:16px;min-width:16px;width:16px}.talent-copy span{font-size:12px;line-height:1.5}.talent-node.ultimate{border-color:#b89150;background:linear-gradient(145deg,#332342,#131b29)}.talent-node:focus-visible{outline:3px solid #ffe197;outline-offset:3px}.rogue-modal{width:min(680px,94vw)}.attribute-node{display:flex;width:100%;text-align:left;align-items:center;justify-content:space-between;gap:18px;border:1px solid #48556d;border-radius:10px;background:#172333;color:#f5eddf;padding:18px;margin:12px 0;cursor:pointer}.attribute-node span{display:grid;gap:7px}.attribute-node small{color:#b5c5d6;line-height:1.5}.attribute-node strong{white-space:nowrap;color:#ffce7e}.attribute-node:disabled{opacity:.6;cursor:default}.attribute-node:focus-visible{outline:3px solid #ffce7e}.run-actions{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.run-actions button{font-size:12px}.run-status{color:#b9cbdd;font-size:13px;line-height:1.6}.talent-caption{flex-wrap:wrap}.xp-track{display:inline-block;background:#354058;width:70px;height:5px}.xp-track i{display:block;background:#b3e5fe;height:100%}
+.home-copy{z-index:2;max-height:calc(100vh - 165px);overflow-y:auto;padding-right:5px;scrollbar-width:thin}.home-footer{z-index:3}
+@media(max-width:1050px){.evolution-modal #talent-tree{grid-template-columns:1fr}.talent-node{min-height:120px!important}.talent-branch{min-width:0}.pause-modal{max-height:88vh;overflow:auto}}@media(max-width:600px){.home-copy{max-height:none;overflow:visible;padding-right:0}}@media(max-width:450px){.talent-track{grid-template-columns:1fr}.talent-node{min-height:90px!important}}
+/* Compact, connected talent trees. */
+.evolution-modal{width:min(1000px,96vw);max-width:1000px}
+.evolution-modal #talent-tree{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.evolution-modal .talent-branch{padding:14px 12px;background:radial-gradient(ellipse at top,color-mix(in srgb,var(--branch-color) 12%,#10121b),#0b1019 75%);border-top:2px solid var(--branch-color)}
+.evolution-modal .talent-branch-title{min-height:60px;align-items:center;gap:9px}
+.evolution-modal .talent-branch-title h3{font-size:16px;letter-spacing:.02em}
+.evolution-modal .talent-branch-title .branch-icon{color:var(--branch-color);width:28px;flex-shrink:0}
+.evolution-modal .talent-branch-title svg{width:28px;height:28px}
+.evolution-modal .talent-branch-title div>span{font:9px monospace;color:#9a9fac}
+.evolution-modal .branch-count{font:11px monospace;color:var(--branch-color)}
+.evolution-modal .talent-track{position:relative;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(6,60px);gap:12px 0;padding:0;margin-top:18px}
+.talent-links{position:absolute;inset:0;width:100%;height:420px;pointer-events:none;fill:none;stroke:#444953;stroke-width:1.4}
+.talent-links .lit{stroke:var(--branch-color);filter:drop-shadow(0 0 3px var(--branch-color))}
+.evolution-modal .talent-node{display:grid;place-items:center;align-items:center!important;justify-self:center;width:48px;height:48px;min-height:48px!important;flex:none;gap:0;padding:4px!important;margin:6px 0;border:2px solid #555b66;border-radius:4px;clip-path:none;background:linear-gradient(145deg,#3a414d,#141820 70%);color:#adb4c0;opacity:1;filter:none;box-shadow:inset 0 0 0 2px #090c13,0 3px 7px #0008;z-index:1;transform:none}
+.evolution-modal .talent-node .talent-art{width:34px;height:34px;display:block;color:inherit;filter:grayscale(1)}
+.talent-art svg{width:100%;height:100%;filter:drop-shadow(0 2px 2px #000)}
+.evolution-modal .talent-node .talent-rank{position:absolute;right:-5px;bottom:-7px;display:block;min-width:0;width:auto;height:auto;padding:1px 3px;border:1px solid #595e67;background:#080b10;color:#b9c0ca;font:10px/1.2 monospace;transform:none;box-shadow:none}
+.evolution-modal .talent-node.available{border-color:#eac880;box-shadow:0 0 0 1px #eac88044,0 0 12px #eac88018;cursor:pointer}
+.evolution-modal .talent-node.available .talent-rank{color:#f8da94;border-color:#b39658}
+.evolution-modal .talent-node.owned{border-color:var(--branch-color);color:#fff0d7;background:radial-gradient(circle at 35% 25%,var(--branch-color),color-mix(in srgb,var(--branch-color) 40%,#111326) 70%);box-shadow:inset 0 0 0 2px #080d1466,0 0 16px color-mix(in srgb,var(--branch-color) 35%,transparent)}
+.evolution-modal .talent-node.owned .talent-art{filter:none}
+.evolution-modal .talent-node.owned .talent-rank{color:var(--branch-color);border-color:var(--branch-color)}
+.evolution-modal .talent-node.ultimate{border-radius:50%}
+.talent-star{position:absolute;top:-12px;color:#d7b772!important;font-size:12px!important}
+.evolution-modal .talent-node:hover,.evolution-modal .talent-node:focus{transform:scale(1.08);outline:2px solid #fff0cc;outline-offset:3px;filter:brightness(1.15)}
+.talent-legend{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:16px 0;font:11px/1.5 'Segoe UI',sans-serif;color:#9da8b9}
+.talent-legend>span:first-child{color:#eac880}.talent-legend>span:nth-child(2){color:#59d6be}
+.talent-help{position:relative;margin-left:auto;cursor:help;border:1px solid #929baa;border-radius:50%;padding:0 6px;color:#fff}
+.talent-help>span{display:none;position:absolute;right:0;bottom:25px;width:min(280px,75vw);padding:14px;background:#10121f;border:1px solid #a58a5f;z-index:5;color:#e5dfd3}
+.talent-help:hover>span,.talent-help:focus>span{display:block}
+#talent-tooltip{position:fixed;z-index:1000;width:280px;max-width:calc(100vw - 16px);box-sizing:border-box;padding:15px 17px;background:linear-gradient(135deg,#192033,#090d18);border:1px solid #c9aa6c;border-radius:5px;box-shadow:0 8px 30px #000b;pointer-events:none;color:#e6e2d9;font:13px/1.5 'Segoe UI',sans-serif}
+#talent-tooltip[hidden]{display:none}#talent-tooltip b{display:block;color:#ffe0a1;font-size:16px}#talent-tooltip small{display:block;color:#98a6bc;font-size:10px;margin-top:3px}#talent-tooltip p{margin:10px 0}#talent-tooltip strong{font:10px monospace;color:#d6bc80}
+@media(max-width:700px){.evolution-modal #talent-tree{grid-template-columns:1fr}.evolution-modal .talent-track{width:min(100%,300px);align-self:center}.evolution-modal .talent-branch-title{min-height:42px}.evolution-points small{display:none}}
+/* Keep icon painting within each branch while the mobile modal scrolls. */
+.evolution-modal .talent-branch{isolation:isolate}
+.evolution-modal .talent-node .talent-art,.talent-art svg{filter:none}

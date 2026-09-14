@@ -34,14 +34,15 @@ test('scenery has damage stages, drops once and can be broken by specials', () =
   const g = arena(), p = g.state.players[0], crate = g.state.props.find(p => p.kind === 'crate');
   g.hitProp(crate, 1, p); assert.equal(crate.hp, crate.maxHp - 1);
   g.hitProp(crate, 9, p); g.hitProp(crate, 9, p);
-  assert.equal(g.state.pickups.length, 1); assert.ok(crate.rubble > 0);
-  const bin = g.state.props.find(p => p.kind === 'bin');
+  assert.equal(g.state.pickups.filter(p => p.kind === 'food').length, 1); assert.ok(crate.rubble > 0);
+  const bin = g.makeProp('bin', 820, 619, { drop: 'energy' }); g.state.props.push(bin);
   g.hazard(p, { x: bin.x, y: bin.y, delay: 0, ttl: .1, damage: 30 }); run(g, .12);
   assert.equal(bin.hp, bin.maxHp - 2, 'one hit per special hazard');
 });
 test('barrel blast is delayed, hurts both teams, supports dodge and chain reactions', () => {
   const g = arena(['yanu', 'jo']), [p, safe] = g.state.players, e = g.state.enemies[0];
-  const barrel = g.state.props.find(p => p.kind === 'barrel'); p.x = safe.x = e.x = barrel.x; p.y = safe.y = e.y = barrel.y; e.invincible = 0;
+  const barrel = g.makeProp('barrel', 1050, 487); g.state.props.push(barrel);
+  p.x = safe.x = e.x = barrel.x; p.y = safe.y = e.y = barrel.y; e.invincible = 0;
   const second = g.makeProp('barrel', barrel.x - 80, barrel.y); g.state.props.push(second);
   const hp = p.hp, enemyHp = e.hp; g.hitProp(barrel, 9, p); run(g, .5);
   assert.equal(p.hp, hp); assert.equal(e.hp, enemyHp);

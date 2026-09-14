@@ -50,7 +50,7 @@ try {
   assert.equal(await page.locator('.special-caption').count(), 2);
   for (const kind of ['karonux', 'jualos', 'yanu', 'lorenzo', 'jo', 'kikor', 'gustavax']) {
     await page.evaluate(async kind => { const { renderEvolution } = await import('/game/evolution-ui.js'); renderEvolution(kind, null, () => {}); }, kind);
-    assert.equal(await page.locator('.branch-icon svg').count(), 2);
+    assert.equal(await page.locator('.branch-icon svg').count(), 3);
   }
   await page.evaluate(async () => {
     const { renderPauseTalents } = await import('/game/evolution-ui.js'); renderPauseTalents(window.encoreQA.sim.state.players[0]);

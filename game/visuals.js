@@ -2,6 +2,17 @@ import { ELITES } from './elite-data.js';
 import { CLASSIC_SPRITES } from './classic-sprites.js';
 import { HERO_IDS } from './hero-sprites.js';
 import { ENCORE_ELITES } from './elite-encore-data.js';
+import { SCENERY_SPRITES } from './scenery.js';
+import { HERO_ACTION_SPRITES } from './weapons.js';
+import { STREET_ENEMIES } from './street-enemies-data.js';
+// Keep extended hands, prone bodies and detached FX inside their atlas region.
+const STREET_GUTTERS = {
+  albero: { rowColumns: { 1: [0, .265, .5, .78, 1], 2: [0, .288, .5, .75, 1] } },
+  oliver: { rowColumns: { 1: [0, .278, .5, .78, 1] } },
+  titou: { rowCuts: [0, 1 / 3, .655, 1], rowColumns: { 1: [0, .25, .5, .785, 1], 2: [0, .25, .5, .78, 1] } },
+  pichoff: { rowCuts: [0, 1 / 3, .655, 1], rowColumns: { 1: [0, .273, .5, .785, 1], 2: [0, .348, .515, .765, 1] } },
+  cedric: { rowCuts: [0, 1 / 3, .645, 1], rowColumns: { 1: [0, .278, .5, .785, 1] } },
+};
 // Hand-tuned gutters preserve oversized paddles, lunges and crouched transformations.
 const ELITE_GUTTERS = {
   precieux: { rowColumns: { 1: [0, .323, .5, .75, 1], 2: [0, .376, .5, .75, 1] } },
@@ -29,11 +40,17 @@ export const VISUALS = {
   spit: frames('/assets/enemies/triso/triso_special', 3),
 };
 export const ARCADE_SPRITES = {
+  ...SCENERY_SPRITES,
+  ...HERO_ACTION_SPRITES,
+  weaponItems: { file: 'weapons', folder: 'shared/scenery', cols: 3, rows: 2, height: 24, cells: { 3: [0, .5, .39, 1], 4: [.4, .5, .67, 1] } },
   golf: { file: 'golf', folder: 'heroes', cols: 3, rows: 1, columnCuts: [0, .326, .674, 1], height: 115 },
   creation: { file: 'creation', folder: 'heroes', cols: 4, rows: 3, height: 96 },
   ...Object.fromEntries(HERO_IDS.map(id => [`hero_${id}`, { file: id, folder: 'heroes', cols: 4, rows: 4, height: 144 }])),
   ...Object.fromEntries(Object.entries(CLASSIC_SPRITES).map(([key, data]) => [key, { file: key, folder: 'enemies/classics', cols: 4, rows: 3, ...data }])),
   ...Object.fromEntries(Object.entries(ELITES).map(([key, data]) => [key, { file: key, folder: ENCORE_ELITES[key] ? 'enemies/encore' : 'enemies/elites', cols: 4, rows: 3, height: data.height, ...ELITE_GUTTERS[key] }])),
+  ...Object.fromEntries(Object.entries(STREET_ENEMIES).map(([key, data]) => [
+    `street_${key}`, { file: key, folder: 'enemies/street', cols: 4, rows: 3, height: data.height, ...STREET_GUTTERS[key] },
+  ])),
   fireFX: { file: 'fire-effects', cols: 4, rows: 3, height: 80 },
   gustavax: { file: 'gustavax-user', folder: 'gustavax', cols: 4, rows: 4, rowCuts: [0, .2823, .5263, .762, 1], columnCuts: [0, .25, .53, .75, 1], height: 144 },
   wrestler: { file: 'wrestler-user', folder: 'gustavax', cols: 4, rows: 3, rowCuts: [0, .3287, 2 / 3, 1], columnCuts: [0, .25, .5345, .75, 1], rowColumns: { 2: [0, .25, .51, .75, 1] }, height: 177 },
@@ -45,7 +62,7 @@ export const ARCADE_SPRITES = {
   energy: { file: 'energy', cols: 1, rows: 1, height: 38 },
   dash: { file: 'dash', cols: 3, rows: 1, height: 32 },
 };
-export const arcadeUrl = key => `/assets/${ARCADE_SPRITES[key].folder || 'shared/arcade'}/${ARCADE_SPRITES[key].file}.png`;
+export const arcadeUrl = key => `/assets/${ARCADE_SPRITES[key].folder || 'shared/arcade'}/${ARCADE_SPRITES[key].file}.${ARCADE_SPRITES[key].ext || 'png'}`;
 export const EXTRA_ASSETS = [...Object.values(VISUALS).flat(), ...Object.keys(ARCADE_SPRITES).map(arcadeUrl)];
 // Source atlas is 1254². Runtime rects retain alpha without rewriting the generated image.
 export const TRANSFORM_ROWS = { pig: [40, 330], wolf: [410, 402], tornado: [815, 439] };

@@ -4,6 +4,10 @@ import { BALANCE } from './balance.js';
 import { ELITES, ELITE_LABELS } from './elite-data.js';
 import { CLASSIC_SPRITES } from './classic-sprites.js';
 import { ENCORE_ELITES, ENCORE_RULES } from './elite-encore-data.js';
+import { streetDecor } from './scenery.js';
+import { WEAPONS, GRAPPLE } from './weapons.js';
+import { xpForLevel } from './progression.js';
+import { STREET_ENEMIES, STREET_LABELS } from './street-enemies-data.js';
 const $ = s => document.querySelector(s);
 const TAU = Math.PI * 2;
 const scoreText = n => String(Math.floor(n)).padStart(6, '0').replace(/(\d{3})$/, ' $1');
@@ -43,6 +47,14 @@ export class Renderer {
       if (e.type === 'golf') this.audio.effect({ ...e, type: 'skid' });
       if (e.type === 'explosion') { this.shake = 7; this.effects.push({ ...e, type: 'special', label: 'BOUM !', ttl: .5, life: .5 }); }
       if (e.type === 'pickup') this.effects.push({ type: 'number', x: e.x, y: e.y, text: e.kind === 'food' ? `+${e.amount ?? BALANCE.scenery.food} PV` : `+${e.amount ?? BALANCE.scenery.energy} ÉNERGIE`, color: '#98efc9', ttl: .9, life: .9 });
+      if (e.type === 'equip') this.effects.push({ type: 'number', x: e.x, y: e.y, text: e.label.toUpperCase(), color: '#a5dbff', ttl: 1.1, life: 1.1 });
+      if (e.type === 'throw') this.shake = Math.max(this.shake, 3);
+      if (e.type === 'rogueFX') this.effects.push({ ...e, type: 'rogueFX', ttl: .45, life: .45 });
+      if (e.type === 'gunshot') {
+        this.effects.push({ ...e, type: 'shot', ttl: .22, life: .22 });
+        this.effects.push({ type: 'spark', x: e.x - e.facing * 30, y: e.y, vx: -e.facing * 100, vy: -110, color: '#dcb56b', ttl: .35, life: .35 });
+        if (e.weapon === 'shotgun') this.shake = Math.max(this.shake, 5);
+      }
       if (e.type === 'revive') this.effects.push({ type: 'number', x: e.x, y: e.y - 130, text: 'DEBOUT, POTO !', color: '#98efc9', ttl: 1.3, life: 1.3 });
       if (e.type === 'rage') this.effects.push({ type: 'announcement', text: e.label.toUpperCase(), color: '#ff8279', ttl: 2, life: 2 });
       if (e.type === 'elite') this.effects.push({ type: 'announcement', text: `ÉLITE · ${e.label.toUpperCase()}`, color: '#d6b4ff', ttl: 1.5, life: 1.5 });
@@ -59,7 +71,7 @@ export class Renderer {
     c.setTransform(this.scale, 0, 0, this.scale, 0, 0); c.fillStyle = '#090d16'; c.fillRect(0, 0, W, H);
     if (!state) return;
     const key = `${state.chapter}:${state.stage}`;
-    if (key !== this.street) { this.street = key; this.visual.clear(); this.effects = []; }
+    if (key !== this.street) { this.street = key; this.visual.clear(); this.effects = []; this.decor = streetDecor(state.chapter, state.stage); }
     this.consume(state);
     c.save();
     if (!this.reducedMotion && this.shake > .1 && !state.paused) c.translate((Math.random() - .5) * this.shake, (Math.random() - .5) * this.shake * .65);
@@ -73,12 +85,14 @@ export class Renderer {
     c.fillStyle = tint; c.fillRect(0, 0, W, H);
     this.atmosphere(state.time);
     this.livingScenery(state);
+    this.drawRogueWorld(state);
     for (const h of state.hazards || []) this.drawHazard(h, state.time);
     if (state.phase === 'clear') this.exit(state);
     for (const p of state.props.filter(p => p.hp <= 0 && p.rubble > 0)) this.prop(p);
-    const entities = [...state.props.filter(p => p.hp > 0).map(p => ({ ...p, prop: true })), ...state.pickups.map(p => ({ ...p, pickup: true })), ...state.enemies, ...state.players, ...(state.allies || [])].sort((a, b) => a.y - b.y || Number(a.enemy) - Number(b.enemy));
+    const entities = [...(state.decor ?? this.decor), ...state.props.filter(p => p.hp > 0).map(p => ({ ...p, prop: true })), ...state.pickups.map(p => ({ ...p, pickup: true })), ...state.enemies, ...state.players, ...(state.allies || [])].sort((a, b) => a.y - b.y || Number(a.enemy) - Number(b.enemy));
     for (const entity of entities) {
-      if (entity.prop) this.prop(entity);
+      if (entity.scenery) this.scenery(entity);
+      else if (entity.prop) this.prop(entity);
       else if (entity.pickup) this.pickup(entity, state.time);
       else {
         let targetX = entity.x, targetY = entity.y;
@@ -91,7 +105,12 @@ export class Renderer {
         const rate = online && Math.abs(previous.x - targetX) < 200 ? (entity.id === slot + 1 ? 40 : 22) : 1000;
         previous.x += (targetX - previous.x) * (1 - Math.exp(-dt * rate)); previous.y += (targetY - previous.y) * (1 - Math.exp(-dt * rate));
         this.visual.set(entity.id, previous);
+        c.save();
+        if (entity.rogueGiant > 0) { c.translate(previous.x, previous.y); c.scale(1.3, 1.3); c.translate(-previous.x, -previous.y); }
+        if (entity.rogueShield > 0) { c.strokeStyle='#9bdeff';c.lineWidth=3;c.beginPath();c.ellipse(previous.x,previous.y-70,58,85,0,0,TAU);c.stroke(); }
+        if (entity.curse) { c.fillStyle='#d78bff';c.font='bold 22px monospace';c.textAlign='center';c.fillText('✦',previous.x,previous.y-185); }
         this.actor({ ...entity, x: previous.x, y: previous.y }, state, slot, online ? Math.min(age, .1) : 0);
+        c.restore();
       }
     }
     this.drawEffects(state.paused ? 0 : dt);
@@ -115,6 +134,21 @@ export class Renderer {
       c.globalAlpha = .1 + Math.sin(time * 1.1 + i) * .07; c.fillStyle = '#ffcc87'; c.fillRect(x, y, i % 3 ? 1.4 : 2, 1.5);
     }
     c.restore();
+  }
+  drawRogueWorld(state) {
+    const c = this.ctx;
+    for (const z of state.rogueZones || []) {
+      c.save(); const dark = ['blackfire','hellgate','chains'].includes(z.kind);
+      c.globalAlpha = Math.min(.7, z.ttl); c.strokeStyle=dark?'#ce81ff':z.kind==='canvas'?'#7bf2d7':'#ffcd87';c.lineWidth=2;
+      this.ellipse(z.x,z.y,z.radius,z.radius*.3,dark?'#591c6055':z.kind==='oil'?'#141a25aa':'#8869ad30');
+      if (['fire','blackfire'].includes(z.kind)) { if(dark)c.filter='hue-rotate(225deg)';this.fireSprite(Math.floor(state.time*8)%4,z.x,z.y+15,z.radius); }
+      else if (z.kind==='car') this.arcadeSprite('golf',z.x,z.y,Math.floor(state.time*8)%2,90);
+      else if(z.kind==='decoy'){const p=state.players.find(p=>p.id===z.owner);if(p){c.globalAlpha*=.5;const f=this.assets.frame(p.kind,'idle',0);if(f){const [x,y,w,h]=f.rect;c.drawImage(f.image,x,y,w,h,z.x-w/h*70,z.y-140,w/h*140,140);}}}
+      else { c.beginPath();c.ellipse(z.x,z.y,z.radius,z.radius*.3,0,0,TAU);c.stroke();for(let i=0;i<4;i++){const a=state.time*2+i*TAU/4;this.ellipse(z.x+Math.cos(a)*z.radius*.7,z.y+Math.sin(a)*z.radius*.2,5,3,c.strokeStyle);} }
+      c.restore();
+    }
+    for(const b of state.rogueBalls||[]){this.ellipse(b.x,b.y,16,6,'#0007');this.ellipse(b.x,b.y-16,b.fire?20:12,b.fire?20:12,b.fire?'#ff9c56':'#dce4ef');}
+    for(const p of state.players)if(p.roguePortalTime>0)for(const portal of p.roguePortals||[]){c.save();c.strokeStyle='#a98cff';c.lineWidth=5;c.beginPath();c.ellipse(portal.x,portal.y-65,40,70,0,0,TAU);c.stroke();c.font='12px monospace';c.textAlign='center';c.fillStyle='#d8c9ff';c.fillText('F · TRAVERSER',portal.x,portal.y+22);c.restore();}
   }
   ellipse(x, y, rx, ry, color) { const c = this.ctx; c.fillStyle = color; c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, TAU); c.fill(); }
   arcadeSprite(key, x, y, frame = 0, height, facing = 1) {
@@ -202,6 +236,15 @@ export class Renderer {
         if (h.kind === 'fire') { c.save(); c.translate(x, y); c.rotate(progress * 5 * h.facing); if (h.atlas) this.arcadeSprite(h.atlas, 0, 8, h.cell, 40); else this.fireSprite(Math.floor(time * 12) % 4, 0, 8, 40); c.restore(); }
         else { const image = this.assets.get(VISUALS.spit[2]); if (image) c.drawImage(image, 511, 17, 105, 110, x - 18, y - 22, 36, 38); }
       }
+    } else if (h.kind === 'streetProjectile') {
+      this.classicFX(`street_${h.atlas}`, h.cell ?? 9, h.x, h.y - 18, 54, h.vx < 0 ? -1 : 1);
+    } else if (h.kind === 'huntingDog') {
+      this.classicFX('street_titou', Math.floor((h.activeAge || 0) * 7) % 2 ? 10 : 9, h.x, h.y - 24, 112, h.vx < 0 ? -1 : 1);
+    } else if (h.kind === 'streetPuddle') {
+      c.globalAlpha = clamp(h.ttl / .7, 0, .85);
+      this.classicFX('street_cedric', 10, h.x, h.y, h.radius * 2);
+    } else if (h.kind === 'streetFX') {
+      c.globalAlpha = clamp(h.ttl / .18, 0, 1); this.classicFX(`street_${h.atlas}`, h.cell ?? 9, h.x + h.facing * h.width / 2, h.y - 45, h.width, h.facing);
     } else if (h.kind === 'plant') {
       c.globalAlpha = clamp(h.ttl / .35, 0, 1);
       this.arcadeSprite(h.atlas, h.x, h.y, (h.activeAge || 0) % ENCORE_RULES.plantCycle < ENCORE_RULES.plantBite ? 11 : 10, 100);
@@ -274,10 +317,12 @@ export class Renderer {
     if (a.enemy && !dead) this.enemyBar(a);
     let action = a.action;
     if (a.elite) { this.drawElite(a, state); return; }
+    if (a.enemy && STREET_ENEMIES[a.kind]) { this.drawStreetEnemy(a, state); return; }
+    if (!a.enemy && !dead && !a.specialState && this.drawInteraction(a, state)) return;
     if (a.enemy && !a.boss && CLASSIC_SPRITES[a.kind]) { this.drawClassic(a, state); return; }
     if (!dead && a.specialState?.kind === 'karonux') {
       const b = BALANCE.specials.karonux;
-      if (a.specialState.elapsed >= b.golfAt && a.specialState.elapsed < b.sleepAt) {
+      if (a.rogueDrive > 0 || a.specialState.elapsed >= b.golfAt && a.specialState.elapsed < b.sleepAt) {
         const braking = Math.abs(a.specialState.elapsed - b.turnAt) < .16 || a.specialState.elapsed > b.sleepAt - .12;
         this.arcadeSprite('golf', a.x, a.y, braking ? 2 : Math.floor(state.time * 9) % 2, 115, a.facing);
         this.arcadeSprite('dash', a.x - a.facing * 95, a.y, Math.floor(state.time * 10) % 3, 35, a.facing);
@@ -293,6 +338,8 @@ export class Renderer {
       return;
     }
     if (a.kind === 'creation') {
+      if (['wolf','boar'].includes(a.rogueForm)) { c.save();c.globalAlpha=.65;this.bitmap(a.rogueForm==='boar'?'pig':'wolf',a.x,a.y,100,state.time,a.facing,true);c.restore();return; }
+      if(a.rogueForm==='copy'&&a.copyKind&&CLASSIC_SPRITES[a.copyKind]){c.save();c.globalAlpha=.6;this.drawClassic({...a,kind:a.copyKind},state);c.restore();return;}
       let cell = a.action === 'walk' ? 1 + Math.floor(state.time * 8) % 2 : 0;
       if (a.attack) cell = a.attack.hit ? 4 : 3;
       if (a.striking > 0) cell = 4;
@@ -300,7 +347,7 @@ export class Renderer {
       if (a.stun > 0) cell = 6;
       if (dead) cell = 7;
       c.save(); c.globalAlpha = a.emerging > 0 ? clamp(1 - a.emerging / BALANCE.specials.kikor.emergeDuration, .15, 1) : dead ? clamp((1.2 - a.deadTime) / .4, 0, 1) : 1;
-      this.arcadeSprite('creation', a.x, a.y - a.z, cell, 96, a.facing); c.restore();
+      this.arcadeSprite('creation', a.x, a.y - a.z, cell, a.rogueForm==='masterpiece'?175:96, a.facing); c.restore();
       if (a.ally) { c.fillStyle = '#9ef5b6'; c.font = '11px monospace'; c.textAlign = 'center'; c.fillText(`ALLIÉ · ${Math.ceil(a.ttl)}s`, a.x, a.y + 20); }
       return;
     }
@@ -341,6 +388,7 @@ export class Renderer {
     const height = (a.boss ? 176 : 144) * (.94 + (a.y - FLOOR.top) / (FLOOR.bottom - FLOOR.top) * .12);
     const [sx, sy, sw, sh] = frame.rect;
     const scale = height / (frame.referenceHeight || base?.rect[3] || sh), dw = sw * scale, dh = sh * scale;
+    if (!a.enemy && !dead && a.weapon && !a.specialState && !a.attack) this.weaponIcon(a.weapon.kind, a.x + a.facing * 29, a.y - a.z - 66, undefined, a.facing);
     c.save();
     if (dead && a.enemy) c.globalAlpha = clamp((1.2 - a.deadTime) / .4, 0, 1);
     else if (a.invincible > .2 && Math.floor(state.time * 14) % 2 === 0) c.globalAlpha = .63;
@@ -379,7 +427,7 @@ export class Renderer {
   enemyBar(a) {
     const c = this.ctx, config = ELITES[a.kind] || ENEMIES[a.kind];
     const name = ELITES[a.kind]?.firstName || (a.kind === 'bolorouet' ? 'Julio' : config?.name?.split(' ·')[0]) || (a.kind === 'creation' ? 'Création' : fighter(a.kind).name);
-    const height = ELITES[a.kind]?.height || CLASSIC_SPRITES[a.kind]?.height || (a.boss ? 176 : a.kind === 'creation' ? 96 : 144);
+    const height = ELITES[a.kind]?.height || CLASSIC_SPRITES[a.kind]?.height || STREET_ENEMIES[a.kind]?.height || (a.boss ? 176 : a.kind === 'creation' ? 96 : 144);
     c.save(); c.font = 'bold 12px monospace'; c.textAlign = 'center';
     const width = Math.max(104, c.measureText(name).width + 22), x = clamp(a.x, width / 2 + 8, W - width / 2 - 8), y = a.y - height - (a.z || 0) - 34;
     c.fillStyle = '#080e19'; c.fillRect(x - width / 2 - 2, y - 2, width + 4, 24);
@@ -408,6 +456,23 @@ export class Renderer {
       c.fillText(a.attack.type === 'special' ? cue : '!', clamp(a.x, 90, 1190), y - 28);
     }
   }
+  drawStreetEnemy(a, state) {
+    const c = this.ctx, config = STREET_ENEMIES[a.kind], p = a.pattern, dead = a.hp <= 0;
+    let cell = a.action === 'walk' ? 1 + Math.floor(state.time * 8) % 2 : 0;
+    if (p) cell = (['megaphone', 'tacoVolley', 'huntingDog', 'puddle', 'fastTalk'].includes(p.kind) ? 7 : 3) + Number(p.hit);
+    if (a.stun > 0) cell = 5;
+    if (dead) cell = 6;
+    c.save();
+    if (dead) c.globalAlpha = clamp((1.2 - a.deadTime) / .4, 0, 1);
+    else if (a.invincible > .2 && Math.floor(state.time * 14) % 2 === 0) c.globalAlpha = .63;
+    if (a.flash > 0) c.filter = 'brightness(2)';
+    this.arcadeSprite(`street_${a.kind}`, a.x, a.y - a.z, cell, config.height, a.facing);
+    c.restore();
+    if (dead) return;
+    const y = a.y - config.height - a.z - 14;
+    c.font = 'bold 11px monospace'; c.textAlign = 'center';
+    if (p && !p.hit) { c.fillStyle = '#ffe1a4'; c.fillText(STREET_LABELS[p.kind] || 'ATTENTION !', clamp(a.x, 110, 1170), y - 27); }
+  }
   drawElite(a, state) {
     const c = this.ctx, config = ELITES[a.kind], q = a.eliteState, p = a.pattern, dead = a.hp <= 0;
     let cell = a.action === 'walk' ? 1 + Math.floor(state.time * 8) % 2 : 0;
@@ -429,6 +494,35 @@ export class Renderer {
     c.textAlign = 'center'; c.font = 'bold 10px monospace'; c.fillStyle = config.color;
     if (p && !p.hit) { c.fillStyle = '#ffe5aa'; c.font = 'bold 11px monospace'; c.fillText(ELITE_LABELS[p.kind] || 'ATTENTION !', clamp(a.x, 145, 1135), y - 27); }
     if (q.landing > 0) { c.fillStyle = '#ffd376'; c.font = 'bold 14px monospace'; c.fillText('CANAPÉ EN APPROCHE !', clamp(a.x, 140, 1140), a.y - 30); }
+  }
+  weaponIcon(kind, x, y, width, facing = 1) {
+    const b = WEAPONS[kind], asset = b && this.assets.arcadeFrame('weaponItems', b.cell); if (!asset) return;
+    const c = this.ctx, [sx, sy, sw, sh] = asset.rect, w = width || b.width, h = w * sh / sw;
+    c.save(); c.translate(x, y); c.scale(facing, 1); c.imageSmoothingEnabled = false; c.drawImage(asset.image, sx, sy, sw, sh, -w / 2, -h / 2, w, h); c.restore();
+  }
+  drawInteraction(a, state) {
+    const g = a.grapple, pickup = a.interaction, attack = a.attack?.type === 'weapon' ? a.attack : null;
+    const weapon = attack?.weapon || a.weapon?.kind, b = WEAPONS[weapon];
+    if (!g && !pickup && !attack && !(b && !a.attack && !a.moving && a.z === 0 && a.stun <= 0)) return false;
+    let cell;
+    if (g) cell = g.throwing ? g.elapsed < GRAPPLE.throwAt ? 2 : 3 : g.elapsed < .16 ? 0 : 1;
+    else if (pickup) cell = pickup.elapsed < .22 ? 4 : 5;
+    else cell = (weapon === 'knife' ? 6 : weapon === 'bat' ? 8 : 10) + Number(!!attack?.hit);
+    const asset = this.assets.arcadeFrame(`actions_${a.kind}`, cell); if (!asset) return false;
+    const c = this.ctx, height = 144 * (.94 + (a.y - FLOOR.top) / (FLOOR.bottom - FLOOR.top) * .12);
+    c.save(); if (a.flash > 0) c.filter = 'brightness(2)';
+    if (b?.gun && !g && !pickup) {
+      this.weaponIcon(weapon, a.x + a.facing * (b.width * .3 + 40), a.y - a.z - height * (attack?.hit ? .73 : .68), b.width, a.facing);
+    }
+    this.arcadeSprite(`actions_${a.kind}`, a.x, a.y - a.z, cell, height, a.facing); c.restore();
+    if (g && !g.throwing) { c.font = 'bold 11px monospace'; c.fillStyle = '#ffce83'; c.textAlign = 'center'; c.fillText('POING + ARRIÈRE · PROJETER', a.x, a.y - height - 16); }
+    return true;
+  }
+  scenery(p) {
+    const asset = this.assets.arcadeFrame(p.key); if (!asset) return;
+    const width = p.height * asset.rect[2] / asset.rect[3];
+    this.ellipse(p.x + 3, p.y + 1, width * .4, Math.min(9, p.height * .065), '#0005');
+    this.arcadeSprite(p.key, p.x, p.y, 0, p.height, p.facing || 1);
   }
   prop(p) {
     if (p.kind === 'sofa') {
@@ -453,6 +547,10 @@ export class Renderer {
     c.restore();
   }
   pickup(p, time) {
+    if (p.kind === 'weapon') {
+      this.ellipse(p.x, p.y + 3, 33, 6, '#8bbfff35'); this.weaponIcon(p.weapon, p.x, p.y - 10 + Math.sin(time * 3) * 2);
+      const c = this.ctx; c.fillStyle = '#b4dfff'; c.font = 'bold 10px monospace'; c.textAlign = 'center'; c.fillText(`F / RT · ${WEAPONS[p.weapon]?.name || 'ARME'}`, p.x, p.y + 23); return;
+    }
     const c = this.ctx, bob = Math.sin(time * 4 + p.id) * 3, food = p.kind === 'food';
     this.ellipse(p.x, p.y + 3, 25, 7, food ? '#98e7ad28' : '#ffba5830');
     c.save(); c.shadowBlur = 16; c.shadowColor = food ? '#8cf7b9' : '#ffba58';
@@ -484,7 +582,20 @@ export class Renderer {
       e.ttl -= dt;
       if (e.ttl <= 0) continue;
       c.save(); c.globalAlpha = clamp(e.ttl / (e.life * .5), 0, 1);
+      if (e.type === 'shot') {
+        const progress = 1 - e.ttl / e.life, spread = e.weapon === 'shotgun' ? 5 : 1;
+        c.translate(e.x, e.y); c.scale(e.facing, 1); c.globalCompositeOperation = 'lighter';
+        if (progress < .4) {
+          c.fillStyle = '#ffe5a0'; c.beginPath(); c.moveTo(-5, -6); c.lineTo(28, -13); c.lineTo(17, -3); c.lineTo(45, 0); c.lineTo(17, 4); c.lineTo(28, 12); c.lineTo(-5, 6); c.fill();
+        }
+        for (let i = 0; i < spread; i++) {
+          const distance = Math.max(12, e.range - 60) * Math.min(1, progress * 1.7), slope = (i - (spread - 1) / 2) * .045;
+          c.strokeStyle = '#ffc66c'; c.lineWidth = 4; c.beginPath(); c.moveTo(Math.max(0, distance - 40), (distance - 40) * slope); c.lineTo(distance, distance * slope); c.stroke();
+          c.strokeStyle = '#fffbea'; c.lineWidth = 1.5; c.stroke();
+        }
+      }
       if (e.type === 'atlasFX') this.arcadeSprite(e.atlas, e.x, e.y, e.cell, 110 + (1 - e.ttl / e.life) * 30);
+      if (e.type === 'rogueFX') { const progress=1-e.ttl/e.life;c.strokeStyle=e.color;c.lineWidth=5*(1-progress);c.beginPath();c.ellipse(e.x,e.y-15,Math.max(1,e.radius*(.3+progress*.7)),Math.max(1,e.radius*.3),0,0,TAU);c.stroke();if(e.label){c.font='bold 14px monospace';c.textAlign='center';c.fillStyle=e.color;c.fillText(e.label,clamp(e.x,180,W-180),e.y-180-progress*15);} }
       if (e.type === 'dash' && !this.reducedMotion) this.arcadeSprite('dash', e.x, e.y, Math.min(2, Math.floor((1 - e.ttl / e.life) * 3)), 34, e.facing);
       if (e.type === 'number') { e.y -= 35 * dt; c.font = `bold ${e.text.length > 3 ? 13 : 24}px monospace`; c.textAlign = 'center'; c.fillStyle = e.color; c.strokeStyle = '#07101b'; c.lineWidth = 4; c.strokeText(e.text, e.x, e.y); c.fillText(e.text, e.x, e.y); }
       if (e.type === 'ember') this.fireSprite(8 + Math.min(3, Math.floor((1 - e.ttl / e.life) * 4)), e.x, e.y + e.radius * .3, e.radius * 1.9);
@@ -528,7 +639,10 @@ export class Renderer {
       const r = p.progression;
       if (!el.querySelector('.special-caption')) el.querySelector('.player-bars').insertAdjacentHTML('beforeend', '<span class="special-caption"></span>');
       el.querySelector('.special-caption').textContent = specialState;
-      if (r) el.querySelector('.talent-caption').innerHTML = `<span>TALENTS ${r.talents.length}/6</span><span class="talent-pips">${Array.from({ length: 6 }, (_, n) => `<i class="${n < r.talents.length ? 'active' : n < r.talents.length + r.points ? 'point' : ''}"></i>`).join('')}</span><small>${r.points ? `${r.points} À CHOISIR · PAUSE` : ''}</small>`;
+      if (!el.querySelector('.weapon-caption')) el.querySelector('.player-bars').insertAdjacentHTML('beforeend', '<span class="weapon-caption"></span>');
+      const weapon = p.weapon && WEAPONS[p.weapon.kind];
+      el.querySelector('.weapon-caption').textContent = weapon ? `${weapon.name.toUpperCase()} · ${p.weapon.uses} ${weapon.gun ? 'MUNITIONS' : 'COUPS'} · J / X` : 'CONTACT · PRISE   POING + ARRIÈRE · PROJECTION';
+      if (r) { const progress = r.level === 20 ? 1 : (r.xp - xpForLevel(r.level)) / (xpForLevel(r.level + 1) - xpForLevel(r.level)); el.querySelector('.talent-caption').innerHTML = `<span>NIV. ${r.level}</span><span class="xp-track"><i style="width:${Math.round(progress * 100)}%"></i></span><small>${r.statPoints} CARAC. · ${r.points} TALENT(S) · PAUSE</small>`; }
     }
     const soloScore = $('.solo-score'); if (soloScore) soloScore.textContent = scoreText(s.score);
     $('#mission-chapter').textContent = `CHAPITRE ${String(s.chapter + 1).padStart(2, '0')} / 06 · MENACE ${s.chapter + 1}/6${online ? ' · ' + scoreText(s.score) : ''}`;

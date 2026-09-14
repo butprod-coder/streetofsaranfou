@@ -1,10 +1,17 @@
 import { FIGHTERS, CHAPTERS, ENEMIES, FLOOR, STEP, fighter, clamp, blankInput } from './data.js';
 import { BALANCE, difficulty } from './balance.js';
 import { applyProfile, completeChapter, spendPoint } from './progression.js';
-import { wavePlan } from './encounters.js';
+import { wavePlan, activeEnemyLimit } from './encounters.js';
 import { combat } from './combat.js';
 import { streetEvents } from './street-events.js';
 import { elites } from './elites.js';
+import { interactionCombat } from './interaction-combat.js';
+import { enemyTactics } from './enemy-tactics.js';
+import { rogueRun } from './rogue-run.js';
+import { rogueCombat } from './rogue-combat.js';
+import { streetEnemies } from './street-enemies.js';
+import { STREET_ENEMIES } from './street-enemies-data.js';
+import { hasTalent } from './rogue-talents.js';
 
 const distance = (a, b) => Math.hypot(a.x - b.x, (a.y - b.y) * 1.5);
 const alive = a => a.hp > 0;
@@ -17,6 +24,7 @@ export class Simulation {
     this.nextId = 10;
     this.state = {
       tick: 0, time: 0, chapter: clamp(Math.floor(chapter), 0, CHAPTERS.length - 1), stage: 0,
+      runId: `run-${this.seed.toString(36)}`,
       phase: 'intro', phaseTime: 2.4, paused: false, pauseReason: '',
       players: characters.slice(0, 2).map((id, i) => this.makePlayer(id, i)), enemies: [], props: [], pickups: [], events: [],
       eventSeq: 0, score: 0, kills: 0, combo: 0, comboTime: 0, bestCombo: 0, allDown: 0,
@@ -54,9 +62,13 @@ export class Simulation {
 
   enterStreet() {
     const s = this.state;
-    s.enemies = []; s.pickups = []; s.combo = 0; s.comboTime = 0;
+    s.decor = null;
+    for (const p of s.players) { this.releaseGrab(p); p.interaction = null; this.clearRogueTransient(p); }
+    s.enemies = []; s.pickups = this.streetWeapons(); s.combo = 0; s.comboTime = 0;
     s.hazards = []; s.allies = []; s.wave = -1; s.spawnQueue = []; s.spawnTimer = 0;
-    s.waves = wavePlan(s.chapter, s.stage, s.players.length, s.difficulty, () => this.random());
+    s.rogueZones = []; s.rogueBalls = [];
+    s.streetSeed = this.seed; s.streetBag = [...(s.enemyBag || [])];
+    s.waves = wavePlan(s.chapter, s.stage, s.players.length, s.difficulty, () => this.random(), s.enemyBag ||= []);
     s.props = this.streetProps(); s.surprise = null; s.surpriseDone = false;
     for (const [i, p] of s.players.entries()) {
       p.x = 200 + i * 95; p.y = 535 + i * 55; p.z = 0; p.vz = 0; p.vx = 0; p.vy = 0;
@@ -72,7 +84,7 @@ export class Simulation {
   spawnWave() {
     const s = this.state, duo = s.players.length === 2, wave = s.waves[++s.wave];
     if (!wave) return;
-    s.spawnQueue = [...wave.kinds]; s.spawnTimer = 0;
+    s.spawnQueue = [...wave.kinds]; s.spawnTimer = 1.6;
     if (s.spawnQueue.length) this.spawnEnemy(s.spawnQueue.shift());
     if (wave.boss) {
       const c = fighter(CHAPTERS[s.chapter].boss), b = BALANCE.bosses[c.id], hp = Math.round((c.id === 'karonux' ? b.carHp : b.hp) * (duo ? BALANCE.bossCombat.duoHp : 1));
@@ -86,11 +98,11 @@ export class Simulation {
 
   spawnEnemy(kind, overrides = {}) {
     const s = this.state, c = ENEMIES[kind] || { hp: 30, speed: 170, power: 7, reach: 70, score: 50 }, mode = difficulty(s.difficulty);
-    const hp = Math.round(c.hp * (1 + s.chapter * BALANCE.enemy.chapterHp) * (s.players.length > 1 ? BALANCE.enemy.duoHp : 1));
+    const hp = Math.round(c.hp * (1 + ((s.chapter * 6 + s.stage) / 35) * 1) * (s.players.length > 1 ? BALANCE.enemy.duoHp : 1));
     // Every reinforcement starts inside the navigable floor, away from the closest player.
     const leftDistance = Math.min(...s.players.map(p => Math.abs(p.x - 85))), rightDistance = Math.min(...s.players.map(p => Math.abs(p.x - 1195)));
-    const e = { ...this.actor(kind, this.nextId++, true), hp, maxHp: hp, power: c.power * (1 + s.chapter * BALANCE.enemy.chapterPower),
-      speed: c.speed * mode.speed * (1 + s.chapter * BALANCE.enemy.chapterSpeed), reach: c.reach, value: c.score,
+    const e = { ...this.actor(kind, this.nextId++, true), hp, maxHp: hp, power: c.power * (1 + ((s.chapter * 6 + s.stage) / 35) * .7),
+      speed: c.speed * mode.speed * (1 + ((s.chapter * 6 + s.stage) / 35) * .35), reach: c.reach, value: c.score,
       x: leftDistance > rightDistance ? 85 : 1195, y: FLOOR.top + 20 + this.random() * 155, cooldown: 1.1, invincible: .35, attackCount: 0, ...overrides };
     s.enemies.push(e); this.initElite(e); this.event('spawn', { x: e.x, y: e.y, actor: e.id }); return e;
   }
@@ -134,7 +146,7 @@ export class Simulation {
         if (++s.stage > 5) {
           s.stage = 0; s.chapter++;
           if (s.chapter >= CHAPTERS.length) { s.chapter = CHAPTERS.length - 1; s.stage = 5; s.phase = 'won'; this.event('win'); return; }
-          for (const p of s.players) { p.hp = Math.min(p.maxHp, Math.max(1, p.hp) + p.maxHp * .4); p.lives = Math.min(3, p.lives + 1); p.energy = 100; }
+          for (const p of s.players) { p.hp = Math.min(p.maxHp, Math.max(1, p.hp) + p.maxHp * .4); p.lives = Math.min(5, p.lives + 1); p.energy = 100; }
         }
         this.enterStreet();
       }
@@ -160,18 +172,18 @@ export class Simulation {
 
     if (s.phase === 'fight' || s.phase === 'surprise' && s.surprise?.warning <= 0) {
       s.spawnTimer -= dt;
-      if (s.spawnQueue.length && s.spawnTimer <= 0 && s.enemies.filter(alive).length < (s.players.length > 1 ? BALANCE.waves.activeDuo : BALANCE.waves.activeSolo)) {
-        this.spawnEnemy(s.spawnQueue.shift()); s.spawnTimer = BALANCE.waves.spawnDelay;
+      if (s.spawnQueue.length && s.spawnTimer <= 0 && s.enemies.filter(alive).length < activeEnemyLimit(s.chapter, s.players.length)) {
+        this.spawnEnemy(s.spawnQueue.shift()); s.spawnTimer = 1.2 + this.random() * .7;
       }
     }
     if (s.phase === 'rest') { s.phaseTime -= dt; if (s.phaseTime <= 0) this.spawnWave(); }
     if (s.phase === 'fight' && s.players.some(alive) && !s.enemies.some(alive) && !s.spawnQueue.length) {
+      this.awardXP(120 + s.chapter * 30, 'wave:' + s.chapter + ':' + s.stage + ':' + s.wave);
       s.hazards = s.hazards.filter(h => !h.enemy);
       if (s.wave < s.waves.length - 1) {
         s.phase = 'rest'; s.phaseTime = s.waves[s.wave + 1].rest;
         this.event('breather', { label: 'UNE SECONDE POUR SOUFFLER…' });
         for (const p of s.players) { p.energy = Math.min(100, p.energy + 12); if (p.hp > 0) p.hp = Math.min(p.maxHp, p.hp + 7); }
-        if (s.phaseTime >= BALANCE.waves.calmRest) s.pickups.push({ id: this.nextId++, x: 640, y: 550, kind: 'food' });
       } else {
         if (!this.beginSurprise()) this.clearStreet();
       }
@@ -207,6 +219,11 @@ export class Simulation {
     }
     p.energy = Math.min(100, p.energy + dt * (p.buff > 0 ? 2 : 3.5) * p.bonuses.energyRegen);
     const pressed = {};
+    const fresh = {};
+    for (const action of ['grab', 'interact']) {
+      fresh[action] = !!input[action] && !p[`${action}Held`] || (input.taps?.[action] || 0) > (p.taps[action] || 0);
+      p[`${action}Held`] = !!input[action]; p.taps[action] = input.taps?.[action] || 0;
+    }
     const dodgeTap = (input.taps?.dodge || 0) > (p.taps.dodge || 0);
     if (dodgeTap || input.dodge && !p.dodgeHeld) p.dodgeBuffer = BALANCE.dodge.buffer;
     p.dodgeHeld = !!input.dodge;
@@ -214,8 +231,15 @@ export class Simulation {
       pressed[action] = input[action] || (input.taps?.[action] || 0) > (p.taps[action] || 0);
       p.taps[action] = input.taps?.[action] || 0;
     }
+    this.updateRoguePlayer(p, input, dt);
+    if (p.rogueLastNap > 0 && !p.specialState) return;
     if (p.specialState) { this.updateSpecial(p, input, dt); if (p.kind !== 'gustavax') return; }
+    if (this.updateInteraction(p, pressed.punch && input.x * (p.grapple?.facing || p.facing) < -.35, dt, input)) return;
     if (p.stun > 0) return;
+    if (p.action !== 'dodge' && !p.specialState) {
+      if (fresh.interact && this.pickWeapon(p)) return;
+      if (!pressed.jump && !pressed.dodge && !pressed.special && !pressed.kick && this.tryGrab(p)) return;
+    }
     if (this.sitOnSofa(p, input, dt)) return;
     if (p.action === 'dodge') {
       if (p.actionTime < BALANCE.dodge.duration) { p.vx = p.dodgeX * BALANCE.dodge.speedX; p.vy = p.dodgeY * BALANCE.dodge.speedY; return; }
@@ -227,6 +251,7 @@ export class Simulation {
       p.dodgeY = (input.y || 0) / length; p.action = 'dodge'; p.actionTime = 0; p.dodgeCd = BALANCE.dodge.cooldown * p.bonuses.dodge;
       p.invincible = Math.max(p.invincible, BALANCE.dodge.invincible); p.attack = null; p.dodgeBuffer = 0;
       p.vx = p.dodgeX * BALANCE.dodge.speedX; p.vy = p.dodgeY * BALANCE.dodge.speedY;
+      this.rogueOnDodge(p);
       this.event('dodge', { actor: p.id, x: p.x, y: p.y, facing: Math.sign(p.dodgeX) || p.facing }); return;
     }
     if (pressed.jump && p.z === 0 && !p.attack) { p.vz = 490; p.z = .1; p.action = 'jump'; p.actionTime = 0; this.event('jump', { actor: p.id }); }
@@ -235,7 +260,7 @@ export class Simulation {
       else if (pressed.kick) this.startAttack(p, 'kick');
       else if (pressed.punch) this.startAttack(p, 'punch');
     }
-    let move = p.attack ? .32 : 1;
+    let move = p.rogueFortress > 0 ? 0 : p.attack ? .32 : 1;
     if (input.revive && p.z === 0 && !p.attack) {
       const down = this.state.players.find(other => other.id !== p.id && other.hp <= 0 && distance(p, other) < 105);
       if (down) {
@@ -255,6 +280,7 @@ export class Simulation {
   startAttack(a, type) {
     const s = this.state;
     if (!a.enemy && type === 'special') { this.activateSpecial(a); return; }
+    if (!a.enemy && type === 'punch' && this.startWeaponAttack(a)) return;
     if (!a.enemy) {
       const near = s.enemies.filter(alive).filter(e => distance(a, e) < 180).sort((x, y) => distance(a, x) - distance(a, y))[0];
       if (near) a.facing = Math.sign(near.x - a.x) || a.facing;
@@ -282,6 +308,8 @@ export class Simulation {
   resolveAttack(a) {
     const s = this.state, attack = a.attack;
     if (!attack || a.hp <= 0) return;
+    if (!a.enemy) this.rogueOnAttack(a);
+    if (attack.type === 'weapon') { this.resolveWeaponAttack(a); return; }
     if (a.enemy && a.kind === 'triso' && attack.type === 'special') {
       const b = BALANCE.triso;
       if (s.hazards.filter(h => h.kind === 'slime').length < b.maxPuddles) {
@@ -324,6 +352,7 @@ export class Simulation {
     const radial = special && ['blast', 'spin', 'frenzy'].includes(technique) || wrestling && type === 'kick';
     let range = a.enemy ? (special ? 195 : a.reach) : type === 'punch' ? 108 : type === 'kick' ? 145 : radial ? 235 : technique === 'gun' ? 680 : 310;
     if (wrestling) range = type === 'kick' ? BALANCE.wrestler.radius * a.bonuses.radius : 145;
+    if (!a.enemy && type === 'punch' && hasTalent(a, 'Main baladeuse')) range += 40;
     const band = wrestling && type === 'kick' ? 95 : a.enemy ? (special ? 115 : 48) : (special ? 95 : attack.air ? 68 : 54);
     const damage = Math.round((wrestling ? a.specialPower : a.power) * (special ? (a.enemy ? 1.35 : 2.5) : type === 'kick' ? 1.5 : a.comboStep === 3 ? 1.4 : 1) * (a.buff > 0 ? 1.2 : 1) * (attack.air ? 1.2 : 1));
     let hits = 0;
@@ -350,10 +379,17 @@ export class Simulation {
     const s = this.state;
     if (target.hp <= 0) return;
     if (!target.enemy) amount = Math.max(1, Math.round(amount * difficulty(s.difficulty).damage * (1 - target.bonuses.defense)));
+    amount = Math.round(this.rogueBeforeDamage(target, amount, source, heavy));
+    if (amount <= 0) return;
     if (target.pattern?.healing) { target.pattern = null; target.cooldown = 1.1; target.recovering = 1.1; this.event('opening', { x: target.x, y: target.y - 160, label: 'RÉCUPÉRATION INTERROMPUE !' }); }
     target.hp = Math.max(0, target.hp - amount); target.flash = .12;
+    if (!target.enemy) { this.releaseGrab(target); target.interaction = null; }
     if (target.elite) this.eliteHit(target, heavy);
-    target.stun = target.boss ? .09 : heavy ? .34 : .23;
+    if (STREET_ENEMIES[target.kind]) {
+      if (target.hp <= 0) s.hazards = s.hazards.filter(h => h.owner !== target.id);
+      if (heavy && target.pattern && !target.pattern.hit) { target.pattern = null; target.cooldown = .8; target.recovering = .8; }
+    }
+    target.stun = (target.boss ? .09 : heavy ? .34 : .23) * (target.enemy ? 1 : target.bonuses.stagger);
     // Boss wind-ups remain readable and cannot be stun-locked indefinitely.
     if (!target.boss || !target.attack) { target.attack = null; target.action = 'hurt'; target.actionTime = 0; }
     target.vx = (Math.sign(target.x - source.x) || source.facing) * (target.boss ? 65 : heavy ? 340 : 110);
@@ -368,18 +404,38 @@ export class Simulation {
       }
       target.attack = null; target.action = 'dead'; target.actionTime = 0; target.deadTime = 0; target.downTime = 0; target.revive = 0;
       this.endSpecial(target); target.pattern = null;
+      if (!target.enemy) this.dropWeapon(target);
+      if (!target.enemy) this.clearRogueTransient(target);
+      if (target.grabbedBy) { const holder = s.players.find(p => p.id === target.grabbedBy); if (holder) this.releaseGrab(holder); }
       this.event('ko', { x: target.x, y: target.y, actor: target.id, enemy: target.enemy, boss: target.boss });
       if (target.enemy) {
+        this.rogueOnKill(source, target);
+        if (!target.owner && !source?.ally) this.awardXP(target.boss ? 600 : 20 + s.chapter * 3, 'enemy:' + target.id);
         s.kills++; s.score += target.value + Math.min(10, Math.floor(s.combo / 3)) * 20;
         if (target.boss) { s.hazards = s.hazards.filter(h => h.owner !== target.id); for (const e of s.enemies) if (e.owner === target.id) { e.hp = 0; e.deadTime = 0; } }
-        if (this.random() < .18) s.pickups.push({ id: this.nextId++, x: target.x, y: target.y, kind: 'food' });
+        if (this.random() < BALANCE.scenery.enemyFoodChance) s.pickups.push({ id: this.nextId++, x: target.x, y: target.y, kind: 'food' });
       }
     }
+    if (target.enemy) this.rogueOnHit(source, target, heavy);
   }
 
   updateEnemy(e, dt) {
+    const speed = e.speed;
+    if (e.rogueSlow > 0) e.speed *= .55;
+    try { this.updateEnemyAction(e, dt); } finally { e.speed = speed; }
+  }
+
+  updateEnemyAction(e, dt) {
+    if (this.updateThrown(e, dt)) return;
     this.tickActor(e, dt);
+    if (this.updateTactics(e, dt)) return;
     if (e.elite) { this.updateElite(e, dt); return; }
+    if (STREET_ENEMIES[e.kind]) {
+      e.eliteState ||= { sequence: 0 };
+      const target = this.state.players.filter(p => p.hp > 0).sort((a, b) => Math.hypot(a.x - e.x, a.y - e.y) - Math.hypot(b.x - e.x, b.y - e.y))[0];
+      if (target) this.updateStreetEnemy(e, target, dt);
+      return;
+    }
     if (e.hp > 0 && e.boss) { this.updateBoss(e, dt); return; }
     if (e.hp <= 0 || e.attack || e.stun > 0 || !['fight', 'surprise'].includes(this.state.phase)) return;
     if (e.boss && e.hp < e.maxHp * .4 && !e.enraged) { e.enraged = true; e.speed *= 1.25; this.event('rage', { actor: e.id, label: `${fighter(e.kind).name} s’énerve !` }); }
@@ -413,7 +469,7 @@ export class Simulation {
   }
 
   separateEnemies(dt) {
-    const enemies = this.state.enemies.filter(alive);
+    const enemies = this.state.enemies.filter(e => alive(e) && !e.grabbedBy && !e.thrown);
     for (let i = 0; i < enemies.length; i++) for (let j = i + 1; j < enemies.length; j++) {
       const a = enemies[i], b = enemies[j], dx = a.x - b.x, dy = a.y - b.y;
       const d = Math.hypot(dx, dy * 1.4);
@@ -426,6 +482,7 @@ export class Simulation {
   }
 
   physics(a, dt) {
+    if (a.grabbedBy || a.thrown) return;
     a.x = clamp(a.x + a.vx * dt, FLOOR.left, FLOOR.right);
     a.y = clamp(a.y + a.vy * dt, FLOOR.top, FLOOR.bottom);
     a.vx *= Math.exp(-9 * dt); a.vy *= Math.exp(-9 * dt);
@@ -435,9 +492,11 @@ export class Simulation {
   collectPickups() {
     const s = this.state;
     s.pickups = s.pickups.filter(item => {
-      const player = s.players.find(p => alive(p) && p.z < 20 && distance(p, item) < 42 && (item.kind === 'food' ? p.hp < p.maxHp : p.energy < 98));
+      if (item.kind === 'weapon') return true;
+      const player = s.players.find(p => alive(p) && p.z < 20 && distance(p, item) < 42 && (item.kind === 'food' ? p.hp < p.maxHp || hasTalent(p, 'Digestion musclée') : p.energy < 98));
       if (!player) return true;
       const before = item.kind === 'food' ? player.hp : player.energy;
+      if (item.kind === 'food' && player.hp >= player.maxHp && hasTalent(player, 'Digestion musclée')) { player.rogueShield = player.maxHp * .15; player.rogueShieldTime = 8; }
       if (item.kind === 'food') player.hp = Math.min(player.maxHp, player.hp + BALANCE.scenery.food + player.bonuses.food);
       else player.energy = Math.min(100, player.energy + BALANCE.scenery.energy + player.bonuses.drink);
       const amount = Math.round((item.kind === 'food' ? player.hp : player.energy) - before);
@@ -446,12 +505,13 @@ export class Simulation {
   }
 
   revivePlayer(p, fraction) {
+    this.releaseGrab(p); p.interaction = null;
     this.endSpecial(p);
     p.hp = Math.round(p.maxHp * fraction); p.invincible = 2.5; p.stun = 0; p.attack = null;
     p.downTime = 0; p.deadTime = 0; p.revive = 0; p.action = 'idle'; p.actionTime = 0; p.vx = 0;
     this.event('revive', { actor: p.id, x: p.x, y: p.y });
   }
 
-  snapshot() { return JSON.parse(JSON.stringify(this.state)); }
+  snapshot() { return JSON.parse(JSON.stringify({ ...this.state, rngSeed: this.seed, nextEntityId: this.nextId })); }
 }
-Object.assign(Simulation.prototype, combat, streetEvents, elites);
+Object.assign(Simulation.prototype, combat, streetEvents, elites, interactionCombat, enemyTactics, rogueRun, rogueCombat, streetEnemies);
