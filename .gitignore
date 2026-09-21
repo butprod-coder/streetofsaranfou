@@ -4,6 +4,7 @@ desktop.ini
 *.log
 .cursor/
 node_modules/
+.pnpm-store/
 dist/
 test-results/
 .runtime/

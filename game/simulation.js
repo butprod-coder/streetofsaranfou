@@ -3,6 +3,12 @@ import { BALANCE, difficulty } from './balance.js';
 import { applyProfile, completeChapter, spendPoint } from './progression.js';
 import { wavePlan, activeEnemyLimit } from './encounters.js';
 import { combat } from './combat.js';
+import { karonuxCombat } from './boss-karonux.js';
+import { kikorCombat } from './boss-kikor.js';
+import { yanuCombat } from './boss-yanu.js';
+import { lorenzoCombat } from './boss-lorenzo.js';
+import { joCombat } from './boss-jo.js';
+import { jualosCombat } from './boss-jualos.js';
 import { streetEvents } from './street-events.js';
 import { elites } from './elites.js';
 import { interactionCombat } from './interaction-combat.js';
@@ -12,6 +18,7 @@ import { rogueCombat } from './rogue-combat.js';
 import { streetEnemies } from './street-enemies.js';
 import { STREET_ENEMIES } from './street-enemies-data.js';
 import { hasTalent } from './rogue-talents.js';
+import { CHAPTER_INTROS, hasChapterIntro, INTRO_DURATION, INTRO_REVEAL } from './chapter-intro.js';
 
 const distance = (a, b) => Math.hypot(a.x - b.x, (a.y - b.y) * 1.5);
 const alive = a => a.hp > 0;
@@ -62,6 +69,9 @@ export class Simulation {
 
   enterStreet() {
     const s = this.state;
+    for (const e of s.enemies) if (e.kikorGrip) this.releaseKikorGrip(e);
+    for (const p of s.players) { p.yanuFrozen = null; p.jualosSlip = null; }
+    s.bossCinema = null;
     s.decor = null;
     for (const p of s.players) { this.releaseGrab(p); p.interaction = null; this.clearRogueTransient(p); }
     s.enemies = []; s.pickups = this.streetWeapons(); s.combo = 0; s.comboTime = 0;
@@ -77,7 +87,9 @@ export class Simulation {
       p.sitting = null; p.seatHold = 0;
       if (p.hp <= 0) this.revivePlayer(p, .45);
     }
-    s.phase = 'intro'; s.phaseTime = s.stage === 0 ? 2.4 : 1.15;
+    s.chapterStory = !!CHAPTER_INTROS[s.chapter] && s.stage === 0;
+    s.phase = 'intro'; s.phaseTime = s.chapterStory ? INTRO_DURATION : s.stage === 0 ? 2.4 : 1.15;
+    this.introJumpHeld = [];
     this.event('street', { chapter: s.chapter, stage: s.stage });
   }
 
@@ -92,6 +104,7 @@ export class Simulation {
         speed: 145 + s.chapter * 7, reach: 115, value: 1800 + s.chapter * 300, x: 1010, y: 540,
         cooldown: 1.8, attackCount: 0, enraged: false, bossPhase: c.id === 'karonux' ? 0 : 1, vehicle: c.id === 'karonux', healUses: 0, summons: 0 });
       this.event('boss', { name: c.name });
+      this.startBossCinema(s.enemies[s.enemies.length - 1]);
     }
     s.phase = 'fight'; this.event('wave', { label: `VAGUE ${s.wave + 1}/${s.waves.length} · ${wave.label}` });
   }
@@ -133,9 +146,35 @@ export class Simulation {
     if (s.paused || s.phase === 'won' || s.phase === 'over') return;
     s.tick++; s.time += dt;
     s.events = s.events.filter(e => s.time - e.time < 2.5);
+    if (s.bossCinema) {
+      const cinema = s.bossCinema, boss = s.enemies.find(e => e.id === cinema.actor && e.hp > 0);
+      cinema.elapsed += dt;
+      if (boss && !cinema.impact && cinema.elapsed >= (cinema.kind === 'arrival' ? 1.2 : .45)) {
+        cinema.impact = true;
+        this.event(cinema.kind === 'arrival' ? 'skid' : 'explosion', { x: cinema.x, y: cinema.y, facing: -1 });
+      }
+      if (boss && cinema.kind === 'arrival') boss.x = cinema.x + (1 - Math.min(1, cinema.elapsed / 1.2)) ** 3 * 500;
+      if (!boss || cinema.elapsed >= cinema.duration) { s.bossCinema = null; if (boss) { boss.x = cinema.x; boss.cooldown = .65; } }
+      if (boss) return;
+    }
     s.comboTime -= dt;
+    if (s.practice?.freeSpecial) for (const p of s.players) { p.energy = 100; p.specialCd = 0; }
     if (s.comboTime <= 0) s.combo = 0;
     if (s.phase === 'intro') {
+      if (hasChapterIntro(s)) {
+        let advance = false;
+        for (const [i, p] of s.players.entries()) {
+          const input = inputs[i] || blankInput();
+          const tapped = (input.taps?.jump || 0) > (p.taps.jump || 0);
+          advance ||= tapped || !!input.jump && !this.introJumpHeld[i];
+          this.introJumpHeld[i] = !!input.jump;
+          p.taps = { ...input.taps };
+        }
+        if (advance && INTRO_DURATION - s.phaseTime > .35) {
+          if (s.phaseTime > INTRO_DURATION - INTRO_REVEAL) s.phaseTime = INTRO_DURATION - INTRO_REVEAL;
+          else s.phaseTime = 0;
+        }
+      }
       s.phaseTime -= dt;
       if (s.phaseTime <= 0) this.spawnWave();
       return;
@@ -178,6 +217,7 @@ export class Simulation {
     }
     if (s.phase === 'rest') { s.phaseTime -= dt; if (s.phaseTime <= 0) this.spawnWave(); }
     if (s.phase === 'fight' && s.players.some(alive) && !s.enemies.some(alive) && !s.spawnQueue.length) {
+      if (s.practice) { s.phase = 'won'; s.hazards = []; return; }
       this.awardXP(120 + s.chapter * 30, 'wave:' + s.chapter + ':' + s.stage + ':' + s.wave);
       s.hazards = s.hazards.filter(h => !h.enemy);
       if (s.wave < s.waves.length - 1) {
@@ -210,6 +250,9 @@ export class Simulation {
   }
 
   updatePlayer(p, input, dt) {
+    if (p.caughtBy && this.updateKikorCaught(p, input, dt)) return;
+    if (p.yanuFrozen && this.updateYanuFrozen(p, input, dt)) return;
+    if (p.jualosSlip && this.updateJualosSlip(p, input, dt)) return;
     this.tickActor(p, dt);
     p.seq = input.seq || 0;
     if (p.hp <= 0) {
@@ -378,11 +421,33 @@ export class Simulation {
   damage(target, amount, source, heavy) {
     const s = this.state;
     if (target.hp <= 0) return;
+    if (s.practice?.invulnerable && !target.enemy) return;
+    if (s.bossCinema) return;
+    if (this.jualosChanging(target)) return;
+    if (this.joChanneling(target)) {
+      target.shieldFlash = .15;
+      return;
+    }
+    // A partner can knock Kikor off the victim even while the painting protects his HP.
+    if (target.kikorGrip && heavy && source?.id !== target.kikorGrip.victim && !source?.enemy) this.releaseKikorGrip(target, 'SAUVÉ PAR TON POTE !');
+    if (this.kikorShielded(target)) {
+      target.shieldFlash = .18;
+      if (s.time >= (target.shieldHintAt || 0)) { target.shieldHintAt = s.time + 1.5; this.event('opening', { x: target.x, y: target.y - 225, label: 'DÉTRUIS LE BONHOMME VERT !' }); }
+      return;
+    }
     if (!target.enemy) amount = Math.max(1, Math.round(amount * difficulty(s.difficulty).damage * (1 - target.bonuses.defense)));
     amount = Math.round(this.rogueBeforeDamage(target, amount, source, heavy));
     if (amount <= 0) return;
+    if (this.damageJoPallet(target, amount, heavy)) return;
+    if (this.lorenzoSofaDamage(target, amount, source, heavy)) return;
+    if (target.boss && (target.recovering > 0 || target.pattern?.kind === 'sleep' && target.pattern.hit)) amount = Math.round(amount * 1.25);
+    this.bossComboHit(target, heavy);
     if (target.pattern?.healing) { target.pattern = null; target.cooldown = 1.1; target.recovering = 1.1; this.event('opening', { x: target.x, y: target.y - 160, label: 'RÉCUPÉRATION INTERROMPUE !' }); }
+    if (target.boss && target.kind === 'lorenzo' && !target.sofa && !target.sofaBroken) amount = Math.min(amount, Math.max(0, target.hp - target.maxHp * BALANCE.bosses.lorenzo.phases[0]));
+    if (target.boss && target.kind === 'jualos' && !target.commercial) amount = Math.min(amount, Math.max(0, target.hp - target.maxHp * BALANCE.bosses.jualos.phases[0]));
     target.hp = Math.max(0, target.hp - amount); target.flash = .12;
+    if (target.boss && target.kind === 'lorenzo' && !target.sofa && !target.sofaBroken && target.hp <= target.maxHp * BALANCE.bosses.lorenzo.phases[0]) this.beginLorenzoSofa(target);
+    if (target.boss && target.kind === 'jualos' && !target.commercial && target.hp <= target.maxHp * BALANCE.bosses.jualos.phases[0]) this.beginJualosCommercial(target);
     if (!target.enemy) { this.releaseGrab(target); target.interaction = null; }
     if (target.elite) this.eliteHit(target, heavy);
     if (STREET_ENEMIES[target.kind]) {
@@ -399,11 +464,17 @@ export class Simulation {
       if (target.vehicle) {
         target.vehicle = false; target.maxHp = Math.round(BALANCE.bosses.karonux.hp * (s.players.length > 1 ? BALANCE.bossCombat.duoHp : 1)); target.hp = target.maxHp;
         target.pattern = null; target.cooldown = 2; target.invincible = 1.3; target.bossPhase = 1;
+        target.attackCount = 0; target.guardHits = 0; target.stun = 0; target.recovering = 0;
+        this.startBossCinema(target, 'exit');
         this.event('rage', { actor: target.id, label: 'GOLF DÉTRUITE · KARONUX SORT !' });
         this.hazard(target, { kind: 'wreck', damage: 0, radius: 100, delay: 0, ttl: 1.1 }); return;
       }
       target.attack = null; target.action = 'dead'; target.actionTime = 0; target.deadTime = 0; target.downTime = 0; target.revive = 0;
       this.endSpecial(target); target.pattern = null;
+      this.releaseYanuFreeze(target.id); target.yanuFrozen = null;
+      this.releaseJualosSlips(target.id); target.jualosSlip = null;
+      if (target.kikorGrip) this.releaseKikorGrip(target);
+      if (target.caughtBy) this.releaseKikorGrip(s.enemies.find(e => e.id === target.caughtBy));
       if (!target.enemy) this.dropWeapon(target);
       if (!target.enemy) this.clearRogueTransient(target);
       if (target.grabbedBy) { const holder = s.players.find(p => p.id === target.grabbedBy); if (holder) this.releaseGrab(holder); }
@@ -426,6 +497,7 @@ export class Simulation {
   }
 
   updateEnemyAction(e, dt) {
+    if (e.joPallet) { this.updateJoPallet(e, dt); return; }
     if (this.updateThrown(e, dt)) return;
     this.tickActor(e, dt);
     if (this.updateTactics(e, dt)) return;
@@ -469,7 +541,7 @@ export class Simulation {
   }
 
   separateEnemies(dt) {
-    const enemies = this.state.enemies.filter(e => alive(e) && !e.grabbedBy && !e.thrown);
+    const enemies = this.state.enemies.filter(e => alive(e) && !e.joPallet && !e.grabbedBy && !e.thrown);
     for (let i = 0; i < enemies.length; i++) for (let j = i + 1; j < enemies.length; j++) {
       const a = enemies[i], b = enemies[j], dx = a.x - b.x, dy = a.y - b.y;
       const d = Math.hypot(dx, dy * 1.4);
@@ -482,7 +554,7 @@ export class Simulation {
   }
 
   physics(a, dt) {
-    if (a.grabbedBy || a.thrown) return;
+    if (a.joPallet || a.grabbedBy || a.thrown || a.caughtBy || a.kikorGrip || a.yanuFrozen || a.jualosSlip || a.sofa && !a.sofaBroken) return;
     a.x = clamp(a.x + a.vx * dt, FLOOR.left, FLOOR.right);
     a.y = clamp(a.y + a.vy * dt, FLOOR.top, FLOOR.bottom);
     a.vx *= Math.exp(-9 * dt); a.vy *= Math.exp(-9 * dt);
@@ -505,6 +577,7 @@ export class Simulation {
   }
 
   revivePlayer(p, fraction) {
+    p.jualosSlip = null;
     this.releaseGrab(p); p.interaction = null;
     this.endSpecial(p);
     p.hp = Math.round(p.maxHp * fraction); p.invincible = 2.5; p.stun = 0; p.attack = null;
@@ -514,4 +587,4 @@ export class Simulation {
 
   snapshot() { return JSON.parse(JSON.stringify({ ...this.state, rngSeed: this.seed, nextEntityId: this.nextId })); }
 }
-Object.assign(Simulation.prototype, combat, streetEvents, elites, interactionCombat, enemyTactics, rogueRun, rogueCombat, streetEnemies);
+Object.assign(Simulation.prototype, combat, karonuxCombat, kikorCombat, yanuCombat, lorenzoCombat, joCombat, jualosCombat, streetEvents, elites, interactionCombat, enemyTactics, rogueRun, rogueCombat, streetEnemies);

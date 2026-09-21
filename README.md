@@ -34,6 +34,13 @@ Les deux joueurs partagent la pause. Une coupure réseau met le combat en pause 
 
 ## Commandes et combat
 
+**Tester les boss** dans le menu principal ouvre l’entraînement solo : choix des six boss,
+du combattant, de la difficulté et de la phase de départ (Karonux peut commencer directement
+à pied). Invulnérabilité et spéciaux illimités sont activés par défaut et désactivables.
+L’introduction est optionnelle. Pendant le test, **Échap / Start → Relancer ce boss**
+ou **Choisir un autre boss** permet d’enchaîner les essais. Aucun record ni sauvegarde
+de campagne n’est modifié par ces combats.
+
 - **ZQSD, WASD ou flèches** : déplacement dans la rue.
 - **J** : poings ; maintenir pour enchaîner un combo de trois coups.
 - **K** : coup de pied, plus puissant et plus long, avec recul.

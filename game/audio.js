@@ -53,12 +53,18 @@ export class Audio {
     source.connect(filter).connect(gain).connect(this.effectsBus); source.start(at); source.stop(at + length); source.onended = () => { source.disconnect(); filter.disconnect(); gain.disconnect(); };
   }
   effect(event) {
-    if (event.type === 'taunt') this.say(event.label);
+    if (event.type === 'taunt') {
+      this.say(event.label);
+      if (event.label === 'BUUUUUUUUU') { this.tone(115, .65, .28, 'sawtooth', 0, 55); this.hiss(.5, .12, 0, 450); }
+      if (event.label === 'HAHAHA !') { for (let i = 0; i < 3; i++) this.tone(150 + i % 2 * 65, .12, .17, 'triangle', this.context?.currentTime + i * .16, 90); }
+    }
     if (['hit', 'explosion', 'thunder', 'special'].includes(event.type)) this.soundtrack?.duck();
     if (event.type === 'talent') { for (const [i, note] of [440, 554, 659, 880].entries()) this.tone(note, .32, .2, 'triangle', this.context?.currentTime + i * .09); }
     if (event.type === 'hit') { this.tone(event.heavy ? 105 : 150, .12, .65, 'triangle', 0, 32); this.hiss(.07, event.heavy ? .22 : .12, 0, 650); }
     else if (event.type === 'swing' && !event.special) this.hiss(.07, .06, 0, 2200);
     else if (event.type === 'skid') this.hiss(.18, .08, 0, 650);
+    else if (event.type === 'freight') { this.tone(240, .16, .16, 'square'); this.tone(180, .24, .16, 'square', this.context?.currentTime + .22); this.hiss(.45, .12, 0, 360); }
+    else if (event.type === 'belly') { this.tone(160, .3, .25, 'triangle', 0, 45); this.hiss(.1, .08, 0, 400); }
     else if (event.type === 'special') { this.tone(event.kind === 'thunder' ? 95 : 70, .4, .4, 'sawtooth', 0, 350); this.hiss(.3, .15); }
     else if (event.type === 'thunder') { this.tone(65, .75, .6, 'triangle', 0, 22); this.hiss(.6, .32, 0, 90); }
     else if (event.type === 'ember') { this.tone(120, .2, .18, 'triangle', 0, 30); this.hiss(.16, .14, 0, 300); }

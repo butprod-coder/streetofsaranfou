@@ -29,7 +29,7 @@ export const interactionCombat = {
   },
   tryGrab(p) {
     if (p.hp <= 0 || p.z > 0 || p.attack || p.cooldown > 0 || p.specialState && p.kind !== 'gustavax' || p.stun > 0 || p.grabCd > 0) return false;
-    const targets = this.state.enemies.filter(e => e.hp > 0 && !e.vehicle && !e.grabbedBy && !e.thrown && e.invincible <= 0 && e.z === 0 &&
+    const targets = this.state.enemies.filter(e => e.hp > 0 && !e.joPallet && !this.joChanneling(e) && !e.vehicle && !e.grabbedBy && !e.thrown && !this.kikorShielded(e) && !e.kikorGrip && e.invincible <= 0 && e.z === 0 &&
       near(p, e, hasTalent(p, 'Ramène-toi') && !e.boss && !HEAVY_ENEMIES.has(e.kind) ? 100 : GRAPPLE.range, GRAPPLE.band) && (!e.boss || e.recovering > 0) && (!e.elite || e.stun > 0));
     const target = targets.sort((a, b) => Math.abs(a.x - p.x) - Math.abs(b.x - p.x))[0];
     if (!target) return false;

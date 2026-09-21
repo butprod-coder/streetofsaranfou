@@ -1,0 +1,15 @@
+{
+  "tool": "image_gen.imagegen",
+  "date": "2026-09-21",
+  "assets": [
+    {
+      "file": "yanu-boss-v2.png",
+      "prompt": "Production transparent PNG sprite atlas for beat-em-up BOSS YANU. Identity reference only: dark swept messy hair, short black beard, black sunglasses, dark navy jacket open over white vest, distressed olive trousers, brown boots. Redraw ALL poses premium crisp 1990s arcade pixel art. Tall imposing athletic adult, same in-game standing height as other bosses 222px. EXACT equal 4 columns by 4 rows with large 12% transparent gutters; full body contained in each cell; all face RIGHT; consistent scale and feet baseline. Row1: ready stance A; ready stance B; running stride A; running stride B. Row2: punch windup; long straight punch; knee raised; full front kick. Row3: deeply inhaling arms spread; shouting open mouth arms flexed; mid transformation dark fur on face and elongated claws still in torn navy jacket; full upright dark werewolf in torn navy jacket olive trousers, huge claws. Row4: werewolf crouching for lunge; werewolf lunging horizontally claw attack; human recoiling hurt; human defeated lying sideways. Actual transparent alpha background, no text, no backdrop, no floor shadows, no grid. No kayaking in this sheet. Preserve human identity in reference.",
+      "reference": "assets/heroes/yanu.png"
+    },
+    {
+      "file": "yanu-water-v2.png",
+      "prompt": "Transparent PNG sprite atlas, premium crisp 1990s arcade pixel art for boss Yanu. EXACT 3 columns 2 rows, six clearly separated full sprites with broad transparent gutters. Top row 3 animation frames: tall lean athletic man black swept hair black beard black sunglasses navy open jacket white vest olive trousers riding a bright yellow ocean kayak, paddling right, three distinct paddle strokes. Entire kayak and man fully contained, identical scale. Bottom row 3 animation frames: massive turquoise curling tsunami travelling right, bright white foam and deep blue swirling water, one isolated wave per cell with no kayak, consistent silhouette, lively foam animation. True transparent alpha background. No text, no grid, no backdrop, no shadows. Side view beat em up game."
+    }
+  ]
+}

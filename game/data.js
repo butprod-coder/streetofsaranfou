@@ -25,7 +25,7 @@ export const CHAPTERS = [
   chapter('Stade Colette Besson', 'Le Stade', 'level3', 'stade', '« Le prochain qui marque a gagné. »', 'yanu', '#72e7b7'),
   chapter('Bourg de Saran', 'Le Bourg', 'level4', 'bourg', '« Rendez-vous devant la boulangerie. »', 'lorenzo', '#ff8f79'),
   chapter('Saran by Night', 'Cap Saran', 'level5', 'capsaran', '« Le dernier bus ? Il est déjà passé. »', 'jo', '#b4a3ff'),
-  chapter('Collège Montjoie', 'Montjoie', 'level6', 'college_montjoie', '« Une dernière tournée. Pour la bande. »', 'gustavax', '#ffe09a'),
+  chapter('Collège Montjoie', 'Montjoie', 'level6', 'college_montjoie', '« Une dernière tournée. Pour la bande. »', 'jualos', '#ffe09a'),
 ];
 export const ENEMIES = {
   ...Object.fromEntries(Object.entries(ELITES).map(([id, data]) => [id, { ...data, elite: true }])),

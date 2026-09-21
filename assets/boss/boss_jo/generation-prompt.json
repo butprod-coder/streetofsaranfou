@@ -1,0 +1,15 @@
+{
+  "tool": "image_gen.imagegen",
+  "date": "2026-09-21",
+  "assets": [
+    {
+      "file": "jo-boss-v2.png",
+      "prompt": "Use case stylized-concept. Production transparent PNG sprite atlas for beat em up boss JO LA MOUK. Reference is identity only: curly ginger hair, ginger full beard, charcoal hoodie with drawstrings, blue jeans, black sneakers white soles. Redraw as imposing athletic MMA fighter, same game standing height 222px as other bosses, crisp detailed 1990s arcade pixel art. Exact 4 columns 4 rows, equal cells, wide transparent gutters, all full bodies completely contained, side view facing RIGHT, consistent body scale. Row1: MMA guard A; MMA guard B; explosive running stride A; running stride B. Row2: jab windup; straight punch extended normal length; driving knee strike; high roundhouse kick. Row3: winding back shoulder for super stretchy punch; throwing super punch with arm stopping at wrist near cell right boundary, fist present but arm need not extend beyond cell; double elbows chambered preparing two stretching punches; crouched hands raised channeling with bright yellow small energy motes. Row4: standing channeling with both palms out and glowing yellow energy at hands; exhausted bent over hands on knees; recoiling hurt; knocked out lying on side. Actual transparent alpha background. No text no grid no backdrop no floor shadows. Never crop fists or feet, do not draw long limbs crossing cells. Stretch extension will be a separate game sprite.",
+      "reference": "assets/heroes/jo.png"
+    },
+    {
+      "file": "jo-props-v2.png",
+      "prompt": "Use case stylized-concept. Transparent PNG production sprite atlas for arcade beat em up, premium crisp detailed 1990s pixel art. EXACT 3 columns 2 rows, six isolated full sprites contained entirely in their own equal cell with generous transparent gutters. Row1 three views of SAME BRIGHT YELLOW manual warehouse PALLET JACK (French transpalette), not forklift, NO rider, no cargo, two long low yellow steel forks pointing RIGHT, black wheels and black upright pump handle at LEFT: intact moving frame A; intact moving frame B with slightly tilted handle; severely damaged crumpled yellow pallet jack wreck with bent forks and broken wheel. Consistent size and perspective, side view slight three quarter. Row2 modular sprites for a stretchy punch belonging to ginger-haired fighter in dark charcoal hoodie: cell4 straight horizontal dark charcoal fabric sleeve segment extending left-to-right, no fist no body, flat ends so game can tile/stretch it; cell5 isolated clenched human fist and short wrist, knuckles facing RIGHT, orange-tan skin and black cuff; cell6 isolated bright yellow circular magic energy sigil with sparks, no letters or text. Actual transparent alpha background, no background or floor shadows. No grids, no text. Sharp readable silhouettes. The manual pallet jacks must be recognizable as yellow transpalettes, never a vehicle with a cabin."
+    }
+  ]
+}

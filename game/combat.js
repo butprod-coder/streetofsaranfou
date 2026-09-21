@@ -32,18 +32,26 @@ export const combat = {
       h.age += dt;
       if (h.delay > 0) { h.delay -= dt; continue; }
       if (h.kind === 'barrelBlast' && !h.exploded) { h.exploded = true; this.event('explosion', { x: h.x, y: h.y }); }
+      if (h.kind === 'lorenzoRing' && !h.ignited) { h.ignited = true; this.event('ember', { x: h.x, y: h.y, radius: 16 }); }
       const ignition = h.kind === 'fire' && !h.ignited;
       if (ignition) { h.ignited = true; this.event('ember', { x: h.x, y: h.y, radius: h.radius }); }
       h.activeAge = (h.activeAge || 0) + dt;
+      if (h.shape === 'ring') {
+        h.previousRadius = h.radius;
+        h.radius = Math.min(h.maxRadius, h.radius + h.growth * dt);
+        if (h.radius >= h.maxRadius) h.ttl = 0;
+      }
       h.ttl -= dt; h.x += h.vx * dt; h.y += h.vy * dt;
       if (h.x < FLOOR.left - 120 || h.x > FLOOR.right + 120 || h.y < FLOOR.top - 80 || h.y > FLOOR.bottom + 80) h.ttl = 0;
       const source = [...s.players, ...s.enemies].find(a => a.id === h.owner) || h;
+      if (h.kind === 'jualosCash') { this.updateJualosCash(h); continue; }
       const intersects = target => { const dx = target.x - h.x, dy = target.y - h.y, extent = target.halfWidth || 0; return h.shape === 'line' ? dx * h.facing >= -25 - extent && dx * h.facing <= h.width + extent && Math.abs(dy) < h.band : Math.hypot(Math.max(0, Math.abs(dx) - extent), dy * 1.45) < h.radius; };
         const armed = h.kind !== 'plant' || h.activeAge % ENCORE_RULES.plantCycle < ENCORE_RULES.plantBite;
         for (const target of h.damage > 0 && armed ? h.both ? [...s.players, ...s.enemies] : h.enemy ? s.players : s.enemies : []) {
         if (!live(target) || target.invincible > 0 || ((h.enemy || h.both) && !target.enemy && target.z > 28) || s.time < (h.hits[target.id] || 0)) continue;
         const dx = target.x - h.x, dy = target.y - h.y;
-        const hit = h.shape === 'line' ? dx * h.facing >= -25 && dx * h.facing <= h.width && Math.abs(dy) < h.band : Math.hypot(dx, dy * (h.verticalScale || 1.45)) < h.radius;
+        const distance = Math.hypot(dx, dy * (h.verticalScale || 1.45));
+        const hit = h.shape === 'ring' ? distance >= h.previousRadius - h.thickness && distance <= h.radius + h.thickness : h.shape === 'line' ? dx * h.facing >= -25 && dx * h.facing <= h.width && Math.abs(dy) < h.band : distance < h.radius;
         if (hit) {
           this.damage(target, Math.round(ignition ? h.ignitionDamage || h.damage : h.damage), source, true);
           if (h.stunDuration && target.hp > 0) target.stun = Math.max(target.stun, h.stunDuration);
@@ -195,6 +203,12 @@ export const combat = {
     return e.vehicle ? 0 : 1 + b.phases.filter(threshold => e.hp / e.maxHp <= threshold).length;
   },
   updateBoss(e, dt) {
+    if (e.kind === 'karonux') return this.updateKaronux(e, dt);
+    if (e.kind === 'kikor') return this.updateKikor(e, dt);
+    if (e.kind === 'yanu') return this.updateYanu(e, dt);
+    if (e.kind === 'lorenzo') return this.updateLorenzo(e, dt);
+    if (e.kind === 'jo') return this.updateJo(e, dt);
+    if (e.kind === 'jualos') return this.updateJualos(e, dt);
     const s = this.state, config = BALANCE.bosses[e.kind], mode = difficulty(s.difficulty);
     const phase = Math.max(e.bossPhase || 0, this.bossPhase(e));
     if (phase !== e.bossPhase) {

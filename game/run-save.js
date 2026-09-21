@@ -10,6 +10,7 @@ const number = (v, max, min = 0) => Number.isFinite(v) ? clamp(v, min, max) : mi
 const integer = (v, max, min = 0) => Math.floor(number(v, max, min));
 const bag = value => Array.isArray(value) ? [...new Set(value.filter(k => ENCOUNTER_ROSTER.includes(k)))].slice(0, ENCOUNTER_ROSTER.length) : [];
 export function checkpoint(state) {
+  if (state?.practice) return null;
   if (!state || !['intro', 'rest', 'clear'].includes(state.phase) || state.enemies.some(e => e.hp > 0) || !state.players.some(p => p.hp > 0)) return null;
   return validateCheckpoint({ version: 2, runId: state.runId, chapter: state.chapter, stage: state.stage, wave: state.wave, phase: state.phase,
     time: state.time, seed: state.rngSeed, streetSeed: state.streetSeed, streetBag: state.streetBag, nextId: state.nextEntityId,
@@ -46,6 +47,7 @@ export function restoreCheckpoint(raw) {
   s.stage=save.stage; s.enemyBag=[...save.streetBag]; sim.seed=save.streetSeed; sim.nextId=10; sim.enterStreet();
   s.runId=save.runId; s.time=save.time; s.tick=Math.floor(save.time*60); s.phase=save.phase;
   s.wave=save.phase==='intro'?-1:save.phase==='clear'?s.waves.length-1:Math.min(s.waves.length-2,Math.max(0,save.wave));
+  s.chapterStory=false;
   s.phaseTime=save.phase==='intro'?1.5:5; s.score=save.score;s.kills=save.kills;s.bestCombo=save.bestCombo;
   if(save.phase==='clear')s.rewardedStreet=save.chapter+':'+save.stage;
   // Do not resurrect consumed pickups or breakables when resuming a completed wave.
@@ -60,6 +62,7 @@ export function restoreCheckpoint(raw) {
 export function readCheckpoint(storage = localStorage) { try { const raw=storage.getItem(RUN_SAVE_KEY);return raw?validateCheckpoint(JSON.parse(raw)):null; } catch { return null; } }
 
 export function recordRun(state, slot, storage = localStorage) {
+  if (state?.practice) return;
   const p=state?.players[slot];if(!p||!state.runId)return;
   let records;try{records=JSON.parse(storage.getItem(RECORDS_KEY)||'{}');}catch{records={};}
   if(!records||typeof records!=='object'||Array.isArray(records))records={};

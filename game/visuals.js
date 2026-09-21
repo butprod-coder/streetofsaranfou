@@ -40,6 +40,18 @@ export const VISUALS = {
   spit: frames('/assets/enemies/triso/triso_special', 3),
 };
 export const ARCADE_SPRITES = {
+  bossJualos: { file: 'jualos-boss-v2', folder: 'boss/boss_jualos', cols: 4, rows: 4, height: 222, rowCuts: [0, .30, .55, .78, 1], rowColumns: { 3: [0, .25, .5, .742, 1] } },
+  bossJualosSuit: { file: 'jualos-commercial-v2', folder: 'boss/boss_jualos', cols: 4, rows: 3, height: 222, rowCuts: [0, .35, .64, 1], rowColumns: { 1: [0, .25, .52, .725, 1], 2: [0, .25, .52, .75, 1] } },
+  bossJualosProps: { file: 'jualos-props-v2', folder: 'boss/boss_jualos', cols: 2, rows: 2, height: 65, rowCuts: [0, .395, 1], rowColumns: { 0: [0, .51, 1], 1: [0, .54, 1] } },
+  bossJo: { file: 'jo-boss-v2', folder: 'boss/boss_jo', cols: 4, rows: 4, height: 222, rowCuts: [0, .27, .515, .735, 1] },
+  bossJoProps: { file: 'jo-props-v2', folder: 'boss/boss_jo', cols: 3, rows: 2, height: 92, columnCuts: [0, .343, .675, 1], rowColumns: { 1: [0, .45, .675, 1] } },
+  bossLorenzo: { file: 'lorenzo-boss-v2', folder: 'boss/boss_lorenzo', cols: 4, rows: 4, height: 222, rowCuts: [0, .30, .55, .80, 1] },
+  bossLorenzoProps: { file: 'lorenzo-props-v2', folder: 'boss/boss_lorenzo', cols: 3, rows: 2, height: 140 },
+  bossYanu: { file: 'yanu-boss-v2', folder: 'boss/boss_yanu', cols: 4, rows: 4, height: 222, rowCuts: [0, .28, .505, .765, 1], rowColumns: { 3: [0, .242, .554, .744, 1] } },
+  bossYanuWater: { file: 'yanu-water-v2', folder: 'boss/boss_yanu', cols: 3, rows: 2, height: 160 },
+  bossKikor: { file: 'kikor-boss-v2', folder: 'boss/boss_kikor', cols: 4, rows: 4, height: 222, rowCuts: [0, .285, .555, .76, 1], rowColumns: { 1: [0, .265, .52, .765, 1], 3: [0, .27, .51, .755, 1] } },
+  bossKaronux: { file: 'karonux-boss-v2', folder: 'boss/boss_karonux', cols: 4, rows: 4, height: 222, rowCuts: [0, .28, .51, .731, 1] },
+  bossGolf: { file: 'golf-boss-v2', folder: 'boss/boss_karonux', cols: 2, rows: 2, height: 145 },
   ...SCENERY_SPRITES,
   ...HERO_ACTION_SPRITES,
   weaponItems: { file: 'weapons', folder: 'shared/scenery', cols: 3, rows: 2, height: 24, cells: { 3: [0, .5, .39, 1], 4: [.4, .5, .67, 1] } },
@@ -63,10 +75,16 @@ export const ARCADE_SPRITES = {
   dash: { file: 'dash', cols: 3, rows: 1, height: 32 },
 };
 export const arcadeUrl = key => `/assets/${ARCADE_SPRITES[key].folder || 'shared/arcade'}/${ARCADE_SPRITES[key].file}.${ARCADE_SPRITES[key].ext || 'png'}`;
-export const EXTRA_ASSETS = [...Object.values(VISUALS).flat(), ...Object.keys(ARCADE_SPRITES).map(arcadeUrl)];
+export const EXTRA_ASSETS = ['/assets/intros/chene-maillard.png', '/assets/intros/chateau-etang.png', '/assets/intros/stade-colette-besson.png', ...Object.values(VISUALS).flat(), ...Object.keys(ARCADE_SPRITES).map(arcadeUrl)];
 // Source atlas is 1254². Runtime rects retain alpha without rewriting the generated image.
 export const TRANSFORM_ROWS = { pig: [40, 330], wolf: [410, 402], tornado: [815, 439] };
 export const PATTERN_LABELS = {
+  jualosBelly: 'BOUFFI BOUFFON · ÉCARTE-TOI OU SAUTE !', jualosCombo: 'DOUBLE FRAPPE', jualosRush: 'CHARGE DU VENTRE !', jualosSuit: 'ACTE II · LE COMMERCIAL', jualosCash: 'BILLETS GLISSANTS · ATTENTION AU SOL !', jualosBagSwing: 'COUP DE POCHON !', jualosBagSlam: 'IL ÉCRASE SON POCHON · ESQUIVE !',
+  joStretch: 'BRAS À RALLONGE · CHANGE DE LIGNE !', joMMA: 'JAB · GENOU · HIGH KICK', joRush: 'GENOU VOLANT · ESQUIVE !', joChannel: 'INVINCIBLE · ÉVITE OU CASSE LES TRANSPALETTES !',
+  lorenzoCigarette: 'ANNEAU DE FEU · SAUTE AU PASSAGE !', lorenzoSofa: 'LIVRAISON · PRÉPARE TES COUPS LOURDS !', lorenzoRage: 'IL EST FOU DE RAGE !', lorenzoCombo: 'POING · POING · PIED', lorenzoKick: 'COUP DE PIED',
+  yanuTsunami: 'TSUNAMI · CHANGE DE LIGNE OU SAUTE !', yanuHowl: 'BUUUUUUUUU · ESQUIVE LE CRI !', yanuCombo: 'POING · POING · PIED', yanuKick: 'COUP DE PIED',
+  kikorPaint: 'IL PEINT SON PROTECTEUR !', kikorBrush: 'COUP DE PINCEAU', kikorHunt: 'GOLLUM · ÉVITE SES MAINS !',
+  sleep: 'IL S’ÉCROULE · ESQUIVE !',
   rainbowStorm: 'PRINCESSE · SALVE ARC-EN-CIEL', preciousHunt: 'MON PRÉCIEUX · ATTENTION AU BOND', kayakRush: 'KAYAK · CHARGE À LA RAME',
   sofaDrop: 'LIVRAISON EXPRESS · BOUGE !', ferretHunt: 'LA FOUINE · CHANGE DE LIGNE', finalRing: 'DERNIER ROUND · TROUVE L’OUVERTURE',
   carRush: 'GOLF · ÉCARTE-TOI !', carRev: 'COUP D’ACCÉLÉRATEUR', rush: 'CHARGE', combo: 'RAFALE DE POINGS',
@@ -75,3 +93,4 @@ export const PATTERN_LABELS = {
   longFist: 'POING À RALLONGE', doubleFist: 'DOUBLE ALLONGE', sweepFist: 'BALAYAGE À RALLONGE',
   gun: 'TIR EN RAFALE', crossfire: 'TIRS CROISÉS', stomp: 'ONDE DE CHOC', guards: 'LA GARDE', flames: 'LE DERNIER FEU',
 };
+

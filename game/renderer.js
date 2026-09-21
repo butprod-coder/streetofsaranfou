@@ -8,8 +8,18 @@ import { streetDecor } from './scenery.js';
 import { WEAPONS, GRAPPLE } from './weapons.js';
 import { xpForLevel } from './progression.js';
 import { STREET_ENEMIES, STREET_LABELS } from './street-enemies-data.js';
+import { JO_PALLET_LANES } from './boss-jo.js';
+import { CHAPTER_INTROS, hasChapterIntro, INTRO_DURATION, INTRO_REVEAL } from './chapter-intro.js';
 const $ = s => document.querySelector(s);
 const TAU = Math.PI * 2;
+const BOSS_PRESENTATIONS = {
+  karonux: ['KARONUX', 'Meme pas du chêne Batard'],
+  kikor: ['KIKOR', 'Benjamin présent dit le Rennais'],
+  yanu: ['YANU', 'La bête qui sommeil BOW !'],
+  lorenzo: ['LORENZO', 'Le bakablai du quartier'],
+  jo: ['JO LA MOUK', 'La Jejette Suisse'],
+  jualos: ['JUALOS', 'Le baron vert'],
+};
 const scoreText = n => String(Math.floor(n)).padStart(6, '0').replace(/(\d{3})$/, ' $1');
 
 export class Renderer {
@@ -57,6 +67,7 @@ export class Renderer {
       }
       if (e.type === 'revive') this.effects.push({ type: 'number', x: e.x, y: e.y - 130, text: 'DEBOUT, POTO !', color: '#98efc9', ttl: 1.3, life: 1.3 });
       if (e.type === 'rage') this.effects.push({ type: 'announcement', text: e.label.toUpperCase(), color: '#ff8279', ttl: 2, life: 2 });
+      if (e.type === 'ko' && e.boss) { this.shake = 8; this.effects.push({ type: 'announcement', text: 'LE PATRON EST À TERRE', color: '#ffe0a3', ttl: 2.6, life: 2.6 }); }
       if (e.type === 'elite') this.effects.push({ type: 'announcement', text: `ÉLITE · ${e.label.toUpperCase()}`, color: '#d6b4ff', ttl: 1.5, life: 1.5 });
       if (e.type === 'taunt') this.effects.push({ type: 'number', x: e.x, y: e.y, text: e.label, color: '#ffe5a7', ttl: 1.7, life: 1.7 });
       if (e.type === 'spectacle') { this.shake = Math.max(this.shake, 5); this.effects.push({ ...e, type: 'atlasFX', ttl: .5, life: .5 }); }
@@ -68,8 +79,10 @@ export class Renderer {
   }
   draw(state, dt, { online = false, slot = 0, input = {}, age = 0, ping = 0 } = {}) {
     const c = this.ctx;
+    document.body.classList.toggle('chapter-story', !!state && hasChapterIntro(state));
     c.setTransform(this.scale, 0, 0, this.scale, 0, 0); c.fillStyle = '#090d16'; c.fillRect(0, 0, W, H);
     if (!state) return;
+    if (hasChapterIntro(state)) { this.chapterStory(state); return; }
     const key = `${state.chapter}:${state.stage}`;
     if (key !== this.street) { this.street = key; this.visual.clear(); this.effects = []; this.decor = streetDecor(state.chapter, state.stage); }
     this.consume(state);
@@ -86,6 +99,12 @@ export class Renderer {
     this.atmosphere(state.time);
     this.livingScenery(state);
     this.drawRogueWorld(state);
+    if (state.bossCinema?.kind === 'exit') {
+      const shot = state.bossCinema;
+      this.arcadeSprite('bossGolf', shot.x + 65, shot.y - 8, 3, 145, -1);
+      for (let i = 0; i < 5; i++) this.ellipse(shot.x + 120 + Math.sin(i + state.time) * 18, shot.y - 75 - (shot.elapsed * 60 + i * 24) % 170, 20 + i * 5, 14 + i * 3, '#9bafbd55');
+    }
+    this.drawJoTraffic(state);
     for (const h of state.hazards || []) this.drawHazard(h, state.time);
     if (state.phase === 'clear') this.exit(state);
     for (const p of state.props.filter(p => p.hp <= 0 && p.rubble > 0)) this.prop(p);
@@ -96,7 +115,7 @@ export class Renderer {
       else if (entity.pickup) this.pickup(entity, state.time);
       else {
         let targetX = entity.x, targetY = entity.y;
-        if (online && entity.id === slot + 1 && entity.action !== 'dodge' && !entity.specialState && !state.paused && ['fight', 'surprise', 'rest', 'clear'].includes(state.phase) && entity.hp > 0 && entity.stun <= 0) {
+        if (online && entity.id === slot + 1 && entity.action !== 'dodge' && !entity.specialState && !entity.caughtBy && !entity.yanuFrozen && !entity.jualosSlip && !state.paused && ['fight', 'surprise', 'rest', 'clear'].includes(state.phase) && entity.hp > 0 && entity.stun <= 0) {
           const factor = entity.attack ? .32 : 1, norm = Math.max(1, Math.hypot(input.x || 0, input.y || 0));
           targetX = clamp(targetX + (input.x || 0) / norm * entity.speed * factor * Math.min(.13, age + ping / 2000), FLOOR.left, FLOOR.right);
           targetY = clamp(targetY + (input.y || 0) / norm * entity.speed * .68 * factor * Math.min(.13, age + ping / 2000), FLOOR.top, FLOOR.bottom);
@@ -121,10 +140,293 @@ export class Renderer {
       c.font = 'italic 52px Impact, sans-serif'; c.fillText(`${state.combo}`, 0, 0); c.font = '16px Impact, sans-serif'; c.fillText('HITS', 8, 22); c.restore();
     }
     if (state.phase === 'intro') this.intro(state);
+    if (state.bossCinema) this.bossCinema(state);
     if (state.phase === 'transition') { c.fillStyle = `rgba(5,9,16,${clamp(1 - state.phaseTime / .65, 0, 1)})`; c.fillRect(0, 0, W, H); }
     c.restore();
     this.hudTime += dt;
     if (this.hudTime > .07) { this.hudTime = 0; this.hud(state, slot, online, ping); }
+  }
+  bossCinema(state) {
+    const c = this.ctx, shot = state.bossCinema, boss = state.enemies.find(e => e.id === shot.actor);
+    if (!boss) return;
+    const fade = Math.min(1, shot.elapsed * 3, (shot.duration - shot.elapsed) * 3);
+    c.save(); c.globalAlpha = fade; c.fillStyle = '#04080ff2'; c.fillRect(0, 0, W, 94); c.fillRect(0, H - 105, W, 105);
+    c.fillStyle = '#e9b96b'; c.fillRect(60, H - 106, W - 120, 2);
+    c.textAlign = 'left'; c.font = 'bold 16px monospace'; c.fillText(shot.kind === 'exit' ? 'ACTE II / LA PORTIÈRE CLAQUE' : 'FIN DE QUARTIER / LE PATRON', 64, 55);
+    if (shot.kind === 'arrival') {
+      c.restore(); this.bossPresentation(boss, shot); return;
+    }
+    c.font = 'italic bold 48px Impact, sans-serif'; c.fillStyle = '#fff0d3'; c.fillText(boss.kind === 'jo' ? 'JO LA MOUK' : fighter(boss.kind).name.toUpperCase(), 64, H - 48);
+    c.font = '14px monospace'; c.fillStyle = '#e7bc80'; c.textAlign = 'right';
+    c.fillText(boss.kind === 'karonux' ? shot.kind === 'exit' ? 'GRAND. NERVEUX. PAS RÉVEILLÉ.' : 'UNE GOLF. UN DERNIER AVERTISSEMENT.' : this.bossSubtitle(boss), W - 64, H - 43);
+    c.restore();
+  }
+  bossPresentation(boss, shot) {
+    const c = this.ctx, [name, description] = BOSS_PRESENTATIONS[boss.kind] || [fighter(boss.kind).name.toUpperCase(), this.bossSubtitle(boss)];
+    const entrance = clamp(shot.elapsed / .65, 0, 1), departure = clamp((shot.elapsed - (shot.duration - .65)) / .65, 0, 1);
+    const offset = this.reducedMotion ? 0 : -(W + 100) * (1 - entrance) ** 3 + (W + 100) * departure ** 3;
+    c.save(); c.globalAlpha = this.reducedMotion ? Math.min(entrance, 1 - departure) : 1;
+    c.fillStyle = '#04080f55'; c.fillRect(0, 94, W, H - 199);
+    c.translate(W / 2 + offset, H / 2);
+    c.shadowColor = '#000000aa'; c.shadowBlur = 24;
+    c.fillStyle = '#080f1bf5'; c.beginPath(); c.moveTo(-570, -123); c.lineTo(595, -123); c.lineTo(555, 123); c.lineTo(-610, 123); c.closePath(); c.fill();
+    c.shadowBlur = 0;
+    c.fillStyle = '#e9b96b'; c.fillRect(-555, -124, 1095, 4); c.fillRect(-540, 120, 1095, 4);
+    c.fillStyle = '#e9b96b22';
+    for (let i = 0; i < 5; i++) { c.save(); c.translate(-525 + i * 24, 0); c.transform(1, 0, -.2, 1, 0, 0); c.fillRect(0, -99, 9, 198); c.restore(); }
+    c.textAlign = 'center'; c.fillStyle = '#e9b96b'; c.font = 'bold 13px monospace'; c.fillText('FIN DE QUARTIER  /  LE PATRON', 0, -85);
+    c.font = 'italic bold 88px Impact, sans-serif'; c.lineWidth = 7; c.strokeStyle = '#03070d'; c.strokeText(name, 0, 12, 870); c.fillStyle = '#fff0d3'; c.fillText(name, 0, 12, 870);
+    c.fillStyle = '#e9b96b'; c.fillRect(-40, 35, 80, 3);
+    c.font = 'bold 25px monospace'; c.fillStyle = '#e7bc80'; c.fillText(description, 0, 80, 940);
+    c.restore();
+  }
+  bossSubtitle(boss) { return boss.kind === 'jualos' ? 'LE DERNIER PATRON. LE VENTRE DES AFFAIRES.' : boss.kind === 'jo' ? 'LE BRAS LONG. LES POINGS VIFS. LIVRAISON BRUTALE.' : boss.kind === 'lorenzo' ? 'UNE BRAISE. UN TRÔNE. PLUS AUCUNE PATIENCE.' : boss.kind === 'yanu' ? 'LA MARÉE MONTE. LA BÊTE SE RÉVEILLE.' : boss.kind === 'kikor' ? 'LA TOILE PREND VIE. LE PEINTRE PERD LA TÊTE.' : `QUARTIER VERROUILLÉ · ${fighter(boss.kind).title || 'LE COMBAT COMMENCE'}`; }
+  drawJualos(a, state) {
+    const c = this.ctx, p = a.pattern, changing = p?.kind === 'jualosSuit', commercial = a.commercial && !(changing && !p.hit);
+    const intro = state.bossCinema?.actor === a.id ? state.bossCinema.elapsed : null;
+    let cell = Math.floor(state.time * 2) % 2;
+    if (a.action === 'walk') cell = 2 + Math.floor(state.time * 7) % 2;
+    if (commercial) {
+      if (p?.kind === 'jualosCash') cell = p.hit ? 5 : 4;
+      if (['jualosBagSwing', 'jualosCombo'].includes(p?.kind)) cell = p.hit ? 7 : 6;
+      if (p?.kind === 'jualosBagSlam') cell = p.hit ? 9 : 8;
+      if (a.laughTime > 0) cell = 10;
+      if (a.hp <= 0) cell = 11;
+    } else {
+      if (p?.kind === 'jualosCombo') cell = p.hit ? 5 : 4;
+      if (p?.kind === 'jualosRush') cell = p.hit ? 6 : 4;
+      if (p?.kind === 'jualosBelly') cell = p.hit ? p.beat === 3 ? 11 : 9 + Math.floor(state.time * 9) % 2 : 8;
+      if (changing) cell = 12;
+      if (a.recovering > 0 && !p) cell = 13;
+      if (a.stun > 0 && !p) cell = 14;
+      if (intro !== null) cell = intro < .8 ? 2 : intro < 1.4 ? 8 : intro < 2.8 ? 9 + Math.floor(state.time * 9) % 2 : 11;
+      if (a.hp <= 0) cell = 15;
+    }
+    c.save();
+    if (intro !== null) { c.fillStyle = '#ffd99616'; c.beginPath(); c.moveTo(a.x - 40, 50); c.lineTo(a.x + 40, 50); c.lineTo(a.x + 180, a.y); c.lineTo(a.x - 180, a.y); c.closePath(); c.fill(); }
+    if (changing) {
+      c.strokeStyle = '#d6c4ff'; c.lineWidth = 3; c.beginPath(); c.ellipse(a.x, a.y - 105, 120, 126, 0, 0, TAU); c.stroke();
+      c.fillStyle = '#e9ddff'; c.font = 'italic bold 22px Impact, sans-serif'; c.textAlign = 'center'; c.fillText('LE COMMERCIAL', a.x, a.y - 240);
+    }
+    if (a.flash > 0) c.filter = 'brightness(1.8)';
+    if (a.hp <= 0) c.globalAlpha = clamp((1.2 - a.deadTime) / .4, 0, 1);
+    this.arcadeSprite(commercial ? 'bossJualosSuit' : 'bossJualos', a.x, a.y - a.z, cell, 222, a.facing);
+    c.filter = 'none';
+    if (p?.kind === 'jualosBelly' && !p.hit) { c.strokeStyle = '#ffca91'; c.lineWidth = 2; c.setLineDash([10, 9]); c.beginPath(); c.ellipse(a.x, a.y, 255, 255 / 1.45, 0, 0, TAU); c.stroke(); }
+    if (p?.kind === 'jualosBagSlam' && !p.hit) { c.strokeStyle = '#ceefa0'; c.lineWidth = 2; c.beginPath(); c.ellipse(a.x + a.facing * 110, a.y, 150, 150 / 1.45, 0, 0, TAU); c.stroke(); }
+    if (a.laughTime > 0 && a.hp > 0) { c.fillStyle = '#ffe6a6'; c.font = 'italic bold 24px Impact, sans-serif'; c.textAlign = 'center'; c.fillText('HAHAHA !', a.x, a.y - 255); }
+    c.restore();
+  }
+  drawJualosSlip(a) {
+    const c = this.ctx, frame = this.assets.frame(a.kind, a.jualosSlip.elapsed < .2 ? 'hurt' : 'dead', .9), base = this.assets.frame(a.kind, 'idle', 0);
+    if (!frame) return;
+    const [sx, sy, sw, sh] = frame.rect, scale = 144 / (frame.referenceHeight || base?.rect[3] || sh);
+    c.save(); c.translate(a.x, a.y); c.scale(a.facing, 1); c.imageSmoothingEnabled = false;
+    c.drawImage(frame.image, sx, sy, sw, sh, -sw * scale / 2, -sh * scale, sw * scale, sh * scale); c.restore();
+    c.fillStyle = '#ffe698'; c.textAlign = 'center'; c.font = 'bold 13px monospace'; c.fillText('GLISSADE !', a.x, a.y - 115);
+  }
+  drawJoTraffic(state) {
+    const boss = state.enemies.find(e => e.boss && e.kind === 'jo' && e.hp > 0 && e.pattern?.kind === 'joChannel');
+    if (!boss) return;
+    const c = this.ctx, safe = JO_PALLET_LANES[boss.pattern.safeLane];
+    c.save(); c.fillStyle = '#80e8c522'; c.fillRect(FLOOR.left, safe - 24, FLOOR.right - FLOOR.left, 48);
+    c.fillStyle = '#b7ffe4'; c.font = 'bold 12px monospace'; c.textAlign = 'left'; c.fillText('PASSAGE LIBRE', FLOOR.left + 14, safe + 4);
+    const shown = new Set();
+    for (const a of state.enemies) if (a.joPallet && a.owner === boss.id && a.hp > 0 && a.delay > 0 && !shown.has(a.lane)) {
+      shown.add(a.lane); c.fillStyle = '#ffd24920'; c.fillRect(FLOOR.left, a.y - 23, FLOOR.right - FLOOR.left, 46);
+      c.strokeStyle = '#ffce62'; c.lineWidth = 2; c.setLineDash([12, 12]); c.beginPath(); c.moveTo(FLOOR.left, a.y); c.lineTo(FLOOR.right, a.y); c.stroke();
+      c.fillStyle = '#ffe898'; c.font = 'bold 22px monospace'; c.textAlign = 'center'; c.fillText(a.facing > 0 ? '>>' : '<<', a.facing > 0 ? 80 : 1200, a.y - 8);
+    }
+    c.restore();
+  }
+  drawJoPallet(a, state) {
+    const c = this.ctx; c.save();
+    if (a.hp <= 0) c.globalAlpha = clamp((1.2 - a.deadTime) / .5, 0, 1);
+    if (a.delay > 0) c.globalAlpha = .45;
+    if (a.flash > 0) c.filter = 'brightness(1.9)';
+    this.ellipse(a.x, a.y + 3, 65, 10, '#05080a88');
+    this.arcadeSprite('bossJoProps', a.x, a.y, a.hp <= 0 ? 2 : Math.floor(state.time * 12) % 2, 92, a.facing);
+    if (a.hp > 0 && a.hp < a.maxHp) { c.fillStyle = '#181c22'; c.fillRect(a.x - 25, a.y - 103, 50, 4); c.fillStyle = '#ffd249'; c.fillRect(a.x - 25, a.y - 103, 50 * a.hp / a.maxHp, 4); }
+    c.restore();
+  }
+  drawJo(a, state) {
+    const c = this.ctx, p = a.pattern, channel = p?.kind === 'joChannel', intro = state.bossCinema?.actor === a.id ? state.bossCinema.elapsed : null;
+    c.save(); let cell = Math.floor(state.time * 4) % 2;
+    if (a.action === 'walk') cell = 2 + Math.floor(state.time * 13) % 2;
+    if (p?.kind === 'joMMA') cell = p.hit ? [5, 6, 7][Math.min(2, Math.max(0, (p.beat || 1) - 1))] : 4;
+    if (p?.kind === 'joRush') cell = p.hit ? 6 : 2;
+    if (p?.kind === 'joStretch') cell = p.hit ? 9 : a.enraged ? 10 : 8;
+    if (channel) {
+      cell = p.hit ? 12 : 11;
+      this.classicFX('bossJoProps', 5, a.x, a.y - 110, 270);
+      c.strokeStyle = a.shieldFlash > 0 ? '#fffce1' : '#ffe15e'; c.lineWidth = 3; c.beginPath(); c.ellipse(a.x, a.y - 110, 100, 128, 0, 0, TAU); c.stroke();
+      c.fillStyle = '#ffe79a'; c.font = 'bold 13px monospace'; c.textAlign = 'center'; c.fillText(`INVINCIBLE · ${Math.max(0, Math.ceil(p.windup + p.active - p.elapsed))}s`, a.x, a.y - 242);
+    }
+    if (a.recovering > 1.3 && !p) cell = 13;
+    if (intro !== null) {
+      cell = intro < 1 ? 2 + Math.floor(state.time * 12) % 2 : intro < 1.7 ? 6 : intro < 2.3 ? 10 : 0;
+      const x = a.x + 350 - intro * 430;
+      if (intro < 2.4) this.arcadeSprite('bossJoProps', x, a.y + 20, Math.floor(state.time * 12) % 2, 92, -1);
+    }
+    if (a.stun > 0 && !p) cell = 14;
+    if (a.hp <= 0) cell = 15;
+    if (a.flash > 0) c.filter = 'brightness(1.8)';
+    if (a.hp <= 0) c.globalAlpha = clamp((1.2 - a.deadTime) / .4, 0, 1);
+    this.arcadeSprite('bossJo', a.x, a.y - a.z, cell, 222, a.facing); c.filter = 'none';
+    if (p?.kind === 'joStretch') {
+      const t = p.elapsed - p.windup;
+      if (!p.hit) {
+        c.fillStyle = '#ffb26620'; c.fillRect(a.facing > 0 ? a.x : a.x - 930, a.y - 30, 930, 60);
+        c.strokeStyle = '#ffce91'; c.lineWidth = 2; c.setLineDash([12, 10]); c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(a.x + a.facing * 930, a.y); c.stroke();
+      }
+      const beatTime = a.enraged && t >= .4 ? t - .55 : t;
+      const extension = beatTime < 0 ? clamp(1 + beatTime / .12, 0, 1) : clamp(1 - Math.max(0, beatTime - .13) / .2, 0, 1);
+      if (extension > 0) {
+        const sleeve = this.assets.arcadeFrame('bossJoProps', 3), fist = this.assets.arcadeFrame('bossJoProps', 4), length = 70 + 820 * extension;
+        c.save(); c.translate(a.x + a.facing * 40, a.y - 137); c.scale(a.facing, 1); c.imageSmoothingEnabled = false;
+        if (sleeve) c.drawImage(sleeve.image, ...sleeve.rect, 0, -14, length - 36, 28);
+        if (fist) c.drawImage(fist.image, ...fist.rect, length - 45, -26, 60, 52);
+        c.restore();
+      }
+    }
+    c.restore();
+  }
+  drawLorenzo(a, state) {
+    const c = this.ctx, p = a.pattern, sofa = a.sofa, seated = sofa && !a.sofaBroken;
+    const intro = state.bossCinema?.actor === a.id ? state.bossCinema.elapsed : null;
+    c.save();
+    if (sofa) {
+      const drop = p?.kind === 'lorenzoSofa' ? (1 - clamp(p.elapsed / p.windup, 0, 1)) ** 2 * 600 : 0;
+      const shake = this.reducedMotion ? 0 : Math.sin(state.time * 95) * (sofa.shake || 0) * 24;
+      this.arcadeSprite('bossLorenzoProps', sofa.x + shake, sofa.y + 5 - drop, a.sofaBroken ? 2 : sofa.hp < sofa.maxHp * .5 ? 1 : 0, 150, a.facing);
+      if (seated) {
+        c.fillStyle = '#20121b'; c.fillRect(a.x - 85, a.y + 25, 170, 8);
+        c.fillStyle = '#ffd286'; c.fillRect(a.x - 85, a.y + 25, 170 * sofa.hp / sofa.maxHp, 8);
+        c.font = 'bold 12px monospace'; c.textAlign = 'center'; c.fillText('CANAPÉ · COUPS LOURDS !', a.x, a.y + 49);
+      }
+    }
+    if (intro !== null) {
+      for (let i = 0; i < 5; i++) this.ellipse(a.x + Math.sin(i * 2 + intro) * 60, a.y - 90 - i * 22, 32 + i * 6, 15, '#b4bfd522');
+      if (intro > 1.65) {
+        c.strokeStyle = '#ffb26a'; c.lineWidth = 3; c.beginPath(); c.ellipse(a.x, a.y, (intro - 1.65) * 150, (intro - 1.65) * 55, 0, 0, TAU); c.stroke();
+      }
+    }
+    let cell = Math.floor(state.time * 3) % 2;
+    if (a.action === 'walk') cell = 2 + Math.floor(state.time * (a.enraged ? 13 : 9)) % 2;
+    if (p?.kind === 'lorenzoCombo') cell = p.hit ? [5, 5, 7][Math.min(2, p.beat - 1 || 0)] : 4;
+    if (p?.kind === 'lorenzoKick') cell = p.hit ? 7 : 6;
+    if (p?.kind === 'lorenzoCigarette') cell = p.hit ? 9 : 8;
+    if (p?.kind === 'lorenzoSofa') cell = p.hit ? 12 : 10;
+    if (seated && sofa.landed) cell = 12;
+    if (p?.kind === 'lorenzoRage') cell = p.elapsed < .55 ? 13 : 11;
+    if (intro !== null) cell = intro < .75 ? 2 + Math.floor(state.time * 10) % 2 : intro < 1.65 ? 8 : intro < 2.15 ? 9 : 0;
+    if (a.stun > 0 && !p && !seated) cell = 14;
+    if (a.hp <= 0) cell = 15;
+    if (a.enraged && a.hp > 0) { c.strokeStyle = '#ff7b54'; c.lineWidth = 2; c.beginPath(); c.ellipse(a.x, a.y + 2, 46, 12, 0, 0, TAU); c.stroke(); }
+    if (a.flash > 0) c.filter = 'brightness(1.8)';
+    if (a.hp <= 0) c.globalAlpha = clamp((1.2 - a.deadTime) / .4, 0, 1);
+    this.arcadeSprite('bossLorenzo', a.x, a.y - a.z - (seated && sofa.landed ? 30 : 0), cell, 222, a.facing);
+    c.restore();
+  }
+  drawYanu(a, state) {
+    const c = this.ctx, p = a.pattern, intro = state.bossCinema?.actor === a.id && state.bossCinema.elapsed < 1.9;
+    const wave = p?.kind === 'yanuTsunami', howl = p?.kind === 'yanuHowl', t = p ? p.elapsed - p.windup : 0;
+    c.save();
+    if (a.flash > 0) c.filter = 'brightness(1.8)';
+    if (a.hp <= 0) c.globalAlpha = clamp((1.2 - a.deadTime) / .4, 0, 1);
+    if (a.hp > 0 && (intro || wave && p.hit)) {
+      const frame = Math.floor(state.time * 8) % 3;
+      this.arcadeSprite('bossYanuWater', a.x - a.facing * 30, a.y + 18, 3 + frame, 240, a.facing);
+      this.arcadeSprite('bossYanuWater', a.x + a.facing * 12, a.y - 105, frame, 195, a.facing);
+    } else {
+      let cell = Math.floor(state.time * 3) % 2;
+      if (a.action === 'walk') cell = 2 + Math.floor(state.time * 9) % 2;
+      if (p?.kind === 'yanuCombo') cell = p.hit ? [5, 5, 7][Math.min(2, Math.floor(t / .3))] : 4;
+      if (p?.kind === 'yanuKick') cell = p.hit ? 7 : 6;
+      if (wave) cell = 8;
+      if (howl) cell = !p.hit ? 8 : t < .25 ? 9 : t < .55 ? 10 : t < .8 ? 11 : t < 1.05 ? 12 : p.lunging ? 13 : 11;
+      if (a.stun > 0 && !p) cell = 14;
+      if (a.hp <= 0) cell = 15;
+      this.arcadeSprite('bossYanu', a.x, a.y - a.z, cell, 222, a.facing);
+    }
+    c.filter = 'none';
+    if (wave && !p.hit) {
+      c.fillStyle = '#43c9ee25'; c.fillRect(FLOOR.left, a.y - 55, FLOOR.right - FLOOR.left, 110);
+      c.strokeStyle = '#8ceeff'; c.lineWidth = 2; c.setLineDash([12, 10]);
+      for (const y of [a.y - 55, a.y + 55]) { c.beginPath(); c.moveTo(FLOOR.left, y); c.lineTo(FLOOR.right, y); c.stroke(); }
+      this.arcadeSprite('bossYanuWater', a.x - a.facing * 60, a.y + 8, 3 + Math.floor(state.time * 6) % 3, 65 + 75 * p.elapsed / p.windup, a.facing);
+    }
+    if (howl) {
+      if (!p.hit) { c.strokeStyle = '#d6baff'; c.lineWidth = 2; c.setLineDash([8, 8]); c.beginPath(); c.ellipse(a.x, a.y, 360, 240, 0, 0, TAU); c.stroke(); }
+      else if (t < .65) {
+        c.strokeStyle = `rgba(185,225,255,${1 - t / .65})`; c.lineWidth = 4;
+        c.beginPath(); c.ellipse(a.x, a.y - 115, 40 + t * 480, 25 + t * 180, 0, 0, TAU); c.stroke();
+        c.font = 'italic bold 34px Impact, sans-serif'; c.textAlign = 'center'; c.fillStyle = '#eefaff'; c.fillText('BUUUUUUUUU', clamp(a.x, 190, 1090), a.y - 242);
+      }
+      if (p.hit && t < 1.05) { c.strokeStyle = '#f3b9ff'; c.lineWidth = 3; c.setLineDash([10, 8]); c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(p.targetX, p.targetY); c.stroke(); }
+    }
+    c.restore();
+  }
+  drawKikor(a, state) {
+    const c = this.ctx, p = a.pattern, guard = state.enemies.find(e => e.kikorCreation && e.owner === a.id && e.hp > 0);
+    let cell = Math.floor(state.time * 2) % 2;
+    if (a.action === 'walk') cell = 2 + Math.floor(state.time * 7) % 2;
+    if (p?.kind === 'kikorPaint') cell = p.hit ? 7 : 6;
+    if (p?.kind === 'kikorBrush') cell = p.hit ? 5 : 4;
+    if (p?.kind === 'kikorHunt') cell = !p.hit ? p.elapsed < p.windup * .5 ? 8 : 9 : p.lunging ? 12 : 10 + Math.floor(state.time * 8) % 2;
+    if (a.kikorGrip) cell = 13;
+    if (a.stun > 0 && !p && !a.kikorGrip) cell = 14;
+    if (a.hp <= 0) cell = 15;
+    c.save();
+    if (guard && a.hp > 0) {
+      c.strokeStyle = a.shieldFlash > 0 ? '#e7ffbd' : '#91ff8d'; c.lineWidth = a.shieldFlash > 0 ? 5 : 2;
+      c.globalAlpha = .6; c.beginPath(); c.moveTo(a.x, a.y - 115); c.quadraticCurveTo((a.x + guard.x) / 2, Math.min(a.y, guard.y) - 180, guard.x, guard.y - 65); c.stroke();
+      c.beginPath(); c.ellipse(a.x, a.y - 105, 80, 116, 0, 0, TAU); c.stroke();
+      c.globalAlpha = 1; c.fillStyle = '#b3ff9c'; c.font = 'bold 12px monospace'; c.textAlign = 'center'; c.fillText('PROTÉGÉ PAR LE BONHOMME VERT', clamp(a.x, 190, 1090), a.y - 242);
+    }
+    if (a.flash > 0) c.filter = 'brightness(1.8)';
+    if (a.hp <= 0) c.globalAlpha = clamp((1.2 - a.deadTime) / .4, 0, 1);
+    this.arcadeSprite('bossKikor', a.x, a.y - a.z, cell, 222, a.facing);
+    c.restore();
+    if (a.kikorGrip) {
+      const victim = state.players.find(p => p.id === a.kikorGrip.victim);
+      c.fillStyle = '#ff9f92'; c.font = 'bold 14px monospace'; c.textAlign = 'center';
+      c.fillText('TAPOTE J / K / MAJ POUR TE LIBÉRER', clamp(a.x, 220, 1060), a.y - 190);
+      c.fillStyle = '#26131e'; c.fillRect(a.x - 40, a.y - 174, 80, 5); c.fillStyle = '#ffd99c'; c.fillRect(a.x - 40, a.y - 174, 80 * Math.min(1, (victim?.escapePresses || 0) / 6), 5);
+    }
+  }
+  drawKaronux(a, state) {
+    const c = this.ctx, p = a.pattern, sleeping = p?.kind === 'sleep' && p.hit;
+    c.save();
+    if (a.flash > 0) c.filter = 'brightness(1.8)';
+    if (a.hp <= 0) c.globalAlpha = clamp((1.2 - a.deadTime) / .4, 0, 1);
+    if (a.vehicle) {
+      this.arcadeSprite('bossGolf', a.x, a.y, a.hp < a.maxHp * .4 ? 2 : p?.hit ? 1 : 0, 145, a.facing);
+      if (p && !p.hit) {
+        c.strokeStyle = '#ffd489'; c.lineWidth = 3; c.setLineDash([12, 12]); c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(p.targetX, p.targetY); c.stroke();
+      }
+    } else {
+      let cell = Math.floor(state.time * 3) % 2;
+      if (a.action === 'walk') cell = 2 + Math.floor(state.time * 10) % 2;
+      if (p?.charge) cell = p.hit ? 2 + Math.floor(state.time * 14) % 2 : 4;
+      if (p?.kind === 'combo') cell = p.hit ? [5, 6, 7][Math.min(2, Math.floor((p.elapsed - p.windup) / .24))] : 4;
+      if (p?.kind === 'sleep') cell = p.hit ? p.elapsed > p.windup + p.active - .4 ? 11 : 10 : p.elapsed > p.windup * .7 ? 9 : 8;
+      if (p?.healing) cell = p.hit ? 13 : 12;
+      if (a.stun > 0 && !p) cell = 14;
+      if (a.hp <= 0) cell = 15;
+      const exit = state.bossCinema?.kind === 'exit' && state.bossCinema.actor === a.id;
+      if (exit) { c.globalAlpha = clamp(state.bossCinema.elapsed * 2 - .5, 0, 1); cell = state.bossCinema.elapsed < 1.1 ? 11 : 0; }
+      this.arcadeSprite('bossKaronux', a.x, a.y - a.z, cell, 222, a.facing);
+      if (sleeping) { c.fillStyle = '#b4dcff'; c.font = 'bold 22px monospace'; c.textAlign = 'center'; c.fillText('Z z z · ENCHAÎNE !', a.x, a.y - 92); }
+      if (p?.kind === 'sleep' && !p.hit) {
+        c.strokeStyle = '#ffb563'; c.lineWidth = 3; c.beginPath(); c.ellipse(a.x + a.facing * 65, a.y, 145, 145 / 1.45, 0, 0, TAU); c.stroke();
+      }
+      if (a.hp > 0 && !sleeping) {
+        c.fillStyle = '#07111d'; c.fillRect(a.x - 34, a.y - 241, 68, 4);
+        c.fillStyle = '#ffcc7b'; c.fillRect(a.x - 34, a.y - 241, 68 * Math.min(1, (a.guardHits || 0) / 5), 4);
+      }
+    }
+    c.restore();
   }
   atmosphere(time) {
     if (this.reducedMotion) return;
@@ -213,8 +515,45 @@ export class Renderer {
     c.restore();
   }
   drawHazard(h, time) {
+    if (h.kind === 'joArm') return; // The matching arm is rendered from the boss's attack clock.
     const c = this.ctx, warning = h.delay > 0, color = h.enemy || h.both ? '#ff696b' : '#83e6ca';
     c.save();
+    if (h.kind === 'jualosCash') {
+      if (warning) {
+        const t = clamp(1 - h.delay / h.flight, 0, 1);
+        this.classicFX('bossJualosProps', 0, h.fromX + (h.x - h.fromX) * t, h.fromY + (h.y - h.fromY) * t - Math.sin(t * Math.PI) * 100, 40);
+        c.strokeStyle = '#e8e8a87a'; c.lineWidth = 1; c.beginPath(); c.ellipse(h.x, h.y, h.radius, h.radius / 1.45, 0, 0, TAU); c.stroke();
+      } else {
+        c.globalAlpha = clamp(h.ttl / .6, 0, 1); this.classicFX('bossJualosProps', 1, h.x, h.y, 68);
+        c.strokeStyle = '#ddeb8c'; c.lineWidth = 1; c.beginPath(); c.ellipse(h.x, h.y, h.radius, h.radius / 1.45, 0, 0, TAU); c.stroke();
+      }
+      c.restore(); return;
+    }
+    if (['jualosBellyWave', 'jualosBag', 'jualosBagSlam'].includes(h.kind)) {
+      if (h.kind !== 'jualosBag') {
+        c.globalAlpha = warning ? .25 : clamp(h.ttl / .14, 0, 1); c.strokeStyle = h.kind === 'jualosBellyWave' ? '#ffd396' : '#c7eca2'; c.lineWidth = 7;
+        c.beginPath(); c.ellipse(h.x, h.y, h.radius, h.radius / 1.45, 0, 0, TAU); c.stroke();
+        if (h.kind === 'jualosBagSlam' && !warning) this.classicFX('bossJualosProps', 3, h.x, h.y - 30, 210);
+      }
+      c.restore(); return;
+    }
+    if (h.kind === 'lorenzoRing') {
+      if (warning) {
+        const t = clamp(1 - h.delay / h.flight, 0, 1);
+        this.classicFX('bossLorenzoProps', 3, h.fromX + (h.x - h.fromX) * t, h.fromY + (h.y - h.fromY) * t - Math.sin(t * Math.PI) * 85, 36, h.facing);
+        c.strokeStyle = '#ffce84'; c.lineWidth = 2; c.beginPath(); c.ellipse(h.x, h.y, 20, 14, 0, 0, TAU); c.stroke();
+      } else {
+        const r = h.radius, count = Math.max(12, Math.min(150, Math.ceil(TAU * r / 28)));
+        c.globalAlpha = clamp(h.ttl / .25, 0, 1);
+        c.strokeStyle = '#ff793ea8'; c.lineWidth = h.thickness * 2; c.beginPath(); c.ellipse(h.x, h.y, r, r / 1.45, 0, 0, TAU); c.stroke();
+        c.strokeStyle = '#ffe6a4'; c.lineWidth = 3; c.stroke();
+        for (let i = 0; i < count; i++) {
+          const angle = i / count * TAU, x = h.x + Math.cos(angle) * r, y = h.y + Math.sin(angle) * r / 1.45;
+          this.classicFX('bossLorenzoProps', 4 + (Math.floor(time * 9) + i) % 2, x, y - 13, 26);
+        }
+      }
+      c.restore(); return;
+    }
     // Ground warnings are reserved exclusively for explosive barrels.
     if (h.kind === 'barrelBlast') {
       c.strokeStyle = color; c.lineWidth = 2; c.globalAlpha = warning ? .22 : .28;
@@ -303,18 +642,30 @@ export class Renderer {
     c.restore();
   }
   actor(a, state, slot, age) {
+    if (a.joPallet) { this.drawJoPallet(a, state); return; }
     const c = this.ctx, dead = a.hp <= 0, t = a.actionTime + (state.paused ? 0 : age);
     const color = a.enemy ? '#ec6569' : a.id === 1 ? '#ffbf66' : '#91c6ff';
-    if (a.boss && a.pattern) {
+    if (a.boss && a.pattern && !(a.pattern.kind === 'yanuHowl' && a.pattern.hit)) {
       const p = a.pattern;
-      c.fillStyle = p.healing ? '#a3ecc6' : '#ffab95'; c.font = 'bold 12px monospace'; c.textAlign = 'center'; c.fillText((PATTERN_LABELS[p.kind] || '').toUpperCase(), clamp(a.x, 180, 1100), a.y - 228 - (a.z || 0));
+      c.fillStyle = p.healing ? '#a3ecc6' : '#ffab95'; c.font = 'bold 12px monospace'; c.textAlign = 'center'; c.fillText((p.kind === 'sleep' && p.hit ? 'IL DORT · +25 % DE DÉGÂTS' : PATTERN_LABELS[p.kind] || '').toUpperCase(), clamp(a.x, 180, 1100), a.y - 264 - (a.z || 0));
     }
-    if (a.recovering > 0 && !dead) { c.fillStyle = '#b9f2ce'; c.font = 'bold 13px monospace'; c.textAlign = 'center'; c.fillText('VULNÉRABLE', a.x, a.y - (ELITES[a.kind]?.height || 176) - 52 - (a.z || 0)); }
+    if (a.recovering > 0 && !dead && !a.shielded && !(a.sofa && !a.sofaBroken)) { c.fillStyle = '#b9f2ce'; c.font = 'bold 13px monospace'; c.textAlign = 'center'; c.fillText('VULNÉRABLE', a.x, a.y - (ELITES[a.kind]?.height || 176) - 52 - (a.z || 0)); }
     this.ellipse(a.x + 5, a.y + 3, dead ? 49 : a.boss ? 39 : 28, dead ? 11 : 9, '#02060aa6');
     if (!a.enemy && !dead) {
       c.strokeStyle = color; c.globalAlpha = .65; c.lineWidth = 1.6; c.beginPath(); c.ellipse(a.x, a.y + 2, 29, 9, 0, 0, TAU); c.stroke(); c.globalAlpha = 1;
     }
-    if (a.enemy && !dead) this.enemyBar(a);
+    if (a.enemy && !dead && !a.boss) this.enemyBar(a);
+    if (a.boss && a.kind === 'karonux') { this.drawKaronux(a, state); return; }
+    if (a.boss && a.kind === 'kikor') { this.drawKikor(a, state); return; }
+    if (a.boss && a.kind === 'yanu') { this.drawYanu(a, state); return; }
+    if (a.boss && a.kind === 'lorenzo') { this.drawLorenzo(a, state); return; }
+    if (a.boss && a.kind === 'jo') { this.drawJo(a, state); return; }
+    if (a.boss && a.kind === 'jualos') { this.drawJualos(a, state); return; }
+    if (a.jualosSlip && !dead) { this.drawJualosSlip(a); return; }
+    if (a.yanuFrozen && !dead) {
+      c.strokeStyle = '#b9e9ff'; c.lineWidth = 3; c.beginPath(); c.ellipse(a.x, a.y - 72, 44, 84, 0, 0, TAU); c.stroke();
+      c.fillStyle = '#dff4ff'; c.font = 'bold 14px monospace'; c.textAlign = 'center'; c.fillText('FIGÉ !', a.x, a.y - 167);
+    }
     let action = a.action;
     if (a.elite) { this.drawElite(a, state); return; }
     if (a.enemy && STREET_ENEMIES[a.kind]) { this.drawStreetEnemy(a, state); return; }
@@ -338,6 +689,7 @@ export class Renderer {
       return;
     }
     if (a.kind === 'creation') {
+      if (a.kikorCreation && !dead) { c.fillStyle = '#b5ff91'; c.font = 'bold 12px monospace'; c.textAlign = 'center'; c.fillText('PROTECTEUR · DÉTRUIS-MOI !', clamp(a.x, 125, 1150), a.y - 146); }
       if (['wolf','boar'].includes(a.rogueForm)) { c.save();c.globalAlpha=.65;this.bitmap(a.rogueForm==='boar'?'pig':'wolf',a.x,a.y,100,state.time,a.facing,true);c.restore();return; }
       if(a.rogueForm==='copy'&&a.copyKind&&CLASSIC_SPRITES[a.copyKind]){c.save();c.globalAlpha=.6;this.drawClassic({...a,kind:a.copyKind},state);c.restore();return;}
       let cell = a.action === 'walk' ? 1 + Math.floor(state.time * 8) % 2 : 0;
@@ -563,6 +915,32 @@ export class Renderer {
     const g = c.createLinearGradient(1140, 0, W, 0); g.addColorStop(0, '#ffba5800'); g.addColorStop(1, '#ffba5844'); c.fillStyle = g; c.fillRect(1140, 410, 140, 275);
     c.fillStyle = '#ffd180'; c.textAlign = 'center'; c.font = '48px Impact, sans-serif'; c.fillText('→', 1190, 465); c.font = '13px Impact, sans-serif'; c.fillText('ON AVANCE', 1190, 488); c.restore();
   }
+  chapterStory(state) {
+    const story = CHAPTER_INTROS[state.chapter];
+    const c = this.ctx, image = this.assets.get(story.image);
+    const elapsed = INTRO_DURATION - state.phaseTime;
+    c.save();
+    if (image) c.drawImage(image, 0, 0, W, H);
+    const shade = c.createLinearGradient(0, 390, 0, H);
+    shade.addColorStop(0, '#03060b00'); shade.addColorStop(.45, '#03060be8'); shade.addColorStop(1, '#03060b');
+    c.fillStyle = shade; c.fillRect(0, 390, W, H - 390);
+    c.fillStyle = '#03060ba8'; c.fillRect(0, 0, W, 100);
+    c.textAlign = 'left'; c.fillStyle = '#ffbd69'; c.font = 'bold 15px monospace';
+    c.fillText(`CHAPITRE ${String(state.chapter + 1).padStart(2, '0')}`, 56, 34);
+    c.font = '36px Impact, sans-serif'; c.fillStyle = '#fff3d9'; c.fillText(CHAPTERS[state.chapter].name.toUpperCase(), 56, 77);
+    c.font = 'bold 26px monospace';
+    const count = this.reducedMotion ? story.text.length : Math.floor(story.text.length * clamp(elapsed / INTRO_REVEAL, 0, 1));
+    // Wrap the complete text first so partially revealed words never change lines.
+    const lines = []; let line = '';
+    for (const word of story.text.split(' ')) {
+      if (line && c.measureText(line + ' ' + word).width > W - 112) { lines.push(line); line = word; }
+      else line += (line ? ' ' : '') + word;
+    }
+    if (line) lines.push(line);
+    let remaining = count;
+    for (const [i, text] of lines.entries()) { c.fillText(text.slice(0, Math.max(0, remaining)), 56, 548 + i * 39); remaining -= text.length + 1; }
+    c.restore();
+  }
   intro(state) {
     const c = this.ctx, chapter = CHAPTERS[state.chapter];
     c.save();
@@ -651,9 +1029,17 @@ export class Renderer {
     const count = s.enemies.filter(e => e.hp > 0).length;
     $('#objective').textContent = s.phase === 'clear' ? (s.players.length === 2 ? 'Rue dégagée · Tous les deux à droite →' : 'Rue dégagée · Avance à droite →') : s.phase === 'intro' ? 'La nuit ne fait que commencer.' : s.phase === 'rest' ? `On souffle · Renforts dans ${Math.ceil(s.phaseTime)}s` : `VAGUE ${s.wave + 1}/${s.waves.length} · ${count} ennemis${s.spawnQueue.length ? ` + ${s.spawnQueue.length} renforts` : ''} · RUE ${s.stage + 1}/6`;
     if (s.phase === 'surprise') $('#objective').textContent = 'DÉFI BONUS · Réussis pour gagner du score · Échec sans blocage';
+    if (s.practice) $('#objective').textContent = `TEST BOSS${s.practice.invulnerable ? ' · INVULNÉRABLE' : ''} · PAUSE : RELANCER / CHANGER DE BOSS`;
     $('#ping').textContent = online ? `${Math.round(ping)} ms · EN LIGNE` : 'SOLO';
     const boss = s.enemies.find(e => e.boss && e.hp > 0);
-    $('#boss-hud').classList.toggle('hidden', !boss);
-    if (boss) { $('#boss-name').textContent = `${fighter(boss.kind).name} — ${boss.vehicle ? 'DÉTRUIS LA GOLF BLANCHE' : `PHASE ${boss.bossPhase}${boss.pattern ? ' · ' + (PATTERN_LABELS[boss.pattern.kind] || '') : boss.recovering > 0 ? ' · CONTRE-ATTAQUE !' : ''}`}`; $('#boss-health').style.transform = `scaleX(${boss.hp / boss.maxHp})`; }
+    $('#boss-hud').classList.toggle('hidden', !boss || !!s.bossCinema);
+    if (boss) {
+      const sleeping = boss.pattern?.kind === 'sleep' && boss.pattern.hit;
+      const status = boss.sofa && !boss.sofaBroken ? 'CANAPÉ · FRAPPE FORT POUR LE DÉLOGER !' : boss.kikorGrip ? 'PRISE · LIBÈRE-TOI !' : boss.shielded ? 'INVINCIBLE · DÉTRUIS LE BONHOMME VERT' : sleeping ? 'IL DORT · ENCHAÎNE !' : boss.pattern ? PATTERN_LABELS[boss.pattern.kind] || '' : boss.recovering > 0 ? 'CONTRE-ATTAQUE · +25 % DÉGÂTS' : 'ENCHAÎNE POUR BRISER SA GARDE';
+      $('#boss-name').textContent = `${boss.kind === 'jo' ? 'Jo la Mouk' : fighter(boss.kind).name} / ${boss.vehicle ? 'ACTE I · LA GOLF BLANCHE' : `ACTE ${boss.kind === 'karonux' ? boss.bossPhase + 1 : boss.bossPhase} · ${status}`}`;
+      $('#boss-health').style.transform = `scaleX(${boss.hp / boss.maxHp})`;
+      $('#boss-hud').classList.toggle('boss-opening', !boss.shielded && (sleeping || boss.recovering > 0));
+    }
   }
 }
+

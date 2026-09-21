@@ -66,7 +66,7 @@ test('every boss introduces a signature after phase change and leaves a countera
     for (let i = 0; i < 500; i++) { p.hp = p.maxHp; p.invincible = 10; sim.step([blankInput()]); if (boss.pattern?.signature) break; }
     assert.ok(boss.pattern?.signature, boss.kind);
     const pattern = boss.pattern; assert.ok(pattern.windup >= 1);
-    for (let i = 0; i < 180 && boss.pattern; i++) { p.hp = p.maxHp; p.invincible = 10; sim.step([blankInput()], STEP); }
+    for (let i = 0; i < 420 && boss.pattern; i++) { p.hp = p.maxHp; p.invincible = 10; sim.step([blankInput()], STEP); }
     assert.ok(boss.recovering > 1, boss.kind);
     sim.damage(boss, boss.hp + 100, p, true);
     assert.ok(!sim.state.hazards.some(h => h.owner === boss.id));

@@ -1,0 +1,15 @@
+{
+  "tool": "image_gen.imagegen",
+  "date": "2026-09-21",
+  "assets": [
+    {
+      "file": "lorenzo-boss-v2.png",
+      "prompt": "Use case stylized-concept. Production sprite atlas for beat em up BOSS LORENZO, same premium crisp detailed 1990s arcade pixel art as the reference identity. Reference image identity only: bald adult man with dark eyebrows, close black beard/goatee, black leather jacket over red button shirt, dark grey trousers, brown dark shoes. Redraw all poses, imposing athletic build, NOT obese. Standing game height 222px. Exact equal 4 columns by 4 rows with broad transparent gutters and no overlaps. Every sprite fully contained in its cell. Side view facing RIGHT. Consistent body scale and feet baseline across standing poses. Row1: idle guard A; idle guard B; running stride A; running stride B. Row2: punch windup; full punch extended; knee raised; full front kick. Row3: lighting cigarette with lighter; flicking burning cigarette downward with outstretched fingers; calling henchmen with raised arm; angrily roaring fists clenched. Row4: seated reclining man holding cigarette WITHOUT any chair drawn, feet near ground; violently thrown out of chair backward WITHOUT chair; hurt recoil standing; defeated lying on side. Actual transparent alpha background, no backdrop, no text, no grids, no floor shadows. Red shirt and bald head distinctive in all poses.",
+      "reference": "assets/heroes/lorenzo.png"
+    },
+    {
+      "file": "lorenzo-props-v2.png",
+      "prompt": "Use case stylized-concept. Production transparent PNG game sprite atlas for arcade beat em up boss Lorenzo. Premium crisp detailed 1990s pixel art. Exact 3 columns by 2 rows, six independent sprites, each fully contained in its equal cell, very generous transparent gutters, nothing overlaps. Top row SAME burgundy red worn leather two-seat sofa seen slightly from front in beat em up side view, no people: cell1 pristine chunky luxury couch on small wooden feet; cell2 same couch visibly damaged torn cushions and exposed stuffing; cell3 same couch completely broken collapsed wreck, broken wooden frame, scattered cushions contained in cell. Bottom row effects: cell4 isolated lit cigarette tilted downward to right glowing orange tip with small ember trail, full cigarette; cell5 compact orange yellow flame tuft, transparent around it, isolated fire sprite; cell6 second animation frame of same flame tuft, curling differently, same scale. Actual alpha transparent background, no text no grid no backdrop no ground shadow. Sofa must remain burgundy across all three damage states. Flames orange red yellow, sharp pixels."
+    }
+  ]
+}

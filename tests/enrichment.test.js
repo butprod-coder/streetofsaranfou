@@ -9,7 +9,7 @@ const run = (g, seconds, input = blankInput()) => { for (let i = 0; i < seconds 
 function bossArena(chapter, mode = 'normal') {
   const g = new Simulation(['karonux'], chapter, 556, { difficulty: mode });
   g.state.stage = 5; g.enterStreet(); g.state.wave = g.state.waves.length - 2; g.spawnWave();
-  g.state.players[0].invincible = 999; return g;
+  g.state.players[0].invincible = 999; run(g, 3.3); return g;
 }
 test('all 36 streets have varied multi-wave plans, delayed reinforcement and locked exits', () => {
   for (let c = 0; c < 6; c++) for (let street = 0; street < 6; street++) {
@@ -67,7 +67,7 @@ test('chapter talents are shared in duo, independent by fighter and spend only i
 test('every boss has monotonic visible phases, different patterns and recovery windows', () => {
   for (let chapter = 0; chapter < 6; chapter++) {
     const g = bossArena(chapter), boss = g.state.enemies[0], p = g.state.players[0];
-    if (boss.vehicle) { const kills = g.state.kills; g.damage(boss, 999, p, true); assert.equal(boss.vehicle, false); assert.equal(g.state.kills, kills); }
+    if (boss.vehicle) { const kills = g.state.kills; g.damage(boss, 999, p, true); assert.equal(boss.vehicle, false); assert.equal(g.state.kills, kills); run(g, 2.7); }
     boss.cooldown = 0;
     const patterns = new Set(); let openings = 0;
     for (let i = 0; i < 60 * 30; i++) { g.step(); if (boss.pattern) patterns.add(boss.pattern.kind); if (boss.recovering > 0) openings++; }
@@ -76,13 +76,13 @@ test('every boss has monotonic visible phases, different patterns and recovery w
       boss.hp = boss.maxHp * (threshold - .01); g.step(); assert.equal(boss.bossPhase, i + 2, boss.kind);
       boss.hp = boss.maxHp; g.step(); assert.equal(boss.bossPhase, i + 2, 'healing cannot rewind a phase');
     }
-    assert.ok(g.state.enemies.every(e => e.x >= FLOOR.left && e.x <= FLOOR.right && e.y >= FLOOR.top && e.y <= FLOOR.bottom));
+    assert.ok(g.state.enemies.every(e => e.x >= FLOOR.left - (e.joPallet ? 150 : 0) && e.x <= FLOOR.right + (e.joPallet ? 150 : 0) && e.y >= FLOOR.top && e.y <= FLOOR.bottom));
   }
 });
-test('Karonux smoke and Yanu whisky are limited and interruptible', () => {
-  for (const chapter of [0, 2]) {
-    const g = bossArena(chapter), e = g.state.enemies[0]; if (e.vehicle) g.damage(e, 999, g.state.players[0], true);
-    e.hp = e.maxHp * .4; e.bossPhase = 2; e.attackCount = 3; e.cooldown = 0; e.invincible = 0; e.stun = 0; g.step();
+test('Karonux smoke is limited and interruptible', () => {
+  for (const chapter of [0]) {
+    const g = bossArena(chapter), e = g.state.enemies[0]; if (e.vehicle) { g.damage(e, 999, g.state.players[0], true); run(g, 2.7); }
+    e.hp = e.maxHp * .4; e.bossPhase = 2; e.attackCount = chapter === 0 ? 4 : 3; e.cooldown = 0; e.invincible = 0; e.stun = 0; g.step();
     assert.ok(e.pattern?.healing); const hp = e.hp; g.damage(e, 5, g.state.players[0], false);
     assert.equal(e.pattern, null); assert.ok(e.hp < hp); assert.equal(e.healUses, 1);
   }
@@ -101,12 +101,10 @@ test('each playable special is distinct, expires, respects cooldown, and stays i
     run(g, 12); assert.equal(g.state.allies.length, 0);
   }
 });
-test('boss summons are finite, paintings breakable, boss death cleans owned hazards', () => {
+test('Kikor creates one protector, becomes vulnerable on its death, and cleans owned hazards', () => {
   const g = bossArena(1), e = g.state.enemies[0]; e.cooldown = 0; run(g, 4);
-  const easel = g.state.props.find(p => p.kind === 'easel'); assert.ok(easel); assert.ok(g.state.enemies.some(e => e.kind === 'creation'));
-  const p = g.state.players[0]; p.x = easel.x - 50; p.y = easel.y; p.facing = 1;
-  for (let i = 0; i < 2; i++) { g.startAttack(p, 'kick'); g.resolveAttack(p); }
-  assert.equal(easel.hp, 0);
+  const green = g.state.enemies.find(e => e.kikorCreation); assert.ok(green); assert.equal(g.kikorShielded(e), true);
+  const p = g.state.players[0]; g.damage(green, 999, p, true); assert.equal(g.kikorShielded(e), false);
   g.hazard(e, { kind: 'fire', ttl: 5 }); g.damage(e, 9999, p, true);
   assert.equal(g.state.hazards.filter(h => h.owner === e.id).length, 0);
 });
