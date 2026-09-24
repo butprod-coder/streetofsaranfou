@@ -47,6 +47,10 @@ export const combat = {
         if (h.radius >= h.maxRadius) h.ttl = 0;
       }
       h.ttl -= dt; h.x += h.vx * dt; h.y += h.vy * dt;
+      if (h.kind === 'bowlingBall') {
+        const pins = s.hazards.find(p => p.kind === 'bowlingPins' && p.owner === h.owner && p.ttl > 0 && Math.hypot(p.x - h.x, p.y - h.y) < 32);
+        if (pins) { pins.ttl = 0; h.ttl = 0; this.event('impact', { x: pins.x, y: pins.y }); }
+      }
       if (h.x < FLOOR.left - 120 || h.x > FLOOR.right + 120 || h.y < FLOOR.top - 80 || h.y > FLOOR.bottom + 80) h.ttl = 0;
       if(h.kind==='finalChair'){this.updateGustavaxChair(h);if(h.ttl<=0)continue;}
       const source = [...s.players, ...s.enemies].find(a => a.id === h.owner) || h;
@@ -60,6 +64,7 @@ export const combat = {
         const hit = h.shape === 'ring' ? distance >= h.previousRadius - h.thickness && distance <= h.radius + h.thickness : h.shape === 'line' ? dx * h.facing >= -25 && dx * h.facing <= h.width && Math.abs(dy) < h.band : distance < h.radius;
         if (hit) {
           this.damage(target, Math.round(ignition ? h.ignitionDamage || h.damage : h.damage), source, true);
+          if (h.sticky && target.hp > 0 && !target.sticky) target.sticky = { owner: h.owner, remaining: 1.25 };
           if (h.stunDuration && target.hp > 0) target.stun = Math.max(target.stun, h.stunDuration);
           h.hits[target.id] = s.time + h.pulse;
         }

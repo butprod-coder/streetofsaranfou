@@ -292,3 +292,7 @@ Gustavax brise son bureau après la sixième revanche. Son duel comporte 1 800 P
 Depuis l’accueil, taper **GUSTAVAX45** (insensible aux majuscules, moins de cinq secondes entre deux touches). Sur mobile : cinq pressions rapides sur le logo, puis saisir le même code. Le passage reste accessible pendant la session ; « Refermer le passage » ou recharger la page le masque de nouveau.
 
 Choix des sept niveaux, de la rue de départ, du personnage, de la difficulté, de chaque boss et de sa phase. Accès au niveau 7 complet ou au duel seul. Options : invulnérabilité, spécial illimité, niveau 20 et huit points de talents à répartir. Les essais se terminent à la fin du quartier choisi et ne touchent ni sauvegarde de tournée ni records. Retour au menu secret disponible en pause et en fin d’essai.
+
+### Gustavax : combat intense
+
+48 poses supplémentaires réparties sur trois planches synchronisent les coups et transitions. Aucun affichage de zone, trajectoire ou passage sûr avant les attaques. Les poses essoufflées et les longues fenêtres de récupération sont retirées : retour en garde en 0,18 seconde, interruption de 0,45 seconde après un choc. Le fauteuil continue sa course pendant que Gustavax enchaîne. Les phases conservent leurs animations de transition ; les flammes, projectiles, onde de choc et avertissement sonore de charge restent visibles/audibles.

@@ -15,7 +15,7 @@ export function checkpoint(state) {
   if (state?.practice || state?.sandbox) return null;
   if (!state || !['intro', 'rest', 'clear', 'badges'].includes(state.phase) || state.enemies.some(e => e.hp > 0) || !state.players.some(p => p.hp > 0)) return null;
   return validateCheckpoint({ version: 4, runId: state.runId, chapter: state.chapter, stage: state.stage, wave: state.wave, phase: state.phase, route: state.route, finale:state.finale,
-    time: state.time, seed: state.rngSeed, streetSeed: state.streetSeed, streetBag: state.streetBag, enemyOrder: state.enemyOrder, nextId: state.nextEntityId,
+    time: state.time, seed: state.rngSeed, streetSeed: state.streetSeed, streetBag: state.streetBag, enemyOrder: state.enemyOrder, randomOpening: true, nextId: state.nextEntityId,
     difficulty: state.difficulty, score: state.score, kills: state.kills, bestCombo: state.bestCombo, neighborhood: state.neighborhood, estate: state.estate, stadium: state.stadium, bourg: state.bourg, night: state.night, school: state.school,
     players: state.players.map(p => ({ kind: p.kind, profile: p.progression, health: p.hp / p.maxHp, energy: p.energy, lives: p.lives,
       weapon: p.weapon, gymBalls: p.gymBalls, rewards: {}, choices: [], supportRole: p.supportRole, sleepSaveChapter: p.sleepSaveChapter })),
@@ -39,7 +39,7 @@ export function validateCheckpoint(raw) {
   if (!players.some(p => p.health > 0)) throw new Error('Cette sortie est terminée.');
   return { version:4, runId:raw.runId, chapter:raw.chapter, stage:raw.stage, phase:raw.phase, route:cleanRoute(raw.route,raw.chapter,raw.phase), finale:raw.chapter===6?{order:[...raw.finale.order]}:null, wave:integer(raw.wave,4,-1), time:number(raw.time,86400),
     seed:integer(raw.seed,0xffffffff), streetSeed:integer(raw.streetSeed,0xffffffff), streetBag:bag(raw.streetBag), neighborhood:cleanNeighborhood(raw.neighborhood, raw.streetSeed), estate:cleanNeighborhood(raw.estate, raw.streetSeed, 1), stadium:cleanNeighborhood(raw.stadium, raw.streetSeed, 2), bourg:cleanNeighborhood(raw.bourg, raw.streetSeed, 3), night:cleanNeighborhood(raw.night, raw.streetSeed, 4), school:cleanNeighborhood(raw.school, raw.streetSeed, 5),
-    enemyOrder: [...new Set([...bag(raw.enemyOrder), ...ENCOUNTER_ROSTER])].filter(k => !STARTING_ENEMIES.includes(k)), nextId:integer(raw.nextId,1000000,10),
+    randomOpening: true, enemyOrder: [...new Set([...(raw.randomOpening ? [] : STARTING_ENEMIES), ...bag(raw.enemyOrder), ...ENCOUNTER_ROSTER])], nextId:integer(raw.nextId,1000000,10),
     difficulty:['easy','normal','hard'].includes(raw.difficulty)?raw.difficulty:'normal', score:integer(raw.score,10000000), kills:integer(raw.kills,10000),bestCombo:integer(raw.bestCombo,10000), players,
     props:(Array.isArray(raw.props)?raw.props:[]).slice(0,30).filter(p=>Array.isArray(p)).map(p=>[integer(p[0],1000000),number(p[1],10)]),
     pickups:(Array.isArray(raw.pickups)?raw.pickups:[]).slice(0,30).filter(p=>p&&['food','energy','weapon'].includes(p.kind)&& (p.kind!=='weapon'||Object.hasOwn(WEAPONS,p.weapon))).map(p=>({kind:p.kind,amount:p.amount == null ? undefined : number(p.amount,35),weapon:p.kind==='weapon'?p.weapon:undefined,uses:integer(p.uses,24),x:number(p.x,1230,50),y:number(p.y,660,450)})),

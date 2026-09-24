@@ -9,12 +9,12 @@ function arena(kind) {
   const sim = new Simulation(['karonux'], 0, 771);
   Object.assign(sim.state, { phase: 'fight', enemies: [], props: [], spawnQueue: [], waves: [{ kinds: [] }], wave: 0 });
   const enemy = sim.spawnEnemy(kind, { x: 760, y: 540, cooldown: 0, invincible: 0 });
-  const player = sim.state.players[0]; player.x = 520; player.y = 540; player.invincible = 99;
+  const player = sim.state.players[0]; player.x = 550; player.y = 540; player.invincible = 99;
   return { sim, enemy, player };
 }
 
 test('new street rivals have an asset for every animation and stay inside the floor', async () => {
-  for (const [kind] of Object.entries(STREET_ENEMIES)) {
+  for (const [kind, config] of Object.entries(STREET_ENEMIES)) {
     await access(new URL(`../assets/enemies/street/${kind}.png`, import.meta.url));
     const { sim, enemy } = arena(kind), patterns = new Set();
     for (let i = 0; i < 900; i++) { sim.step([blankInput()]); if (enemy.pattern) patterns.add(enemy.pattern.kind); }
@@ -39,7 +39,7 @@ test('street rivals cannot attack after KO or outside combat; heavy hits interru
     enemy.eliteState = { sequence: 0 };
     sim.updateStreetEnemy(enemy, player, .01);
     // Close-distance rivals need a closer target to start their tell.
-    if (!enemy.pattern) { enemy.x = player.x + 110; sim.updateStreetEnemy(enemy, player, .01); }
+    if (!enemy.pattern) { enemy.x = player.x + 70; sim.updateStreetEnemy(enemy, player, .01); }
     assert.ok(enemy.pattern, kind);
     sim.damage(enemy, 1, player, true);
     assert.equal(enemy.pattern, null, `${kind}: heavy hit interrupts preparation`);

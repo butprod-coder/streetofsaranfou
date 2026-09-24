@@ -85,6 +85,7 @@ export const karonuxCombat = {
     e.actionTime = 0; e.vx = e.vy = 0;
   },
   bossComboHit(e, heavy) {
+    if(e.kind==='gustavax'&&e.boss)return;
     if (!e.boss || e.vehicle || this.jualosChanging(e) || this.joChanneling(e) || e.sofa && !e.sofaBroken || e.recovering > 0 || e.pattern?.kind === 'sleep') return;
     e.guardHits = this.state.time - (e.guardLastHit ?? -10) < 1.15 ? (e.guardHits || 0) + (heavy ? 2 : 1) : (heavy ? 2 : 1);
     e.guardLastHit = this.state.time;

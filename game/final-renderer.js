@@ -1,4 +1,4 @@
-import { gustavaxPose, GUSTAVAX_BEATS } from './gustavax-animation.js';
+import { gustavaxPose } from './gustavax-animation.js';
 import { CHAPTERS } from './data.js';
 
 export function drawFinalArena(r,s){
@@ -30,32 +30,10 @@ export function drawFinalArena(r,s){
 
 
 export function drawGustavax(r,a,s){
-  const c=r.ctx,p=a.pattern,pose=gustavaxPose(a);
+  const c=r.ctx,pose=gustavaxPose(a);
   c.save();if(a.flash>0)c.filter='brightness(1.7)';
   if(a.bossPhase===2&&s.finale?.smoke>0){c.shadowColor='#d0deed99';c.shadowBlur=7;}
   r.arcadeSprite(pose.atlas,a.x,a.y-(a.z||0),pose.frame,215,a.facing);c.restore();
-  if(!p)return;
-  c.save();c.strokeStyle='#ffb56b';c.fillStyle='#ff8c4525';c.lineWidth=2;
-  if(p.kind==='lastWord'){
-    for(const [i,mark] of (p.marks||[]).entries())if(p.elapsed<p.windup+GUSTAVAX_BEATS.lastWord[i]){
-      const radius=i===4?125:75;c.beginPath();c.ellipse(mark.x,mark.y,radius,radius/1.45,0,0,Math.PI*2);c.fill();c.stroke();
-      c.fillStyle='#fff0ce';c.textAlign='center';c.font='bold 13px monospace';c.fillText(i===4?'!':String(i+1),mark.x,mark.y+4);c.fillStyle='#ff8c4525';
-    }
-  }else if(!p.hit){
-    if(p.charge||p.kind==='chairRush'){
-      const x=p.kind==='chairRush'?(a.facing>0?1177:103):p.x+p.dx*610,y=p.kind==='chairRush'?p.y:p.y+p.dy*610;
-      c.setLineDash([10,7]);c.lineWidth=4;c.beginPath();c.moveTo(p.x,p.y);c.lineTo(x,y);c.stroke();c.setLineDash([]);
-    }else if(p.kind==='cigarRain'){
-      for(const mark of p.marks||[]){c.beginPath();c.ellipse(mark.x,mark.y,65,45,0,0,Math.PI*2);c.fill();c.stroke();}
-      if(p.safeLane!=null){const x=[160,400,640,880,1120][p.safeLane];c.fillStyle='#84efbb18';c.fillRect(x-75,448,150,198);c.fillStyle='#b6edcd';c.font='bold 11px monospace';c.textAlign='center';c.fillText('PASSAGE LIBRE',x,635);}
-    }else if(p.kind==='deskSlam'){
-      c.beginPath();c.ellipse(a.x+a.facing*70,a.y,100,68,0,0,Math.PI*2);c.stroke();
-    }else{
-      const width=p.kind==='deskSweep'?225:175,band=p.kind==='deskSweep'?48:40;
-      c.fillRect(a.facing>0?a.x:a.x-width,a.y-band,width,band*2);c.strokeRect(a.facing>0?a.x:a.x-width,a.y-band,width,band*2);
-    }
-  }
-  c.restore();
 }
 
 export function drawFinalSmoke(r,s){

@@ -4,7 +4,7 @@ import { ELITE_ORDER } from './elite-data.js';
 export const ENCOUNTER_ROSTER = [...new Set([...Object.keys(ENEMIES), ...ELITE_ORDER])];
 export const STARTING_ENEMIES = ['remy', 'charlingals', 'orelsan'];
 export function createEnemyOrder(random = Math.random) {
-  const order = ENCOUNTER_ROSTER.filter(kind => !STARTING_ENEMIES.includes(kind));
+  const order = [...ENCOUNTER_ROSTER];
   for (let i = order.length - 1; i > 0; i--) {
     const j = Math.min(i, Math.floor(random() * (i + 1)));
     [order[i], order[j]] = [order[j], order[i]];
@@ -12,7 +12,7 @@ export function createEnemyOrder(random = Math.random) {
   return order;
 }
 export function streetEnemyRoster(chapter, stage, order) {
-  return [...STARTING_ENEMIES, ...order.slice(0, chapter * 6 + stage)];
+  return order.slice(0, 3 + chapter * 6 + stage);
 }
 export const activeEnemyLimit = (chapter, players = 1) => Math.min(5, 3 + Math.floor(chapter / 2)) + (players > 1 ? 2 : 0);
 // Serializable shuffle bag spans waves and streets. Each identity has equal frequency.
@@ -30,7 +30,7 @@ export function randomEnemyKinds(chapter, count, random = Math.random, bag = [],
 }
 export function wavePlan(chapter, stage, players = 1, mode = 'normal', random = Math.random, bag = [], order = createEnemyOrder(random)) {
   const roster = streetEnemyRoster(chapter, stage, order);
-  const newcomer = order[chapter * 6 + stage - 1];
+  const newcomer = chapter * 6 + stage > 0 ? order[chapter * 6 + stage + 2] : null;
   // Present the newly unlocked rival immediately, even if the previous bag is not empty.
   if (newcomer) {
     const index = bag.indexOf(newcomer);

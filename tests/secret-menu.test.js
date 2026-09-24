@@ -1,7 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { secretCodeMatcher, createSecretSession } from '../game/secret-menu.js';
+import { secretCodeMatcher, createSecretSession, SECRET_ENEMIES } from '../game/secret-menu.js';
 import { checkpoint, recordRun, finalDuelCheckpoint } from '../game/run-save.js';
+
+test('every enemy can be tested alone, retried and defeated without campaign progression',()=>{
+  for(const [kind] of SECRET_ENEMIES){
+    const sim=createSecretSession({mode:'enemy',enemy:kind,chapter:6,stage:6,character:'jo',invulnerable:true,freeSpecial:true});
+    const s=sim.state;
+    assert.equal(s.phase,'fight');assert.equal(s.chapter,0);assert.equal(s.enemies.length,1);assert.equal(s.enemies[0].kind,kind);assert.ok(!s.enemies[0].boss);
+    assert.deepEqual(s.spawnQueue,[]);assert.deepEqual(s.props,[]);assert.equal(checkpoint(sim.snapshot()),null);
+    s.players[0].energy=0;sim.step();assert.equal(s.players[0].energy,100);
+    const retry=createSecretSession(s.sandbox);assert.equal(retry.state.enemies[0].kind,kind);
+    s.enemies.forEach(e=>e.hp=0);sim.step();assert.equal(s.phase,'won',kind);assert.equal(s.stage,0);
+  }
+  const fallback=createSecretSession({mode:'enemy',enemy:'__proto__'});assert.ok(SECRET_ENEMIES.some(([id])=>id===fallback.state.enemies[0].kind));
+});
 
 test('secret code is case insensitive, tolerates leading keys and expires after a pause',()=>{
   const match=secretCodeMatcher();let opened=false;

@@ -38,10 +38,10 @@ test('Gustavax phases cannot be skipped by one huge hit and phase three has no s
   assert.equal(g.state.enemies.length,1);assert.equal(g.state.spawnQueue.length,0);
 });
 
-test('smoke charge colliding with desk debris creates a long opening and clears the smoke',()=>{
+test('smoke charge colliding with desk debris briefly interrupts the charge and clears the smoke',()=>{
   const g=createBossPractice({chapter:6,phase:2}),b=g.state.enemies[0];b.x=310;b.y=500;g.state.finale.smoke=6;
   b.pattern={kind:'smokeCharge',charge:true,hit:true,elapsed:1,windup:1,active:1,dx:1,dy:0,hits:[]};
-  g.updateGustavax(b,.1);assert.equal(b.pattern,null);assert.ok(b.recovering>=3);assert.equal(g.state.finale.smoke,0);assert.ok(g.state.finale.debris[0].broken);
+  g.updateGustavax(b,.1);assert.equal(b.pattern,null);assert.equal(b.recovering,0);assert.ok(b.cooldown<=.6);assert.equal(g.state.finale.smoke,0);assert.ok(g.state.finale.debris[0].broken);
 });
 
 test('slam shockwave can be jumped and its damage is dealt by authoritative simulation',()=>{

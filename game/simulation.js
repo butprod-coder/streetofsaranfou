@@ -253,7 +253,7 @@ export class Simulation {
     }
     if (s.phase === 'rest') { s.phaseTime -= dt; if (s.phaseTime <= 0) this.spawnWave(); }
     if (s.phase === 'fight' && s.players.some(alive) && !s.enemies.some(alive) && !s.spawnQueue.length) {
-      if (s.practice) { s.phase = 'won'; s.hazards = []; return; }
+      if (s.practice || s.sandbox?.mode === 'enemy') { s.phase = 'won'; s.hazards = []; return; }
       this.finishNeighborhoodWave();
       this.awardXP(120 + this.routeDepth() * 30, 'wave:' + s.chapter + ':' + s.stage + ':' + s.wave);
       s.hazards = s.hazards.filter(h => !h.enemy);
@@ -291,6 +291,12 @@ export class Simulation {
     if (p.yanuFrozen && this.updateYanuFrozen(p, input, dt)) return;
     if (p.jualosSlip && this.updateJualosSlip(p, input, dt)) return;
     this.tickActor(p, dt);
+    if (p.sticky) {
+      const owner = this.state.enemies.find(e => e.id === p.sticky.owner && e.hp > 0);
+      p.sticky.remaining -= dt;
+      if (!owner || p.hp <= 0 || p.sticky.remaining <= 0) p.sticky = null;
+      else { p.x = clamp(owner.x - owner.facing * 32, FLOOR.left, FLOOR.right); p.y = owner.y; p.vx = p.vy = 0; p.action = 'hurt'; return; }
+    }
     p.seq = input.seq || 0;
     if (p.hp <= 0) {
       p.downTime += dt;

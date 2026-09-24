@@ -13,6 +13,13 @@ try{
  await page.locator('[data-action=secret-play]').click();await screen(null);
  const state=await page.evaluate(()=>window.saranfou.inspect().state);assert.equal(state.chapter,6);assert.equal(state.enemies[0].bossPhase,3);assert.ok(state.sandbox.invulnerable);
  await page.locator('[data-action=pause]').click();await screen('pause');await page.locator('#pause [data-action=secret-menu]').click();await screen('secret-menu');
+ await page.locator('#secret-mode').selectOption('enemy');
+ assert.equal(await page.locator('#secret-enemy-label').isVisible(),true);assert.equal(await page.locator('#secret-chapter-label').isVisible(),false);assert.equal(await page.locator('#secret-phase-label').isVisible(),false);
+ const enemyCount=await page.evaluate(async()=>Object.keys((await import('/game/data.js')).ENEMIES).length);assert.equal(await page.locator('#secret-enemy option').count(),enemyCount);
+ await page.locator('#secret-enemy').selectOption('jo_rose');await page.locator('[data-action=secret-play]').click();await screen(null);
+ const trial=await page.evaluate(()=>window.saranfou.inspect().state);assert.equal(trial.sandbox.mode,'enemy');assert.equal(trial.enemies.length,1);assert.equal(trial.enemies[0].kind,'jo_rose');assert.equal(trial.spawnQueue.length,0);
+ await page.locator('[data-action=pause]').click();await screen('pause');await page.locator('#pause [data-action=secret-menu]').click();await screen('secret-menu');
+ await page.screenshot({path:'test-results/secret-enemy-menu.png'});
  await page.locator('[data-action=secret-lock]').click();await screen('home');assert.equal(await page.locator('.home-buttons [data-action=secret-menu]').isVisible(),false);
  await page.locator('.brand').click({clickCount:5,delay:90});await screen('secret-code');await page.locator('#secret-password').fill('GUSTAVAX45');await page.locator('#secret-code-form button[type=submit]').click();await screen('secret-menu');
  assert.deepEqual(errors,[]);console.log('PASS secret menu: hidden gate, code, phase selection, sandbox, pause return, relock and touch entry');

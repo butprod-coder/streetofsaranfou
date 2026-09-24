@@ -7,6 +7,14 @@ import { HERO_ACTION_SPRITES } from './weapons.js';
 import { STREET_ENEMIES } from './street-enemies-data.js';
 // Keep extended hands, prone bodies and detached FX inside their atlas region.
 const STREET_GUTTERS = {
+  lorenzo_pigeons: { rowCuts: [0, .455, .745, 1], rowColumns: { 2: [0, .275, .5, .75, 1] } },
+  titou_bowling: { rowCuts: [0, .38, .675, 1], rowColumns: { 1: [0, .315, .5, .79, 1], 2: [0, .35, .5, .75, 1] } },
+  yann_fluo: { rowCuts: [0, .35, .675, 1], rowColumns: { 1: [0, .275, .5, .77, 1], 2: [0, .31, .5, .75, 1] } },
+  kikor_velo: { rowCuts: [0, .35, .665, 1] },
+  jo_rose: { rowCuts: [0, .35, .665, 1], rowColumns: { 2: [0, .31, .5, .75, 1] } },
+  karonux_plongeur: { rowCuts: [0, .345, .665, 1], rowColumns: { 1: [0, .275, .5, .76, 1], 2: [0, .31, .5, .75, 1] } },
+  gustavax_diable: { rowCuts: [0, .35, .675, 1], rowColumns: { 2: [0, .28, .5, .75, 1] } },
+  jualos_karaoke: { rowCuts: [0, .36, .685, 1], rowColumns: { 1: [0, .25, .5, .775, 1] } },
   albero: { rowColumns: { 1: [0, .265, .5, .78, 1], 2: [0, .288, .5, .75, 1] } },
   oliver: { rowColumns: { 1: [0, .278, .5, .78, 1] } },
   titou: { rowCuts: [0, 1 / 3, .655, 1], rowColumns: { 1: [0, .25, .5, .785, 1], 2: [0, .25, .5, .78, 1] } },

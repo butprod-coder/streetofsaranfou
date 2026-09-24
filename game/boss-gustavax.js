@@ -6,8 +6,7 @@ export const gustavaxCombat={
   gustavaxOpening(e,kind='normal'){
     const s=this.state;
     e.pattern=null;e.action='idle';e.actionTime=0;e.guardHits=0;e.recoveryKind=kind;
-    e.cooldown=e.recovering=(kind==='lastWord'?3.3:['crash','angry'].includes(kind)?3:1.6)*difficulty(s.difficulty).recovery;
-    this.event('opening',{x:e.x,y:e.y-220,label:kind==='crash'?'SONNÉ · ENCHAÎNE !':kind==='angry'?'IL PERD SON CALME · ENCHAÎNE !':kind==='lastWord'?'À GENOUX · À TOI !':'À TOI !'});
+    e.recovering=0;e.cooldown=(kind==='crash'?.45:.18)*difficulty(s.difficulty).recovery;
   },
   updateGustavax(e,dt){
     const s=this.state,mode=difficulty(s.difficulty);
@@ -44,7 +43,7 @@ export const gustavaxCombat={
     const melee=['executiveCombo','deskSweep','deskSlam'].includes(kind);
     if(melee&&(Math.abs(dx)>140||Math.abs(dy)>35)||kind==='chairRush'&&Math.abs(dy)>30){e.x+=melee?dx/d*230*dt:0;e.y+=dy/d*165*dt;e.action='walk';return;}
     e.attackCount++;e.recoveryKind=null;
-    const windup=(kind==='lastWord'?1.25:kind==='deskSlam'?1.15:.95)*mode.telegraph;
+    const windup=(kind==='lastWord'?.85:kind==='deskSlam'?.8:.65)*mode.telegraph;
     e.pattern={kind,elapsed:0,windup,active:GUSTAVAX_ACTIVE[kind],hit:false,beat:0,charge:kind==='smokeCharge',dx:dx/d,dy:dy/d,hits:[],x:e.x,y:e.y,targetX:target.x,targetY:target.y,facing:e.facing};
     if(kind==='lastWord')e.pattern.marks=Array.from({length:5},(_,i)=>({x:clamp(target.x+(i-2)*140,110,1170),y:target.y}));
     if(kind==='cigarRain'){

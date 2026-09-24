@@ -1,10 +1,12 @@
 import { STREET_ENEMIES, STREET_RULES as R } from './street-enemies-data.js';
+import { updateCostumeEnemy } from './costume-enemies.js';
 import { FLOOR, clamp } from './data.js';
 import { BALANCE, difficulty } from './balance.js';
 
 export const streetEnemies = {
   updateStreetEnemy(e, target, dt) {
     const s = this.state, b = STREET_ENEMIES[e.kind], mode = difficulty(s.difficulty);
+    if (b.costume) return updateCostumeEnemy.call(this, e, target, dt);
     if (e.hp <= 0 || e.stun > 0 || e.grabbedBy || !['fight', 'surprise'].includes(s.phase)) return;
     if (e.pattern) {
       const p = e.pattern;

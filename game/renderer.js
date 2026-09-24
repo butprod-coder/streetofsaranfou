@@ -13,6 +13,7 @@ import { streetDecor } from './scenery.js';
 import { WEAPONS, GRAPPLE } from './weapons.js';
 import { xpForLevel } from './progression.js';
 import { drawNeighborhoodWorld, drawNeighborhoodChoices, drawNeighborhoodPanel, neighborhoodHint } from './neighborhood-renderer.js';
+import { drawCostumeEnemy, drawCostumeHazard } from './costume-renderer.js';
 import { STREET_ENEMIES, STREET_LABELS } from './street-enemies-data.js';
 import { JO_PALLET_LANES } from './boss-jo.js';
 import { CHAPTER_INTROS, hasChapterIntro, INTRO_DURATION, INTRO_REVEAL } from './chapter-intro.js';
@@ -542,6 +543,7 @@ export class Renderer {
     c.restore();
   }
   drawHazard(h, time) {
+    if (h.costumeFX) return drawCostumeHazard.call(this, h, time);
     if (h.kind === 'joArm') return; // The matching arm is rendered from the boss's attack clock.
     const c = this.ctx, warning = h.delay > 0, color = h.enemy || h.both ? '#ff696b' : '#83e6ca';
     c.save();
@@ -846,12 +848,13 @@ export class Renderer {
     if (dead) c.globalAlpha = clamp((1.2 - a.deadTime) / .4, 0, 1);
     else if (a.invincible > .2 && Math.floor(state.time * 14) % 2 === 0) c.globalAlpha = .63;
     if (a.flash > 0) c.filter = 'brightness(2)';
-    this.arcadeSprite(`street_${a.kind}`, a.x, a.y - a.z, cell, config.height, a.facing);
+    if (config.costume) drawCostumeEnemy.call(this, a, state);
+    else this.arcadeSprite(`street_${a.kind}`, a.x, a.y - a.z, cell, config.height, a.facing);
     c.restore();
     if (dead) return;
     const y = a.y - config.height - a.z - 14;
     c.font = 'bold 11px monospace'; c.textAlign = 'center';
-    if (p && !p.hit) { c.fillStyle = '#ffe1a4'; c.fillText(STREET_LABELS[p.kind] || 'ATTENTION !', clamp(a.x, 110, 1170), y - 27); }
+    if (p && !p.hit) { c.fillStyle = '#ffe1a4'; c.fillText(STREET_LABELS[p.kind] || config.tell || 'ATTENTION !', clamp(a.x, 110, 1170), y - 27); }
   }
   drawElite(a, state) {
     const c = this.ctx, config = ELITES[a.kind], q = a.eliteState, p = a.pattern, dead = a.hp <= 0;
@@ -1076,13 +1079,14 @@ export class Renderer {
     if (s.phase === 'surprise') $('#objective').textContent = 'DÉFI BONUS · Réussis pour gagner du score · Échec sans blocage';
     if (s.neighborhoodEncounter) $('#objective').textContent = neighborhoodHint(s);
     if(s.sandbox&&!s.practice)$('#objective').textContent+=' · MENU SECRET'+(s.sandbox.invulnerable?' · INVULNÉRABLE':'');
+    if(s.sandbox?.mode==='enemy')$('#objective').textContent='TEST ENNEMI · '+ENEMIES[s.sandbox.enemy].name+(s.sandbox.invulnerable?' · INVULNÉRABLE':'')+' · PAUSE : MENU SECRET';
     if (s.practice) $('#objective').textContent = `TEST BOSS${s.practice.invulnerable ? ' · INVULNÉRABLE' : ''} · PAUSE : RELANCER / CHANGER DE BOSS`;
     $('#ping').textContent = online ? `${Math.round(ping)} ms · EN LIGNE` : 'SOLO';
     const boss = s.enemies.find(e => e.boss && e.hp > 0);
     $('#boss-hud').classList.toggle('hidden', !boss || !!s.bossCinema);
     if (boss) {
       const sleeping = boss.pattern?.kind === 'sleep' && boss.pattern.hit;
-      const status = boss.sofa && !boss.sofaBroken ? 'CANAPÉ · FRAPPE FORT POUR LE DÉLOGER !' : boss.kikorGrip ? 'PRISE · LIBÈRE-TOI !' : boss.shielded ? 'INVINCIBLE · DÉTRUIS LE BONHOMME VERT' : sleeping ? 'IL DORT · ENCHAÎNE !' : boss.pattern ? PATTERN_LABELS[boss.pattern.kind] || '' : boss.recovering > 0 ? 'CONTRE-ATTAQUE · +25 % DÉGÂTS' : 'ENCHAÎNE POUR BRISER SA GARDE';
+      const status = boss.sofa && !boss.sofaBroken ? 'CANAPÉ · FRAPPE FORT POUR LE DÉLOGER !' : boss.kikorGrip ? 'PRISE · LIBÈRE-TOI !' : boss.shielded ? 'INVINCIBLE · DÉTRUIS LE BONHOMME VERT' : sleeping ? 'IL DORT · ENCHAÎNE !' : boss.pattern ? PATTERN_LABELS[boss.pattern.kind] || '' : boss.recovering > 0 ? 'CONTRE-ATTAQUE · +25 % DÉGÂTS' : boss.kind==='gustavax'?'PRESSION CONSTANTE':'ENCHAÎNE POUR BRISER SA GARDE';
       $('#boss-name').textContent = `${boss.kind === 'jo' ? 'Jo la Mouk' : fighter(boss.kind).name} / ${boss.vehicle ? 'ACTE I · LA GOLF BLANCHE' : `ACTE ${boss.kind === 'karonux' ? boss.bossPhase + 1 : boss.bossPhase} · ${status}`}`;
       $('#boss-health').style.transform = `scaleX(${boss.hp / boss.maxHp})`;
       $('#boss-hud').classList.toggle('boss-opening', !boss.shielded && (sleeping || boss.recovering > 0));

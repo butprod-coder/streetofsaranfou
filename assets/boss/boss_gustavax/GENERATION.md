@@ -12,3 +12,15 @@ Retouche finale :
 Precise game sprite sheet extraction edit. Replace every brown/black backdrop pixel outside the six objects with one solid perfectly flat bright pure magenta #FF00FF, no gradient, no glow, no shadow in backdrop. Preserve all six objects exactly. This is a chroma-key sprite sheet for a game, magenta must touch object outlines everywhere, also between legs and inside open gaps of broken desk. Keep original image dimensions/composition and identities, NO need to change grid. Remove smoke glow, use discrete gray smoke curls. Background MUST be bright pink magenta flat uniform, NOT dark. No captions.
 
 Le résultat possède finalement un vrai canal alpha (924072 pixels complètement transparents), conservé sans détourage supplémentaire. Les colonnes irrégulières sont décrites explicitement dans l’atlas. La planche supplémentaire de débris n’a pas été produite : quota imagegen atteint.
+
+## Animations de combat v2
+
+Trois planches de seize poses générées avec image_gen intégré, sans conversion ni remplacement des sources. Référence : gustavax-final.png, puis les nouvelles planches pour conserver l’identité.
+
+- patron-v2.png : garde, deux marches, préparation, deux poings, préparation et frappe du pied, lancer de cigare, poussée du fauteuil, colère, blessure, fatigue, genou et défaite.
+- fumee-v2.png : garde, marches, préparation de charge, course, impact, collision, allumage/inhalation/exhalation du cigare, braises, veste retirée, blessure et défaite.
+- dernier-mot-v2.png : garde et marches avec pied de bureau, prise de l’arme, deux balayages, levée de l’arme, écrasement, frappe finale et défaite.
+
+Prompts de production : planches 4 × 4 sur alpha transparent ; Gustavax conserve cheveux noirs relevés, lunettes de soleil, chaîne dorée, pantalon et chaussures noirs ; vues vers la droite, corps entiers et échelle constante. Phase 1 : veste noire ouverte, combo revers/poing/coup de pied, lancer du cigare et poussée. Phase 2 : torse nu, course et charge, énorme cigare, braises et transition de veste. Phase 3 : torse nu sans cigare, pied de bureau en bois sombre cerclé de laiton, balayages et coups de masse. Les cellules sont isolées au chargement pour exclure les fragments de sprites voisins.
+
+À la demande du joueur, les poses de fatigue et de récupération à genoux ne sont plus jouées ; les avertissements géométriques au sol sont supprimés. Retour en garde après chaque attaque, 0,18 s de délai, 0,45 s après collision. Les indices visuels sont les mouvements du boss, les projectiles et les effets réels.
