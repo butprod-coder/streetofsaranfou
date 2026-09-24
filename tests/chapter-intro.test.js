@@ -21,7 +21,7 @@ test('opening freezes combat, supports guest advance, and does not repeat on lat
   assert.equal(sim.state.phaseTime, 1.15);
 });
 
-test('opening finishes automatically and respects pause; other chapters keep their short intro', () => {
+test('opening finishes automatically and respects pause; all chapters have an opening', () => {
   const sim = new Simulation(['jo'], 0, 42);
   sim.pause(true); sim.step(); assert.equal(sim.state.phaseTime, INTRO_DURATION);
   sim.pause(false);
@@ -33,7 +33,16 @@ test('opening finishes automatically and respects pause; other chapters keep the
   const yanu = new Simulation(['jo'], 2, 42);
   assert.ok(hasChapterIntro(yanu.state));
   assert.equal(yanu.state.phaseTime, INTRO_DURATION);
-  const next = new Simulation(['jo'], 3, 42);
+  const lorenzo = new Simulation(['jo'], 3, 42);
+  assert.ok(hasChapterIntro(lorenzo.state));
+  assert.equal(lorenzo.state.phaseTime, INTRO_DURATION);
+  const jo = new Simulation(['jo'], 4, 42);
+  assert.ok(hasChapterIntro(jo.state));
+  assert.equal(jo.state.phaseTime, INTRO_DURATION);
+  const next = new Simulation(['jo'], 5, 42);
+  assert.ok(hasChapterIntro(next.state));
+  assert.equal(next.state.phaseTime, INTRO_DURATION);
+  next.state.stage = 1; next.enterStreet();
   assert.equal(hasChapterIntro(next.state), false);
-  assert.equal(next.state.phaseTime, 2.4);
+  assert.equal(next.state.phaseTime, 1.15);
 });

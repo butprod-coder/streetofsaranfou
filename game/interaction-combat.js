@@ -59,7 +59,7 @@ export const interactionCombat = {
     g.elapsed += dt; p.vx = 0; p.vy = 0; p.moving = false; p.facing = g.facing;
     if (!g.throwing && hasTalent(p, 'À emporter')) { p.x = clamp(p.x + (input.x || 0) * p.speed * .4 * dt, FLOOR.left, FLOOR.right); p.y = clamp(p.y + (input.y || 0) * p.speed * .3 * dt, FLOOR.top, FLOOR.bottom); }
     if (!g.throwing && hasTalent(p, 'Changement de programme') && input.punch && input.y > .35) { pressedGrab = true; g.slam = true; }
-    if (!g.throwing && pressedGrab) { g.throwing = true; g.elapsed = 0; p.actionTime = 0; }
+    if (!g.throwing && pressedGrab) { this.stadiumAction('throw'); g.throwing = true; g.elapsed = 0; p.actionTime = 0; }
     if (!g.throwing && g.elapsed >= GRAPPLE.holdTime + (hasTalent(p, 'Prise ferme') ? 1.2 : 0)) { this.releaseGrab(p); return true; }
     p.action = g.throwing ? 'throw' : 'grab';
     if (!g.released) {
@@ -72,6 +72,7 @@ export const interactionCombat = {
         e.thrown = { owner: p.id, heavy, elapsed: 0, fromX: e.x, toX: heavy || g.slam ? e.x : clamp(p.x - g.facing * GRAPPLE.distance, FLOOR.left, FLOOR.right), y: e.y, fromZ: heavy ? 35 : e.z, hits: [] };
         e.action = 'hurt'; e.stun = GRAPPLE.flight + .4;
         this.rogueOnThrow(p, e);
+        this.schoolAction('throw');
         this.event('throw', { actor: p.id, x: p.x, y: p.y - 110 });
       }
     }
@@ -90,7 +91,7 @@ export const interactionCombat = {
     const owner = this.state.players.find(p => p.id === t.owner) || { id: t.owner, x: t.fromX, facing: Math.sign(t.toX - t.fromX), power: 19 };
     if (!t.heavy && e.z < 85) for (const other of this.state.enemies) {
       if (other.id === e.id || other.hp <= 0 || other.invincible > 0 || t.hits.includes(other.id) || !near(e, other, 62, 40)) continue;
-      t.hits.push(other.id); this.damage(other, Math.round(owner.power), owner, true);
+      t.hits.push(other.id); this.damage(other, Math.round(owner.power), owner, true, true);
     }
     if (progress >= 1) {
       e.thrown = null; e.z = 0; e.vz = 0;
@@ -116,7 +117,7 @@ export const interactionCombat = {
     const targets = this.state.enemies.filter(e => e.hp > 0 && e.invincible <= 0 && e.z < 40 &&
       (e.x - p.x) * p.facing >= -18 && (e.x - p.x) * p.facing <= b.range && Math.abs(e.y - p.y) <= b.band)
       .sort((a, z) => Math.abs(a.x - p.x) - Math.abs(z.x - p.x));
-    for (const target of b.gun && kind !== 'shotgun' ? targets.slice(0, 1) : targets) this.damage(target, Math.round(p.power * b.power * (p.bonuses.weaponPower || 1)), p, true);
+    for (const target of b.gun && kind !== 'shotgun' ? targets.slice(0, 1) : targets) this.damage(target, Math.round(p.power * b.power * (p.bonuses.weaponPower || 1)), p, true, true);
     for (const prop of this.state.props) if (prop.hp > 0 && !(prop.kind === 'easel' && !prop.enemy) &&
       (prop.x - p.x) * p.facing >= -18 && (prop.x - p.x) * p.facing <= b.range && Math.abs(prop.y - p.y) <= b.band) this.hitProp(prop, kind === 'bat' ? 3 : 2, p);
     if (b.gun) {

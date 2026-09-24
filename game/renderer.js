@@ -1,12 +1,18 @@
+import { drawFinalArena, drawGustavax, drawFinalSmoke } from './final-renderer.js';
+import { routeDepth } from './campaign-route.js';
+import { drawNightDarkness } from './late-renderer.js';
+import { drawBourgTable } from './bourg-renderer.js';
 import { W, H, FLOOR, CHAPTERS, fighter, ENEMIES, clamp } from './data.js';
 import { VISUALS, PATTERN_LABELS, TRANSFORM_ROWS } from './visuals.js';
 import { BALANCE } from './balance.js';
+import { golfBodies } from './golf.js';
 import { ELITES, ELITE_LABELS } from './elite-data.js';
 import { CLASSIC_SPRITES } from './classic-sprites.js';
 import { ENCORE_ELITES, ENCORE_RULES } from './elite-encore-data.js';
 import { streetDecor } from './scenery.js';
 import { WEAPONS, GRAPPLE } from './weapons.js';
 import { xpForLevel } from './progression.js';
+import { drawNeighborhoodWorld, drawNeighborhoodChoices, drawNeighborhoodPanel, neighborhoodHint } from './neighborhood-renderer.js';
 import { STREET_ENEMIES, STREET_LABELS } from './street-enemies-data.js';
 import { JO_PALLET_LANES } from './boss-jo.js';
 import { CHAPTER_INTROS, hasChapterIntro, INTRO_DURATION, INTRO_REVEAL } from './chapter-intro.js';
@@ -55,6 +61,7 @@ export class Renderer {
       if (e.type === 'dodge') this.effects.push({ ...e, type: 'dash', ttl: .32, life: .32 });
       if (e.type === 'skid') { this.shake = Math.max(this.shake, 3); this.effects.push({ ...e, type: 'dash', ttl: .45, life: .45 }); }
       if (e.type === 'golf') this.audio.effect({ ...e, type: 'skid' });
+      if(e.type==='gustavaxCrash'){this.shake=Math.max(this.shake,6);for(let i=0;i<9;i++)this.effects.push({type:'spark',x:e.x,y:e.y,vx:(Math.random()-.5)*240,vy:-Math.random()*170,ttl:.5,life:.5,color:'#c8a16a'});}
       if (e.type === 'explosion') { this.shake = 7; this.effects.push({ ...e, type: 'special', label: 'BOUM !', ttl: .5, life: .5 }); }
       if (e.type === 'pickup') this.effects.push({ type: 'number', x: e.x, y: e.y, text: e.kind === 'food' ? `+${e.amount ?? BALANCE.scenery.food} PV` : `+${e.amount ?? BALANCE.scenery.energy} ÉNERGIE`, color: '#98efc9', ttl: .9, life: .9 });
       if (e.type === 'equip') this.effects.push({ type: 'number', x: e.x, y: e.y, text: e.label.toUpperCase(), color: '#a5dbff', ttl: 1.1, life: 1.1 });
@@ -71,7 +78,7 @@ export class Renderer {
       if (e.type === 'elite') this.effects.push({ type: 'announcement', text: `ÉLITE · ${e.label.toUpperCase()}`, color: '#d6b4ff', ttl: 1.5, life: 1.5 });
       if (e.type === 'taunt') this.effects.push({ type: 'number', x: e.x, y: e.y, text: e.label, color: '#ffe5a7', ttl: 1.7, life: 1.7 });
       if (e.type === 'spectacle') { this.shake = Math.max(this.shake, 5); this.effects.push({ ...e, type: 'atlasFX', ttl: .5, life: .5 }); }
-      if (['wave', 'breather'].includes(e.type) || e.type === 'surprise' && state.phase !== 'surprise') this.effects.push({ type: 'announcement', text: e.label, color: e.type === 'surprise' ? '#94efdb' : '#ffdb91', ttl: 1.8, life: 1.8 });
+      if (!e.neighborhood && (['wave', 'breather'].includes(e.type) || e.type === 'surprise' && state.phase !== 'surprise')) this.effects.push({ type: 'announcement', text: e.label, color: e.type === 'surprise' ? '#94efdb' : '#ffdb91', ttl: 1.8, life: 1.8 });
       if (['heal', 'opening'].includes(e.type)) this.effects.push({ type: 'number', x: e.x, y: e.y, text: e.type === 'heal' ? `+${e.amount} PV` : e.label, color: '#9feecb', ttl: 1.1, life: 1.1 });
       if (e.type === 'talent' && !this.effects.some(f => f.type === 'announcement' && f.text === e.label && f.ttl > 0)) this.effects.push({ type: 'announcement', text: e.label, color: '#ffe084', ttl: 4, life: 4 });
     }
@@ -92,12 +99,14 @@ export class Renderer {
     const background = this.assets.get(CHAPTERS[state.chapter].backgrounds[state.stage]);
     if (background) {
       const scale = Math.max(W / background.width, H / background.height);
-      c.drawImage(background, (W - background.width * scale) / 2, (H - background.height * scale) / 2, background.width * scale, background.height * scale);
+      if(state.chapter===6)c.drawImage(background,0,0,W,H);
+      else c.drawImage(background, (W - background.width * scale) / 2, (H - background.height * scale) / 2, background.width * scale, background.height * scale);
     }
     const tint = c.createLinearGradient(0, 0, 0, H); tint.addColorStop(0, '#09142c05'); tint.addColorStop(.6, '#10274605'); tint.addColorStop(1, '#08101e5c');
     c.fillStyle = tint; c.fillRect(0, 0, W, H);
     this.atmosphere(state.time);
-    this.livingScenery(state);
+    if(state.chapter!==6)this.livingScenery(state);
+    drawFinalArena(this,state);
     this.drawRogueWorld(state);
     if (state.bossCinema?.kind === 'exit') {
       const shot = state.bossCinema;
@@ -105,10 +114,12 @@ export class Renderer {
       for (let i = 0; i < 5; i++) this.ellipse(shot.x + 120 + Math.sin(i + state.time) * 18, shot.y - 75 - (shot.elapsed * 60 + i * 24) % 170, 20 + i * 5, 14 + i * 3, '#9bafbd55');
     }
     this.drawJoTraffic(state);
-    for (const h of state.hazards || []) this.drawHazard(h, state.time);
+    drawNightDarkness(this, state);
+    for (const h of state.hazards || []) {this.drawHazard(h,state.time);if(h.kind==='finalChair')this.arcadeSprite('bossGustavax',h.x,h.y,2,135,h.facing);}
     if (state.phase === 'clear') this.exit(state);
+    drawNeighborhoodWorld(this, state);
     for (const p of state.props.filter(p => p.hp <= 0 && p.rubble > 0)) this.prop(p);
-    const entities = [...(state.decor ?? this.decor), ...state.props.filter(p => p.hp > 0).map(p => ({ ...p, prop: true })), ...state.pickups.map(p => ({ ...p, pickup: true })), ...state.enemies, ...state.players, ...(state.allies || [])].sort((a, b) => a.y - b.y || Number(a.enemy) - Number(b.enemy));
+    const entities = [...state.props.filter(p => p.hp > 0).map(p => ({ ...p, prop: true })), ...state.pickups.map(p => ({ ...p, pickup: true })), ...state.enemies, ...state.players, ...(state.allies || [])].sort((a, b) => a.y - b.y || Number(a.enemy) - Number(b.enemy));
     for (const entity of entities) {
       if (entity.scenery) this.scenery(entity);
       else if (entity.prop) this.prop(entity);
@@ -116,7 +127,7 @@ export class Renderer {
       else {
         let targetX = entity.x, targetY = entity.y;
         if (online && entity.id === slot + 1 && entity.action !== 'dodge' && !entity.specialState && !entity.caughtBy && !entity.yanuFrozen && !entity.jualosSlip && !state.paused && ['fight', 'surprise', 'rest', 'clear'].includes(state.phase) && entity.hp > 0 && entity.stun <= 0) {
-          const factor = entity.attack ? .32 : 1, norm = Math.max(1, Math.hypot(input.x || 0, input.y || 0));
+          const factor = (entity.attack ? .32 : 1) * (state.chapter === 2 && state.stadium?.boostStage === state.stage ? 1.15 : 1), norm = Math.max(1, Math.hypot(input.x || 0, input.y || 0));
           targetX = clamp(targetX + (input.x || 0) / norm * entity.speed * factor * Math.min(.13, age + ping / 2000), FLOOR.left, FLOOR.right);
           targetY = clamp(targetY + (input.y || 0) / norm * entity.speed * .68 * factor * Math.min(.13, age + ping / 2000), FLOOR.top, FLOOR.bottom);
         }
@@ -125,21 +136,24 @@ export class Renderer {
         previous.x += (targetX - previous.x) * (1 - Math.exp(-dt * rate)); previous.y += (targetY - previous.y) * (1 - Math.exp(-dt * rate));
         this.visual.set(entity.id, previous);
         c.save();
-        if (entity.rogueGiant > 0) { c.translate(previous.x, previous.y); c.scale(1.3, 1.3); c.translate(-previous.x, -previous.y); }
-        if (entity.rogueShield > 0) { c.strokeStyle='#9bdeff';c.lineWidth=3;c.beginPath();c.ellipse(previous.x,previous.y-70,58,85,0,0,TAU);c.stroke(); }
-        if (entity.curse) { c.fillStyle='#d78bff';c.font='bold 22px monospace';c.textAlign='center';c.fillText('✦',previous.x,previous.y-185); }
+        if (entity.rogueGiant > state.time) { c.translate(previous.x, previous.y); c.scale(1.3, 1.3); c.translate(-previous.x, -previous.y); }
+        if (entity.rogueFortress > state.time) { c.strokeStyle='#9bdeff';c.lineWidth=3;c.beginPath();c.ellipse(previous.x,previous.y-70,58,85,0,0,TAU);c.stroke(); }
+        if (entity.rogueSheitan > state.time) { c.fillStyle='#d78bff';c.font='bold 22px monospace';c.textAlign='center';c.fillText('✦',previous.x,previous.y-185); }
         this.actor({ ...entity, x: previous.x, y: previous.y }, state, slot, online ? Math.min(age, .1) : 0);
         c.restore();
       }
     }
+    drawFinalSmoke(this,state);
+    drawNeighborhoodChoices(this, state);
     this.drawEffects(state.paused ? 0 : dt);
     c.fillStyle = this.vignette; c.fillRect(0, 0, W, H);
     if (state.phase === 'surprise') this.surprisePanel(state);
+    drawNeighborhoodPanel(this, state);
     if (state.combo > 1 && state.comboTime > 0) {
       c.save(); c.translate(63, 217); c.rotate(-.06); c.fillStyle = '#ffbe5c'; c.shadowColor = '#060c16'; c.shadowBlur = 6;
       c.font = 'italic 52px Impact, sans-serif'; c.fillText(`${state.combo}`, 0, 0); c.font = '16px Impact, sans-serif'; c.fillText('HITS', 8, 22); c.restore();
     }
-    if (state.phase === 'intro') this.intro(state);
+    if (state.phase === 'intro' && !(state.chapter===6&&state.stage===6)) this.intro(state);
     if (state.bossCinema) this.bossCinema(state);
     if (state.phase === 'transition') { c.fillStyle = `rgba(5,9,16,${clamp(1 - state.phaseTime / .65, 0, 1)})`; c.fillRect(0, 0, W, H); }
     c.restore();
@@ -439,9 +453,22 @@ export class Renderer {
   }
   drawRogueWorld(state) {
     const c = this.ctx;
+    for(const e of state.enemies) {
+      for(const p of state.players) {
+        const stacks=e.roguePaint?.[p.id]?.stacks || 0;
+        for(let i=0;i<3&&stacks;i++)this.ellipse(e.x-12+i*12,e.y-140-(p.id-1)*12,4,4,i<stacks?(p.id===1?'#83ffc4':'#e3a4ff'):'#535766');
+        if(e.id===p.roguePrey||e.id===p.rogueTarget||e.id===p.rogueCochonnet){c.save();c.strokeStyle=p.id===1?'#83ffc4':'#e3a4ff';c.lineWidth=2;c.strokeRect(e.x-17,e.y-165,34,20);c.font='11px monospace';c.fillStyle=c.strokeStyle;c.fillText('J'+p.id,e.x-8,e.y-151);c.restore();}
+        if(e.rogueCurses?.[p.id]>state.time){c.save();c.fillStyle='#c16fff';c.font='bold 22px monospace';c.fillText('×',e.x-7,e.y-128);c.restore();}
+        if(e.rogueBurns?.[p.id])this.ellipse(e.x,e.y-65,8,12,e.rogueBurns[p.id].bleed?'#dc3458':e.rogueBurns[p.id].black?'#a747d9':'#ff9655');
+      }
+    }
+    for(const p of state.players) {
+      if(p.specialState?.convoi&&p.specialState.elapsed>=BALANCE.specials.karonux.golfAt&&p.specialState.elapsed<p.specialState.duration-BALANCE.specials.karonux.exitDuration)for(const body of golfBodies(p).filter(b=>b.lane))this.arcadeSprite('golf',body.x,body.y,Math.floor(state.time*8)%2,100,p.facing);
+      if(['rogueEmpowered','rogueHeadReady','rogueCounter'].some(k=>p[k]>state.time)||p.rogueDouble){c.save();c.fillStyle='#ffe092';c.font='bold 14px monospace';c.fillText('◆',p.x-7,p.y-165);c.restore();}
+    }
     for (const z of state.rogueZones || []) {
       c.save(); const dark = ['blackfire','hellgate','chains'].includes(z.kind);
-      c.globalAlpha = Math.min(.7, z.ttl); c.strokeStyle=dark?'#ce81ff':z.kind==='canvas'?'#7bf2d7':'#ffcd87';c.lineWidth=2;
+      c.globalAlpha = Math.min(.7, z.ttl); if(z.owner===2)c.filter='hue-rotate(35deg)'; c.strokeStyle=dark?'#ce81ff':z.kind==='canvas'?'#7bf2d7':'#ffcd87';c.lineWidth=2;
       this.ellipse(z.x,z.y,z.radius,z.radius*.3,dark?'#591c6055':z.kind==='oil'?'#141a25aa':'#8869ad30');
       if (['fire','blackfire'].includes(z.kind)) { if(dark)c.filter='hue-rotate(225deg)';this.fireSprite(Math.floor(state.time*8)%4,z.x,z.y+15,z.radius); }
       else if (z.kind==='car') this.arcadeSprite('golf',z.x,z.y,Math.floor(state.time*8)%2,90);
@@ -449,7 +476,7 @@ export class Renderer {
       else { c.beginPath();c.ellipse(z.x,z.y,z.radius,z.radius*.3,0,0,TAU);c.stroke();for(let i=0;i<4;i++){const a=state.time*2+i*TAU/4;this.ellipse(z.x+Math.cos(a)*z.radius*.7,z.y+Math.sin(a)*z.radius*.2,5,3,c.strokeStyle);} }
       c.restore();
     }
-    for(const b of state.rogueBalls||[]){this.ellipse(b.x,b.y,16,6,'#0007');this.ellipse(b.x,b.y-16,b.fire?20:12,b.fire?20:12,b.fire?'#ff9c56':'#dce4ef');}
+    for(const b of state.rogueBalls||[]){this.ellipse(b.x,b.y,16,6,'#0007');this.ellipse(b.x,b.y-16,b.big?23:12,b.big?23:12,b.fire?'#ff9c56':'#dce4ef');}
     for(const p of state.players)if(p.roguePortalTime>0)for(const portal of p.roguePortals||[]){c.save();c.strokeStyle='#a98cff';c.lineWidth=5;c.beginPath();c.ellipse(portal.x,portal.y-65,40,70,0,0,TAU);c.stroke();c.font='12px monospace';c.textAlign='center';c.fillStyle='#d8c9ff';c.fillText('F · TRAVERSER',portal.x,portal.y+22);c.restore();}
   }
   ellipse(x, y, rx, ry, color) { const c = this.ctx; c.fillStyle = color; c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, TAU); c.fill(); }
@@ -655,6 +682,7 @@ export class Renderer {
       c.strokeStyle = color; c.globalAlpha = .65; c.lineWidth = 1.6; c.beginPath(); c.ellipse(a.x, a.y + 2, 29, 9, 0, 0, TAU); c.stroke(); c.globalAlpha = 1;
     }
     if (a.enemy && !dead && !a.boss) this.enemyBar(a);
+    if(a.boss&&a.kind==='gustavax'){drawGustavax(this,a,state);return;}
     if (a.boss && a.kind === 'karonux') { this.drawKaronux(a, state); return; }
     if (a.boss && a.kind === 'kikor') { this.drawKikor(a, state); return; }
     if (a.boss && a.kind === 'yanu') { this.drawYanu(a, state); return; }
@@ -673,11 +701,11 @@ export class Renderer {
     if (a.enemy && !a.boss && CLASSIC_SPRITES[a.kind]) { this.drawClassic(a, state); return; }
     if (!dead && a.specialState?.kind === 'karonux') {
       const b = BALANCE.specials.karonux;
-      if (a.rogueDrive > 0 || a.specialState.elapsed >= b.golfAt && a.specialState.elapsed < b.sleepAt) {
-        const braking = Math.abs(a.specialState.elapsed - b.turnAt) < .16 || a.specialState.elapsed > b.sleepAt - .12;
+      if (a.specialState.elapsed >= b.golfAt && a.specialState.elapsed < a.specialState.duration - b.exitDuration) {
+        const braking = !a.specialState.moving || a.specialState.elapsed < (a.specialState.boostUntil || 0);
         this.arcadeSprite('golf', a.x, a.y, braking ? 2 : Math.floor(state.time * 9) % 2, 115, a.facing);
         this.arcadeSprite('dash', a.x - a.facing * 95, a.y, Math.floor(state.time * 10) % 3, 35, a.facing);
-        c.fillStyle = '#ffdb91'; c.font = 'bold 11px monospace'; c.textAlign = 'center'; c.fillText('GOLF BLANCHE !', a.x, a.y - 190);
+        c.fillStyle = '#ffdb91'; c.font = 'bold 11px monospace'; c.textAlign = 'center'; c.fillText('GOLF · DIRECTIONS POUR CONDUIRE', a.x, a.y - 190);
         return;
       }
     }
@@ -714,13 +742,13 @@ export class Renderer {
       if (a.stun > 0) cell = 10;
       if (a.specialState.elapsed < .3) cell = 11;
       c.save();
-      if (a.flash > 0) c.filter = 'brightness(2)';
+      if (a.flash > 0) c.filter = 'brightness(2)'; else if (a.rogueSheitan > state.time) c.filter = 'hue-rotate(255deg) saturate(1.8)';
       this.arcadeSprite('wrestler', a.x, a.y - a.z, cell, 177 * (.94 + (a.y - FLOOR.top) / (FLOOR.bottom - FLOOR.top) * .12), a.facing);
       c.restore(); c.fillStyle = '#9acbff'; c.textAlign = 'center'; c.font = 'bold 11px monospace';
       c.fillText(`J${a.id} · CATCHEUR +30 % · ${Math.max(0, Math.ceil(a.specialState.duration - a.specialState.elapsed))}s`, a.x, a.y + 24);
       return;
     }
-    if (!dead && a.specialState && ['jualos', 'yanu', 'jo'].includes(a.kind)) {
+    if (!dead && a.specialState && !a.specialState.override && ['jualos', 'yanu', 'jo'].includes(a.kind)) {
       this.bitmap(({ jualos: 'pig', yanu: 'wolf', jo: 'tornado' })[a.kind], a.x, a.y, a.kind === 'jualos' ? 112 : 147, state.time, a.facing, true);
       if (a.kind === 'yanu') { c.strokeStyle = '#b8ffee'; c.lineWidth = 4; c.globalAlpha = .5; for (let i = 0; i < 3; i++) { c.beginPath(); c.ellipse(a.x, a.y - 55, 130 + i * 10, 42 + i * 7, -.3, state.time * 5, state.time * 5 + 1.7); c.stroke(); } c.globalAlpha = 1; }
       return;
@@ -877,6 +905,7 @@ export class Renderer {
     this.arcadeSprite(p.key, p.x, p.y, 0, p.height, p.facing || 1);
   }
   prop(p) {
+    if (p.bourgTable) { drawBourgTable(this, p); return; }
     if (p.kind === 'sofa') {
       this.arcadeSprite('canape', p.x, p.y, p.hp > 3 ? 8 : 10, 128);
       if (p.hp > 0) { const c = this.ctx; c.fillStyle = '#ffdf8c'; c.font = 'bold 11px monospace'; c.textAlign = 'center'; c.fillText('E / LB · S’ASSEOIR', p.x, p.y + 18); }
@@ -926,8 +955,8 @@ export class Renderer {
     c.fillStyle = shade; c.fillRect(0, 390, W, H - 390);
     c.fillStyle = '#03060ba8'; c.fillRect(0, 0, W, 100);
     c.textAlign = 'left'; c.fillStyle = '#ffbd69'; c.font = 'bold 15px monospace';
-    c.fillText(`CHAPITRE ${String(state.chapter + 1).padStart(2, '0')}`, 56, 34);
-    c.font = '36px Impact, sans-serif'; c.fillStyle = '#fff3d9'; c.fillText(CHAPTERS[state.chapter].name.toUpperCase(), 56, 77);
+    c.fillText(`CHAPITRE ${String(routeDepth(state) + 1).padStart(2, '0')}`, 56, 34);
+    c.font = '36px Impact, sans-serif'; c.fillStyle = '#fff3d9'; c.fillText((story.title || CHAPTERS[state.chapter].name).toUpperCase(), 56, 77);
     c.font = 'bold 26px monospace';
     const count = this.reducedMotion ? story.text.length : Math.floor(story.text.length * clamp(elapsed / INTRO_REVEAL, 0, 1));
     // Wrap the complete text first so partially revealed words never change lines.
@@ -949,7 +978,7 @@ export class Renderer {
     c.fillStyle = '#070d17d9'; c.fillRect(0, 270, W, state.stage === 0 ? 165 : 112);
     c.fillStyle = chapter.color; c.fillRect(0, 270, 7, state.stage === 0 ? 165 : 112);
     c.textAlign = 'center'; c.fillStyle = chapter.color; c.font = '12px monospace';
-    c.fillText(`CHAPITRE ${String(state.chapter + 1).padStart(2, '0')}  /  RUE ${state.stage + 1} SUR 6`, W / 2, 305);
+    c.fillText(state.chapter===6?`NIVEAU 7 / REVANCHE ${state.stage+1} SUR 6`:`ÉTAPE ${routeDepth(state)+1} / RUE ${state.stage+1} SUR 6`, W / 2, 305);
     c.fillStyle = '#f4f1e8'; c.font = '54px Impact, sans-serif'; c.fillText(state.stage === 5 ? 'LE PATRON DU QUARTIER.' : chapter.name.toUpperCase(), W / 2, 362);
     if (state.stage === 0) { c.fillStyle = '#b1bdce'; c.font = 'italic 16px Segoe UI, sans-serif'; c.fillText(chapter.quote, W / 2, 399); }
     c.restore();
@@ -973,6 +1002,7 @@ export class Renderer {
         }
       }
       if (e.type === 'atlasFX') this.arcadeSprite(e.atlas, e.x, e.y, e.cell, 110 + (1 - e.ttl / e.life) * 30);
+      if (e.type === 'rogueFX' && e.visual === 'arms') { c.save();c.strokeStyle=e.color;c.lineWidth=12*e.ttl/e.life;c.beginPath();c.moveTo(e.x,e.y-65);c.lineTo(e.x+(e.facing||1)*e.radius*.75,e.y-70);c.moveTo(e.x,e.y-60);c.lineTo(e.x-(e.facing||1)*e.radius*.5,e.y-55);c.stroke();c.restore(); }
       if (e.type === 'rogueFX') { const progress=1-e.ttl/e.life;c.strokeStyle=e.color;c.lineWidth=5*(1-progress);c.beginPath();c.ellipse(e.x,e.y-15,Math.max(1,e.radius*(.3+progress*.7)),Math.max(1,e.radius*.3),0,0,TAU);c.stroke();if(e.label){c.font='bold 14px monospace';c.textAlign='center';c.fillStyle=e.color;c.fillText(e.label,clamp(e.x,180,W-180),e.y-180-progress*15);} }
       if (e.type === 'dash' && !this.reducedMotion) this.arcadeSprite('dash', e.x, e.y, Math.min(2, Math.floor((1 - e.ttl / e.life) * 3)), 34, e.facing);
       if (e.type === 'number') { e.y -= 35 * dt; c.font = `bold ${e.text.length > 3 ? 13 : 24}px monospace`; c.textAlign = 'center'; c.fillStyle = e.color; c.strokeStyle = '#07101b'; c.lineWidth = 4; c.strokeText(e.text, e.x, e.y); c.fillText(e.text, e.x, e.y); }
@@ -990,11 +1020,13 @@ export class Renderer {
     this.effects = this.effects.filter(e => e.ttl > 0);
   }
   hud(s, slot, online, ping) {
+    $('#hud').classList.toggle('is-solo', s.players.length === 1);
     const key = s.players.map(p => p.kind).join(',');
     if (key !== this.hudKey) {
       this.hudKey = key;
       for (let i = 0; i < 2; i++) {
         const el = $(`#hud-p${i + 1}`), p = s.players[i];
+        el.classList.toggle('score-only', !p);
         if (!p) { el.innerHTML = '<div class="player-bars solo-score-panel"><div><b>SCORE DE LA BANDE</b></div><strong class="solo-score"></strong></div>'; continue; }
         const f = fighter(p.kind);
         el.style.setProperty('--fighter-color', f.color);
@@ -1012,23 +1044,38 @@ export class Renderer {
       const cost = BALANCE.specials[p.kind].cost;
       el.querySelector('.dodge-caption').textContent = p.dodgeCd > 0 ? `ESQUIVE ${p.dodgeCd.toFixed(1)}s` : 'ESQUIVE ✓';
       el.querySelector('.credits').textContent = `${'◆'.repeat(p.lives) || '◇'} VIE${p.lives > 1 ? 'S' : ''}`;
-      const specialState = p.specialCd > 0 ? `RECHARGE ${Math.ceil(p.specialCd)}s` : p.energy >= cost ? 'SPÉCIAL PRÊT' : `${cost - Math.floor(p.energy)} ÉNERGIE MANQUANTE`;
-      el.querySelector('.energy-bar').classList.toggle('ready', p.specialCd <= 0 && p.energy >= cost);
+      const specialState = p.specialState ? 'SPÉCIAL EN COURS' : p.energy >= cost ? 'SPÉCIAL PRÊT' : `FRAPPE POUR CHARGER · ${Math.floor(p.energy)} %`;
+      el.querySelector('.energy-bar').classList.toggle('ready', !p.specialState && p.energy >= cost);
       const r = p.progression;
       if (!el.querySelector('.special-caption')) el.querySelector('.player-bars').insertAdjacentHTML('beforeend', '<span class="special-caption"></span>');
       el.querySelector('.special-caption').textContent = specialState;
       if (!el.querySelector('.weapon-caption')) el.querySelector('.player-bars').insertAdjacentHTML('beforeend', '<span class="weapon-caption"></span>');
       const weapon = p.weapon && WEAPONS[p.weapon.kind];
       el.querySelector('.weapon-caption').textContent = weapon ? `${weapon.name.toUpperCase()} · ${p.weapon.uses} ${weapon.gun ? 'MUNITIONS' : 'COUPS'} · J / X` : 'CONTACT · PRISE   POING + ARRIÈRE · PROJECTION';
-      if (r) { const progress = r.level === 20 ? 1 : (r.xp - xpForLevel(r.level)) / (xpForLevel(r.level + 1) - xpForLevel(r.level)); el.querySelector('.talent-caption').innerHTML = `<span>NIV. ${r.level}</span><span class="xp-track"><i style="width:${Math.round(progress * 100)}%"></i></span><small>${r.statPoints} CARAC. · ${r.points} TALENT(S) · PAUSE</small>`; }
+      if (r) { const progress = r.level === 20 ? 1 : (r.xp - xpForLevel(r.level)) / (xpForLevel(r.level + 1) - xpForLevel(r.level)); el.querySelector('.talent-caption').innerHTML = `<span>NIV. ${r.level}</span><span class="xp-track"><i style="width:${Math.round(progress * 100)}%"></i></span>${p.rogueDebt != null ? `<span>RIPOSTE ${Math.round(p.rogueDebt / (p.power * 2) * 100)}%</span>` : ''}${p.rogueRhythm != null ? `<span>RYTHME ${p.rogueRhythm}/3</span>` : ''}${p.rogueInstinctGauge != null ? `<span>INSTINCT ${p.rogueInstinctGauge}/3</span>` : ''}`; }
     }
+    const progression = s.players[slot]?.progression;
+    const stats = progression?.statPoints || 0, talents = progression?.points || 0;
+    const notice = $('#upgrade-notice');
+    notice.hidden = stats + talents === 0;
+    for (const [selector, count, label] of [['.upgrade-stats', stats, 'caractéristiques'], ['.upgrade-talents', talents, 'talents']]) {
+      const button = notice.querySelector(selector);
+      button.hidden = count === 0;
+      button.querySelector('.upgrade-count').textContent = count;
+      button.setAttribute('aria-label', `${count} point${count > 1 ? 's' : ''} de ${label} à dépenser. Ouvrir le menu.`);
+    }
+    const announcement = `${stats} point${stats > 1 ? 's' : ''} de caractéristiques et ${talents} point${talents > 1 ? 's' : ''} de talents à dépenser.`;
+    if ($('#upgrade-announcement').textContent !== announcement) $('#upgrade-announcement').textContent = announcement;
     const soloScore = $('.solo-score'); if (soloScore) soloScore.textContent = scoreText(s.score);
-    $('#mission-chapter').textContent = `CHAPITRE ${String(s.chapter + 1).padStart(2, '0')} / 06 · MENACE ${s.chapter + 1}/6${online ? ' · ' + scoreText(s.score) : ''}`;
+    $('#mission-chapter').textContent = s.chapter===6?'NIVEAU 07 · LE DERNIER MOT':`ÉTAPE ${String(routeDepth(s) + 1).padStart(2, '0')} / 06 · MENACE ${routeDepth(s) + 1}/6${online ? ' · ' + scoreText(s.score) : ''}`;
     $('#mission-title').textContent = CHAPTERS[s.chapter].name;
     $('#street-progress').innerHTML = CHAPTERS[s.chapter].backgrounds.map((_, i) => `<i class="${i <= s.stage ? 'done' : ''}"></i>`).join('');
     const count = s.enemies.filter(e => e.hp > 0).length;
     $('#objective').textContent = s.phase === 'clear' ? (s.players.length === 2 ? 'Rue dégagée · Tous les deux à droite →' : 'Rue dégagée · Avance à droite →') : s.phase === 'intro' ? 'La nuit ne fait que commencer.' : s.phase === 'rest' ? `On souffle · Renforts dans ${Math.ceil(s.phaseTime)}s` : `VAGUE ${s.wave + 1}/${s.waves.length} · ${count} ennemis${s.spawnQueue.length ? ` + ${s.spawnQueue.length} renforts` : ''} · RUE ${s.stage + 1}/6`;
+    if(s.chapter===6)$('#objective').textContent=s.stage<6?`REVANCHES ${s.stage}/6 · VAGUE ${Math.max(1,s.wave+1)}/${s.waves.length} · ${count} ennemis`:'GUSTAVAX · TROIS PHASES · POINT DE REPRISE ACTIVÉ';
     if (s.phase === 'surprise') $('#objective').textContent = 'DÉFI BONUS · Réussis pour gagner du score · Échec sans blocage';
+    if (s.neighborhoodEncounter) $('#objective').textContent = neighborhoodHint(s);
+    if(s.sandbox&&!s.practice)$('#objective').textContent+=' · MENU SECRET'+(s.sandbox.invulnerable?' · INVULNÉRABLE':'');
     if (s.practice) $('#objective').textContent = `TEST BOSS${s.practice.invulnerable ? ' · INVULNÉRABLE' : ''} · PAUSE : RELANCER / CHANGER DE BOSS`;
     $('#ping').textContent = online ? `${Math.round(ping)} ms · EN LIGNE` : 'SOLO';
     const boss = s.enemies.find(e => e.boss && e.hp > 0);

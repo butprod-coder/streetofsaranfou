@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { finalDuelCheckpoint } from '../game/run-save.js';
 import { createReadStream } from 'node:fs';
 import { stat, realpath } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -169,14 +170,15 @@ export function createGameServer({ root = ROOT, maxRooms = 100, reconnectMs = 45
       if (msg.type === 'ready' && !room.sim) {
         player.ready = !!msg.value; lobby(room);
         if (room.players.every(p => p?.ws && p.ready)) {
-          room.sim = room.checkpoint ? restoreCheckpoint(room.checkpoint) : new Simulation(room.players.map(p => p.character), room.chapter, Date.now(), { difficulty: room.difficulty, profiles: room.players.map(p => p.profile) });
+          room.sim = room.checkpoint ? restoreCheckpoint(room.checkpoint) : new Simulation(room.players.map(p => p.character), room.chapter, Date.now(), { randomRoute:true, difficulty: room.difficulty, profiles: room.players.map(p => p.profile) });
           room.checkpoint = null;
           room.sim.pause(true, 'loading');
           for (const p of room.players) p.loaded = false;
-          broadcast(room, { type: 'prepare', characters: room.players.map(p => p.character), chapter: room.chapter });
+          broadcast(room, { type: 'prepare', characters: room.players.map(p => p.character), chapter: room.sim.state.chapter });
         }
         return;
       }
+      if(msg.type==='route-ready'&&room.sim){const before=room.sim.state.chapter;room.sim.confirmRoute(ws.slot);if(room.sim.state.chapter!==before){room.sim.pause(true,'loading');for(const p of room.players)p.loaded=false;broadcast(room,{type:'prepare',chapter:room.sim.state.chapter,resume:true});}else broadcast(room,{type:'state',state:room.sim.snapshot()});return;}
       if (msg.type === 'loaded' && room.sim) {
         player.loaded = true;
         if (room.players.every(p => p?.ws && p.loaded)) {
@@ -214,6 +216,8 @@ export function createGameServer({ root = ROOT, maxRooms = 100, reconnectMs = 45
       }
       if (msg.type === 'retry' && room.sim && ['won', 'over'].includes(room.sim.state.phase)) {
         if (ws.slot !== 0) { error(ws, 'L’hôte peut relancer la partie.'); return; }
+        const finalSave=finalDuelCheckpoint(room.sim.snapshot());
+        if(finalSave){room.sim=restoreCheckpoint(finalSave);room.sim.pause(true,'loading');for(const p of room.players)if(p){p.loaded=false;p.input=blankInput();}broadcast(room,{type:'prepare',chapter:6,resume:true});return;}
         room.chapter = room.sim.state.phase === 'won' ? 0 : room.sim.state.chapter;
         for (const member of room.players) if (member) member.profile = normalizeProfile({}, member.character);
         room.sim = null;

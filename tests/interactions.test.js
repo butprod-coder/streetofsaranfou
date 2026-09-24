@@ -74,19 +74,19 @@ test('gun lanes, facing, range and friendlies are respected', () => {
   for (const [x, y] of [[p.x - 90, p.y], [p.x + 90, p.y + 80], [p.x + 750, p.y]]) { e.x = x; e.y = y; g.startWeaponAttack(p); g.resolveWeaponAttack(p); assert.equal(e.hp, hp); }
   e.x = 950; e.y = p.y; g.startWeaponAttack(p); g.resolveWeaponAttack(p); assert.ok(e.hp < hp); assert.equal(other.hp, friendHp);
 });
-test('36 streets have rare breakables; six theme atlases contain twelve unique props each', () => {
+test('36 streets have only occasional food crates and explosive barrels, with no ambient decor', () => {
   const keys = THEME_DECOR.flat().map(d => d.key); assert.equal(new Set(keys).size, 72);
   for (let chapter = 0; chapter < 6; chapter++) {
     const g = new Simulation(['karonux'], chapter, 42); let count = 0, drops = 0;
-    for (let stage = 0; stage < 6; stage++) { g.state.stage = stage; g.enterStreet(); count += g.state.props.length; drops += g.state.props.filter(p => p.drop).length; assert.ok(streetDecor(chapter, stage).length >= 3); }
-    assert.equal(count, 4); assert.equal(drops, 3);
+    for (let stage = 0; stage < 6; stage++) { g.state.stage = stage; g.enterStreet(); count += g.state.props.length; drops += g.state.props.filter(p => p.drop).length; assert.deepEqual(streetDecor(chapter, stage), []); assert.ok(g.state.props.every(p => p.kind === 'crate' && p.drop === 'food' || p.kind === 'barrel' && p.drop === null)); }
+    assert.equal(count, 2); assert.equal(drops, 1);
   }
 });
 test('edited layouts round trip, preserve deliberately empty streets and reject hostile data', () => {
   let value; const storage = { setItem: (k, v) => { value = v; }, getItem: () => value };
   const data = { version: 1, streets: { '0:0': [], '2:4': [{ key: THEME_DECOR[2][6].key, x: 612, y: 559, height: 88, facing: -1 }] } };
   saveLayouts(data, storage); assert.deepEqual(readLayouts(storage).streets['0:0'], []); assert.equal(layoutFor(0, 0, readLayouts(storage)).length, 0);
-  assert.equal(readLayouts(storage).streets['2:4'][0].facing, -1); assert.ok(layoutFor(1, 0, data).length);
+  assert.equal(readLayouts(storage).streets['2:4'][0].facing, -1); assert.equal(layoutFor(1, 0, data).length, 0);
   assert.throws(() => validateLayouts({ version: 1, streets: { '9:9': [] } }));
   assert.throws(() => validateDecor([{ key: '__proto__', x: 0, y: 0, height: 30 }]));
   assert.throws(() => validateDecor([{ key: keysForTest(), x: NaN, y: 0, height: 30 }]));

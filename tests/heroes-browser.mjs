@@ -52,7 +52,7 @@ try {
       const sim = new Simulation([kind], 0, 42); sim.spawnWave(); sim.state.props = []; sim.state.spawnQueue = []; sim.state.enemies = [];
       const p = sim.state.players[0]; p.x = 420; p.y = 550; p.invincible = 999;
       sim.spawnEnemy('remy', { x: 730, y: 550, cooldown: 999, speed: 0, hp: 10000 });
-      if (seconds) sim.activateSpecial(p);
+      if (seconds) { p.energy=100; sim.activateSpecial(p); }
       for (let i = 0; i < seconds * 60; i++) sim.step();
       r.reset(); r.draw(sim.state, .016);
     }, {kind, seconds});

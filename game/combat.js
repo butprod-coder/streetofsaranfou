@@ -3,6 +3,7 @@ import { FLOOR, fighter, clamp } from './data.js';
 import { refreshPlayerStats } from './progression.js';
 import { ENCORE_RULES } from './elite-encore-data.js';
 import { hasTalent } from './rogue-talents.js';
+import { golfCombat } from './golf.js';
 const SIGNATURES = { karonux: 'rainbowStorm', kikor: 'preciousHunt', yanu: 'kayakRush', lorenzo: 'sofaDrop', jo: 'ferretHunt', gustavax: 'finalRing' };
 const live = a => a.hp > 0;
 const distance = (a, b) => Math.hypot(a.x - b.x, (a.y - b.y) * 1.4);
@@ -10,8 +11,12 @@ const nearest = (a, actors) => actors.filter(live).sort((x, y) => distance(a, x)
 
 /** Serializable combat extensions, stepped exclusively by the shared simulation. */
 export const combat = {
+  ...golfCombat,
   endSpecial(p) {
     const wrestling = p.specialState?.kind === 'gustavax';
+    const after = p.specialState?.after;
+    if (after && p.hp > 0) { p[after] = this.state.time + 6; this.rogueFX(p, after === 'rogueDrift' ? 'ROND-POINT DE L’ENFER' : 'DÉMOLITION EXPRESS', 180); }
+    for (const e of this.state?.enemies || []) if (e.rogueCarried?.owner === p.id) { e.rogueCarried = null; e.vx = p.facing * 620; }
     p.specialState = null;
     p.rogueBlood = false;
     if (wrestling) refreshPlayerStats(p, true);
@@ -43,6 +48,7 @@ export const combat = {
       }
       h.ttl -= dt; h.x += h.vx * dt; h.y += h.vy * dt;
       if (h.x < FLOOR.left - 120 || h.x > FLOOR.right + 120 || h.y < FLOOR.top - 80 || h.y > FLOOR.bottom + 80) h.ttl = 0;
+      if(h.kind==='finalChair'){this.updateGustavaxChair(h);if(h.ttl<=0)continue;}
       const source = [...s.players, ...s.enemies].find(a => a.id === h.owner) || h;
       if (h.kind === 'jualosCash') { this.updateJualosCash(h); continue; }
       const intersects = target => { const dx = target.x - h.x, dy = target.y - h.y, extent = target.halfWidth || 0; return h.shape === 'line' ? dx * h.facing >= -25 - extent && dx * h.facing <= h.width + extent && Math.abs(dy) < h.band : Math.hypot(Math.max(0, Math.abs(dx) - extent), dy * 1.45) < h.radius; };
@@ -58,7 +64,7 @@ export const combat = {
           h.hits[target.id] = s.time + h.pulse;
         }
       }
-      if (!h.enemy && h.damage > 0) for (const prop of s.props.filter(p => !(p.kind === 'easel' && !p.enemy))) {
+      if (h.damage > 0) for (const prop of s.props.filter(p => (!h.enemy || p.bourgTable) && !(p.kind === 'easel' && !p.enemy))) {
         const key = `prop${prop.id}`;
         if (prop.hp > 0 && !h.hits[key] && intersects(prop)) { this.hitProp(prop, h.propDamage || 2, source); h.hits[key] = 1; }
       }
@@ -66,8 +72,14 @@ export const combat = {
     s.hazards = s.hazards.filter(h => h.ttl > 0);
     for (const a of s.allies) {
       a.ttl -= dt; a.cooldown -= dt; a.actionTime += dt;
-      const owner = s.players.find(p => p.id === a.owner), target = nearest(a, s.enemies);
+      const owner = s.players.find(p => p.id === a.owner);
+      const target = s.enemies.find(e => e.hp > 0 && e.id === owner?.rogueTarget) || (a.rogueForm === 'wolf' ? s.enemies.find(e => e.hp > 0 && e.rogueBurns?.[owner?.id]) : null) || nearest(a, s.enemies);
       if (!owner || !live(owner)) { a.ttl = 0; continue; }
+      if (a.rogueForm === 'boar' && owner.specialState) {
+        a.x = clamp(owner.x - owner.facing * 35, FLOOR.left, FLOOR.right); a.y = clamp(owner.y + (a.id % 2 ? 65 : -65), FLOOR.top, FLOOR.bottom); a.facing = owner.facing;
+        if (a.cooldown <= 0) { a.cooldown = .65; this.rogueBurst(owner,a.x,a.y,95,.6,'').forEach(e => this.roguePush(owner,e,450)); }
+        continue;
+      }
       a.emerging = Math.max(0, (a.emerging || 0) - dt);
       a.striking = Math.max(0, (a.striking || 0) - dt);
       if (a.emerging > 0) { a.action = 'special'; continue; }
@@ -103,15 +115,15 @@ export const combat = {
   },
   activateSpecial(p) {
     const b = BALANCE.specials[p.kind], bonus = p.bonuses;
+    if (p.hp <= 0 || p.specialState || p.energy < b.cost) return false;
+    this.stadiumAction('special');
+    p.examTargets = [];
     p.energy -= b.cost; p.specialCd = b.cooldown * bonus.cooldown;
     p.specialState = { kind: p.kind, elapsed: 0, duration: b.duration + bonus.duration - bonus.sleepReduction, nextPulse: 0, turn: 0, dx: p.facing, dy: 0, hit: false };
     p.action = 'special'; p.actionTime = 0; p.attack = null; p.cooldown = p.specialState.duration; p.invincible = p.kind === 'karonux' ? 1.2 : .8;
     if (p.kind === 'karonux') {
       p.vx = 0; p.vy = 0; p.z = 0; p.vz = 0;
-      const a = p.specialState, left = FLOOR.left + 110, right = FLOOR.right - 110;
-      a.startX = clamp(p.x, left, right); a.startY = p.y;
-      if ((a.dx > 0 ? right - a.startX : a.startX - left) < b.golfDistance * .6) a.dx *= -1;
-      a.endX = clamp(a.startX + a.dx * b.golfDistance, left, right); a.hits = {}; p.facing = a.dx;
+      Object.assign(p.specialState, { hits: {}, specialHeld: true, specialTap: p.taps?.special || 0, moving: false });
     }
     if (p.kind === 'gustavax') { p.cooldown = .3; refreshPlayerStats(p, true); }
     this.rogueOnSpecial(p);
@@ -119,45 +131,18 @@ export const combat = {
   },
   updateSpecial(p, input, dt) {
     const a = p.specialState, b = BALANCE.specials[p.kind], s = this.state;
-    a.elapsed += dt; if (p.kind !== 'gustavax') p.action = 'special';
+    a.elapsed += dt; if (p.kind !== 'gustavax' && !a.free) p.action = 'special';
+    if (a.override) { if (a.elapsed >= a.duration) { this.endSpecial(p); p.cooldown = 0; } return; }
     const power = p.specialPower, radius = b.radius * p.bonuses.radius;
     const pulse = () => {
       this.hazard(p, { radius, delay: 0, ttl: .08, damage: Math.round(power * b.damage), kind: 'special', pulse: .5 });
       a.nextPulse = a.elapsed + (p.kind === 'yanu' ? .6 : .4);
     };
     if (p.kind === 'karonux') {
-      if (p.rogueDrive > 0) { p.action = 'special'; p.invincible = Math.max(p.invincible, .06); return; }
-      if (a.elapsed >= b.golfAt && a.elapsed < b.sleepAt) {
-        const returning = a.elapsed >= b.turnAt, leg = returning ? 1 : 0, previousX = p.x;
-        const progress = clamp((a.elapsed - (returning ? b.turnAt : b.golfAt)) / (returning ? b.sleepAt - b.turnAt : b.turnAt - b.golfAt), 0, 1);
-        p.x = returning ? a.endX + (a.startX - a.endX) * progress : a.startX + (a.endX - a.startX) * progress;
-        p.y = a.startY; p.facing = returning ? -a.dx : a.dx; p.invincible = Math.max(p.invincible, .06);
-        if (!a.hit) { a.hit = true; this.event('golf', { actor: p.id, x: p.x, y: p.y }); }
-        if (returning && !a.turned) { a.turned = true; this.event('skid', { x: p.x, y: p.y, facing: p.facing }); }
-        // Swept car body: one impact per opponent per pass, never a screen-wide explosion.
-        for (const target of [...s.enemies, ...s.props.filter(q => !(q.kind === 'easel' && !q.enemy))]) {
-          const key = `${leg}:${target.id}`;
-          if (target.hp <= 0 || a.hits[key] || Math.abs(target.y - p.y) > 46 * p.bonuses.radius || target.x < Math.min(previousX, p.x) - radius || target.x > Math.max(previousX, p.x) + radius) continue;
-          const enemy = s.enemies.includes(target);
-          if (enemy && target.invincible > 0) continue;
-          a.hits[key] = true;
-          if (enemy) {
-            this.damage(target, Math.round(power * b.damage), p, true);
-            if (!target.boss && hasTalent(p, 'Pare-chocs aimanté')) { target.x = clamp(p.x + p.facing * 90, FLOOR.left, FLOOR.right); target.vx = returning ? p.facing * 620 : 0; }
-          }
-          else this.hitProp(target, 2, p);
-        }
-      }
-      if (a.elapsed >= b.sleepAt) {
-        if (!a.parked) {
-          a.parked = true; p.x = a.startX; p.y = a.startY;
-          if (p.hp > 0 && p.bonuses.blastHeal) { const amount = Math.min(p.bonuses.blastHeal, p.maxHp - p.hp); p.hp += amount; this.event('heal', { x: p.x, y: p.y - 60, amount }); }
-        }
-        p.action = 'sleep';
-      }
+      this.updateGolf(p, input, dt);
     } else if (p.kind === 'jualos') {
       p.x += a.dx * 510 * p.bonuses.chargeSpeed * dt; p.y += input.y * 190 * dt;
-      if (p.x <= FLOOR.left + 8 || p.x >= FLOOR.right - 8) { a.dx *= -1; p.facing = a.dx; }
+      if (p.x <= FLOOR.left + 8 || p.x >= FLOOR.right - 8) { if (hasTalent(p, 'Défenses croisées')) { a.dx *= -1; p.facing = a.dx; } else a.elapsed = a.duration; }
       if (a.elapsed >= a.nextPulse) pulse();
     } else if (p.kind === 'yanu') {
       p.x += input.x * p.speed * .6 * dt; p.y += input.y * p.speed * .4 * dt;
@@ -196,13 +181,14 @@ export const combat = {
         }
       }
     }
-    if (a.elapsed >= a.duration) { this.endSpecial(p); p.action = 'idle'; }
+    if (a.elapsed >= a.duration) { this.endSpecial(p); p.action = 'idle'; p.cooldown = Math.min(p.cooldown, .15); }
   },
   bossPhase(e) {
     const b = BALANCE.bosses[e.kind];
     return e.vehicle ? 0 : 1 + b.phases.filter(threshold => e.hp / e.maxHp <= threshold).length;
   },
   updateBoss(e, dt) {
+    if(e.kind==='gustavax')return this.updateGustavax(e,dt);
     if (e.kind === 'karonux') return this.updateKaronux(e, dt);
     if (e.kind === 'kikor') return this.updateKikor(e, dt);
     if (e.kind === 'yanu') return this.updateYanu(e, dt);

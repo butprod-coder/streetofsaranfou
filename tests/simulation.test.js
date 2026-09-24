@@ -46,8 +46,8 @@ test('neutralizing a stale network input never replays old special-button presse
   assert.ok(game.state.players[0].energy >= before); assert.equal(game.state.players[0].attack, null);
 });
 test('special consumes energy, grants protection and cannot fire when empty', () => {
-  const game = arena(), p = game.state.players[0];
-  game.step([input({ special: true })]); assert.ok(p.energy >= 50 && p.energy < 51); assert.ok(p.invincible > .5);
+  const game = arena(), p = game.state.players[0];p.energy=100;
+  game.step([input({ special: true })]); assert.equal(p.energy,0); assert.ok(p.invincible > .5);
   p.energy = 0; p.attack = null; p.cooldown = 0;
   game.step([input({ special: true })]); assert.equal(p.attack, null);
 });
@@ -84,7 +84,8 @@ test('cleared streets require both players at the exit; final chapter can be won
   run(game, .7); assert.equal(game.state.stage, 1); assert.equal(game.state.phase, 'intro');
   game.state.chapter = 5; game.state.stage = 5; game.state.phase = 'clear'; game.state.enemies = [];
   for (const p of game.state.players) p.x = 1200;
-  run(game, 1); assert.equal(game.state.phase, 'won');
+  run(game, 1); assert.equal(game.state.chapter,6);assert.equal(game.state.phase,'intro');
+  game.state.stage=6;game.enterStreet();game.state.phase='fight';game.state.wave=0;game.state.enemies=[];game.state.spawnQueue=[];game.step();assert.equal(game.state.phase,'won');
 });
 test('same seed and inputs produce identical solo and server game state', () => {
   const a = new Simulation(['yanu', 'gustavax'], 2, 42), b = new Simulation(['yanu', 'gustavax'], 2, 42);

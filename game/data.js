@@ -7,9 +7,9 @@ export const W = 1280;
 export const H = 720;
 export const FLOOR = { top: 448, bottom: 646, left: 55, right: 1225 };
 export const STEP = 1 / 60;
-export const VERSION = 3;
+export const VERSION = 5;
 export const FIGHTERS = [
-  { id: 'karonux', name: 'Karonux', title: 'Le Fatigué', hp: 140, speed: 255, power: 19, color: '#ffb34d', special: 'Tour de Golf blanche', technique: 'golf', description: 'Il fonce en Golf blanche, puis s’endort au sol.', stats: [4, 3, 4] },
+  { id: 'karonux', name: 'Karonux', title: 'Le Fatigué', hp: 140, speed: 255, power: 19, color: '#ffb34d', special: 'Tour de Golf blanche', technique: 'golf', description: 'Pilote sa Golf blanche avec les directions et reprend le combat là où il s’arrête.', stats: [4, 3, 4] },
   { id: 'jualos', name: 'Jualos', title: 'Le Poporc', hp: 185, speed: 220, power: 24, color: '#f594a9', special: 'Charge Poporc', technique: 'charge', description: 'Une montagne de tendresse. Sauf sur son chemin.', stats: [5, 2, 5] },
   { id: 'yanu', name: 'Yanu', title: 'La Bête', hp: 110, speed: 315, power: 16, color: '#6ee7cf', special: 'Instinct du loup', technique: 'frenzy', description: 'Toujours le premier dans la mêlée. Toujours debout.', stats: [3, 5, 2] },
   { id: 'lorenzo', name: 'Lorenzo', title: 'Crâne de Chmère', hp: 165, speed: 235, power: 22, color: '#ff795c', special: 'Clope infernale', technique: 'fire', description: 'Le crâne lisse, les poings lourds, le sang chaud.', stats: [5, 2, 4] },
@@ -27,6 +27,7 @@ export const CHAPTERS = [
   chapter('Saran by Night', 'Cap Saran', 'level5', 'capsaran', '« Le dernier bus ? Il est déjà passé. »', 'jo', '#b4a3ff'),
   chapter('Collège Montjoie', 'Montjoie', 'level6', 'college_montjoie', '« Une dernière tournée. Pour la bande. »', 'jualos', '#ffe09a'),
 ];
+CHAPTERS.push({name:'Le bureau de Gustavax',short:'Le dernier mot',quote:'« Vous avez fini de jouer ? »',boss:'gustavax',color:'#e8bf73',backgrounds:Array(7).fill('/assets/shared/levels/level7/gustavax-office.png')});
 export const ENEMIES = {
   ...Object.fromEntries(Object.entries(ELITES).map(([id, data]) => [id, { ...data, elite: true }])),
   ...STREET_ENEMIES,

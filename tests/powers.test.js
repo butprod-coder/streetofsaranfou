@@ -15,7 +15,7 @@ test('wrestler grants exactly 30 percent once, preserves health ratio and restor
   const { g, p } = arena('gustavax'); p.hp = 77.5;
   const base = { hp: p.hp, maxHp: p.maxHp, power: p.power, specialPower: p.specialPower, speed: p.speed, defense: p.bonuses.defense };
   for (let i = 0; i < 5; i++) {
-    g.activateSpecial(p);
+    p.energy = 100; g.activateSpecial(p);
     assert.equal(p.maxHp, Math.round(base.maxHp * 1.3)); assert.equal(p.hp / p.maxHp, .5);
     assert.equal(p.power, base.power * 1.3); assert.equal(p.specialPower, base.specialPower * 1.3); assert.equal(p.speed, base.speed * 1.3);
     assert.ok(Math.abs(p.bonuses.defense - .3) < 1e-9);
@@ -25,39 +25,26 @@ test('wrestler grants exactly 30 percent once, preserves health ratio and restor
   }
 });
 test('wrestler damage, death and street changes never leave a permanent buff or resurrect', () => {
-  const { g, p, e } = arena('gustavax'); g.activateSpecial(p); g.damage(p, 20, e, false); assert.equal(p.maxHp - p.hp, 12);
+  const { g, p, e } = arena('gustavax'); p.energy = 100; g.activateSpecial(p); g.damage(p, 20, e, false); assert.equal(p.maxHp - p.hp, 12);
   const ratio = p.hp / p.maxHp; g.enterStreet(); assert.equal(p.maxHp, 155); assert.equal(p.hp / p.maxHp, ratio); assert.equal(p.specialState, null);
-  g.activateSpecial(p); g.damage(p, 9999, e, false); assert.equal(p.hp, 0); assert.equal(p.maxHp, 155); assert.equal(p.power, 21);
+  p.energy = 100; g.activateSpecial(p); g.damage(p, 9999, e, false); assert.equal(p.hp, 0); assert.equal(p.maxHp, 155); assert.equal(p.power, 21);
   g.revivePlayer(p, .5); assert.equal(p.hp, Math.round(155 * .5)); assert.equal(p.specialState, null);
 });
-test('Karonux drives the white Golf once before sleeping, retaining his talent benefits', () => {
-  const { g, p, e } = arena('karonux'); const names = ['Marche arrière sauvage', 'Oreiller de secours', 'Réveil difficile'];
-  applyProfile(p, { xp: xpForLevel(20), completed: [0, 1, 2, 3, 4, 5], talents: TALENTS.karonux.filter(n => names.includes(n.name)).map(n => n.id) }); p.hp = 50;
-  const start = p.x; g.activateSpecial(p); run(g, .2); assert.equal(e.hp, 10000);
-  run(g, .7); assert.ok(e.hp < 10000); assert.ok(p.x > start + 250); assert.equal(p.hp, 50);
-  run(g, .4); assert.equal(p.facing, -1); assert.equal(p.action, 'special');
-  run(g, .6); assert.equal(p.x, start); assert.equal(p.action, 'sleep'); assert.equal(p.hp, 50);
-  const hp = e.hp; run(g, .3); assert.equal(e.hp, hp);
-  assert.equal(g.state.events.filter(e => e.type === 'golf').length, 1); assert.ok(!g.state.events.some(e => e.type === 'thunder'));
-  run(g, 1.5); assert.equal(p.specialState, null);
+test('Golf follows all directions, stops when released and exits at the chosen position', () => {
+  const {g,p,e}=arena('karonux');p.energy=100;g.activateSpecial(p);const start={x:p.x,y:p.y};run(g,.3);assert.equal(p.x,start.x);assert.equal(p.y,start.y);assert.equal(e.hp,10000);
+  run(g,.4,{...blankInput(),x:1});assert.ok(p.x>start.x+150);assert.ok(e.hp<10000);
+  const right=p.x;run(g,.2,{...blankInput(),x:-1});assert.ok(p.x<right-80);assert.equal(p.facing,-1);
+  run(g,.2,{...blankInput(),y:-1});assert.ok(p.y<start.y-35);run(g,.1,{...blankInput(),y:1});assert.ok(p.y>start.y-40);
+  const stop={x:p.x,y:p.y};run(g,3);assert.equal(p.specialState,null);assert.equal(p.x,stop.x);assert.equal(p.y,stop.y);assert.notEqual(p.x,start.x);assert.notEqual(p.action,'sleep');assert.equal(p.energy,0);
 });
-
-test('Golf is bounded near both walls and each opponent can be hit at most once per pass', () => {
-  for (const start of [FLOOR.left, FLOOR.right]) {
-    const { g, p, e } = arena('karonux'); p.x = start; p.facing = start === FLOOR.left ? -1 : 1;
-    e.x = start === FLOOR.left ? 380 : 900;
-    g.activateSpecial(p);
-    const hits = new Set();
-    for (let i = 0; i < 230; i++) {
-      g.step(); assert.ok(p.x >= FLOOR.left && p.x <= FLOOR.right);
-      for (const event of g.state.events) if (event.type === 'hit' && event.actor === e.id) hits.add(event.id);
-    }
-    assert.ok(hits.size >= 1 && hits.size <= 2); assert.equal(p.specialState, null);
-  }
+test('Golf cannot leave the street or hit a boss more than twice per activation',()=>{
+  const {g,p,e}=arena('karonux');e.boss=true;e.kind='karonux';p.energy=100;g.activateSpecial(p);const a=p.specialState;
+  for(let i=0;i<240;i++){g.step([{...blankInput(),x:i%80<40?1:-1,y:i%60<30?1:-1}]);assert.ok(p.x>=FLOOR.left&&p.x<=FLOOR.right);assert.ok(p.y>=FLOOR.top&&p.y<=FLOOR.bottom);}
+  assert.ok(Object.values(a.hits).every(h=>h.count<=2));assert.equal(p.specialState,null);
 });
 
 test('Kikor paints ahead, summons from the easel, holds attack poses and cleans up', () => {
-  const { g, p, e } = arena('kikor'); g.activateSpecial(p); run(g, .3);
+  const { g, p, e } = arena('kikor'); p.energy = 100; g.activateSpecial(p); run(g, .3);
   const easel = g.state.props.find(q => q.kind === 'easel'); assert.ok(easel.x > p.x); assert.equal(g.state.allies.length, 0);
   run(g, .4); const ally = g.state.allies[0]; assert.equal(ally.x, easel.x); assert.ok(ally.emerging > 0);
   e.x = ally.x + 35; e.y = ally.y; run(g, .3); assert.equal(ally.action, 'punch');
@@ -66,7 +53,7 @@ test('Kikor paints ahead, summons from the easel, holds attack poses and cleans 
   run(g, 12); assert.equal(g.state.allies.length, 0); assert.equal(easel.hp, 0);
 });
 test('Jo tornado follows normalized player input, stops when released and remains in bounds', () => {
-  const { g, p } = arena('jo'); g.activateSpecial(p); const x = p.x, y = p.y;
+  const { g, p } = arena('jo'); p.energy = 100; g.activateSpecial(p); const x = p.x, y = p.y;
   run(g, .2); assert.equal(p.x, x); assert.equal(p.y, y);
   run(g, .2, { ...blankInput(), x: 1 }); assert.ok(p.x > x + 50);
   const right = p.x; run(g, .2, { ...blankInput(), x: -1 }); assert.ok(p.x < right - 50);
@@ -74,7 +61,7 @@ test('Jo tornado follows normalized player input, stops when released and remain
   p.x = FLOOR.right - 1; run(g, .2, { ...blankInput(), x: 1, y: -1 }); assert.equal(p.x, FLOOR.right); assert.ok(p.y < y);
 });
 test('Lorenzo throws five distinct delayed blasts, leaves finite fire and never hurts teammates', () => {
-  const { g, p, e } = arena('lorenzo'); g.activateSpecial(p); run(g, .25);
+  const { g, p, e } = arena('lorenzo'); p.energy = 100; g.activateSpecial(p); run(g, .25);
   const fires = g.state.hazards.filter(h => h.kind === 'fire'); assert.equal(fires.length, 5); assert.equal(new Set(fires.map(h => `${h.x}:${h.y}`)).size, 5);
   e.x = fires[0].x; e.y = fires[0].y; p.x = e.x; p.y = e.y; const hp = p.hp;
   run(g, .35); assert.equal(e.hp, 10000); run(g, .25); assert.ok(e.hp < 10000); assert.equal(p.hp, hp);

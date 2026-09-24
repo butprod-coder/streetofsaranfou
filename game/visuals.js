@@ -40,6 +40,15 @@ export const VISUALS = {
   spit: frames('/assets/enemies/triso/triso_special', 3),
 };
 export const ARCADE_SPRITES = {
+  gustavaxPatron:{file:'patron-v2',folder:'boss/boss_gustavax',cols:4,rows:4,height:215,cleanComponents:true,rowCuts:[0,.271,.518,.776,1],cells:{15:[.712,.776,1,1]}},
+  gustavaxSmoke:{file:'fumee-v2',folder:'boss/boss_gustavax',cols:4,rows:4,height:215,cleanComponents:true,rowCuts:[0,.276,.51,.774,1],cells:{15:[.71,.774,1,1]}},
+  gustavaxLast:{file:'dernier-mot-v2',folder:'boss/boss_gustavax',cols:4,rows:4,height:215,cleanComponents:true,rowCuts:[0,.265,.501,.778,1],cells:{5:[.25,.265,.522,.501],8:[0,.47,.25,.778],9:[.25,.485,.5,.778],12:[0,.726,.25,1],15:[.718,.778,1,1]}},
+  bossGustavax:{file:'gustavax-final',folder:'boss/boss_gustavax',cols:4,rows:2,height:210,cells:{0:[0,0,.36,.46],1:[.365,0,.795,.463],2:[.80,0,1,.455],3:[0,.47,.35,1],4:[.36,.49,.66,1],5:[.70,.46,1,1],6:[.38,.23,.505,.405],7:[.7,.27,.792,.431]}},
+  nightBus: { file: 'night-bus', folder: 'shared/scenery', cols: 1, rows: 2, height: 230 },
+  nightCart: { file: 'night-cart', folder: 'shared/scenery', cols: 2, rows: 1, height: 100 },
+  nightElectric: { file: 'night-electric', folder: 'shared/scenery', cols: 2, rows: 1, height: 120 },
+  nightVending: { file: 'night-vending', folder: 'shared/scenery', cols: 2, rows: 1, height: 170 },
+  estateProps: { file: 'estate-events', folder: 'shared/scenery', cols: 3, rows: 2, height: 100 },
   bossJualos: { file: 'jualos-boss-v2', folder: 'boss/boss_jualos', cols: 4, rows: 4, height: 222, rowCuts: [0, .30, .55, .78, 1], rowColumns: { 3: [0, .25, .5, .742, 1] } },
   bossJualosSuit: { file: 'jualos-commercial-v2', folder: 'boss/boss_jualos', cols: 4, rows: 3, height: 222, rowCuts: [0, .35, .64, 1], rowColumns: { 1: [0, .25, .52, .725, 1], 2: [0, .25, .52, .75, 1] } },
   bossJualosProps: { file: 'jualos-props-v2', folder: 'boss/boss_jualos', cols: 2, rows: 2, height: 65, rowCuts: [0, .395, 1], rowColumns: { 0: [0, .51, 1], 1: [0, .54, 1] } },
@@ -75,10 +84,11 @@ export const ARCADE_SPRITES = {
   dash: { file: 'dash', cols: 3, rows: 1, height: 32 },
 };
 export const arcadeUrl = key => `/assets/${ARCADE_SPRITES[key].folder || 'shared/arcade'}/${ARCADE_SPRITES[key].file}.${ARCADE_SPRITES[key].ext || 'png'}`;
-export const EXTRA_ASSETS = ['/assets/intros/chene-maillard.png', '/assets/intros/chateau-etang.png', '/assets/intros/stade-colette-besson.png', ...Object.values(VISUALS).flat(), ...Object.keys(ARCADE_SPRITES).map(arcadeUrl)];
+export const EXTRA_ASSETS = ['/assets/intros/chene-maillard.png', '/assets/intros/chateau-etang.png', '/assets/intros/stade-colette-besson.png', '/assets/intros/allee-guignace.png', '/assets/intros/cap-saran.png', '/assets/intros/montjoie.png', ...Object.values(VISUALS).flat(), ...Object.keys(ARCADE_SPRITES).map(arcadeUrl)];
 // Source atlas is 1254². Runtime rects retain alpha without rewriting the generated image.
 export const TRANSFORM_ROWS = { pig: [40, 330], wolf: [410, 402], tornado: [815, 439] };
 export const PATTERN_LABELS = {
+  executiveCombo:'Le revers du patron · esquive',cigarRain:'Braises · quitte les cercles',chairRush:'Fauteuil lancé · change de ligne',smokeCharge:'Braise rouge · charge imminente',deskSweep:'Deux balayages · recule',deskSlam:'Onde de choc · saute',lastWord:'Dernier avertissement · évite les marques',
   jualosBelly: 'BOUFFI BOUFFON · ÉCARTE-TOI OU SAUTE !', jualosCombo: 'DOUBLE FRAPPE', jualosRush: 'CHARGE DU VENTRE !', jualosSuit: 'ACTE II · LE COMMERCIAL', jualosCash: 'BILLETS GLISSANTS · ATTENTION AU SOL !', jualosBagSwing: 'COUP DE POCHON !', jualosBagSlam: 'IL ÉCRASE SON POCHON · ESQUIVE !',
   joStretch: 'BRAS À RALLONGE · CHANGE DE LIGNE !', joMMA: 'JAB · GENOU · HIGH KICK', joRush: 'GENOU VOLANT · ESQUIVE !', joChannel: 'INVINCIBLE · ÉVITE OU CASSE LES TRANSPALETTES !',
   lorenzoCigarette: 'ANNEAU DE FEU · SAUTE AU PASSAGE !', lorenzoSofa: 'LIVRAISON · PRÉPARE TES COUPS LOURDS !', lorenzoRage: 'IL EST FOU DE RAGE !', lorenzoCombo: 'POING · POING · PIED', lorenzoKick: 'COUP DE PIED',

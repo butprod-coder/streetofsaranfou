@@ -13,7 +13,7 @@ function arena(team = ['yanu']) {
 }
 function bonus(kind, duo = false) {
   const g = arena(duo ? ['yanu', 'jo'] : ['yanu']); g.state.enemies = [];
-  g.state.chapter = kind === 'delivery' ? 1 : 0; g.state.stage = kind === 'ambush' ? 3 : 1;
+  g.state.chapter = kind === 'delivery' ? 5 : 4; g.state.stage = kind === 'ambush' ? 3 : 1;
   assert.ok(g.beginSurprise()); return g;
 }
 test('dodge starts immediately, requires release, consumes no energy, stays in bounds', () => {
@@ -68,7 +68,7 @@ test('bonus success rewards the team once and the next street resets event state
     g.step(); assert.equal(g.state.phase, 'clear'); assert.equal(g.state.surprise.status, 'success');
     g.state.players.forEach((p, i) => assert.equal(p.progression.points, points[i]));
     const score = g.state.score; run(g, 1); assert.equal(g.state.score, score);
-    g.enterStreet(); assert.equal(g.state.surprise, null); assert.equal(g.state.surpriseDone, false);
+    g.state.stage=2; g.enterStreet(); assert.equal(g.state.surprise, null); assert.equal(g.state.surpriseDone, false);
   }
 });
 test('surprise death stays game over, no timeout resurrection; serialized snapshots are complete', () => {

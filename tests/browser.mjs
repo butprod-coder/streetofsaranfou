@@ -24,7 +24,7 @@ try {
   await page.keyboard.down('ArrowRight'); await page.waitForTimeout(450); await page.keyboard.up('ArrowRight');
   let after = await state(page); assert.ok(after.state.players[0].x > before.state.players[0].x + 60, 'Solo movement');
   await page.keyboard.down('KeyL'); await page.waitForTimeout(200); await page.keyboard.up('KeyL');
-  after = await state(page); assert.ok(after.state.players[0].energy < 65, 'Special uses energy');
+  after = await state(page); assert.equal(after.state.players[0].specialState, null, 'Empty energy prevents special activation');assert.equal(after.state.players[0].energy,0);
   await page.keyboard.press('Escape'); await waitScreen(page, 'pause');
   const frozen = (await state(page)).state.tick; await page.waitForTimeout(200); assert.equal((await state(page)).state.tick, frozen, 'Pause freezes game');
   await page.getByRole('button', { name: /Reprendre/ }).click(); await waitScreen(page, null);

@@ -11,7 +11,7 @@ Cette version enrichit le moteur Reborn existant. Le client solo et le serveur c
 ## Esquive et rues interactives
 
 - **Esquive** : Maj gauche/droite au clavier, RB/R1 sur une manette standard, bouton ⇧ tactile. Direction du déplacement ou direction du regard à l'arrêt. Départ dès la première frame, durée 0,26 s, protection 0,22 s, recharge 0,95 s, sans coût en énergie. Une pression doit être relâchée avant la suivante : maintenir ne permet plus d'esquiver en boucle. Une pression dans les dernières 0,14 s de récupération est mémorisée. Une attaque normale peut être annulée, mais pas une transformation spéciale en cours, sauf le catcheur de Gustavax qui conserve ses commandes. Indicateur de recharge sous les barres, silhouettes de traînée et poussière animée.
-- **Caisses** : 3 unités de résistance, sandwich (+35 PV). **Poubelles** : 4 unités, boisson (+40 énergie). **Barils rouges** : 3 unités, sans loot. Il ne reste que quatre objets destructibles ordinaires par chapitre, avec des rues d’événement dégagées ; les soins automatiques entre vagues et les drops ennemis sont fortement réduits. Un poing enlève 1 unité, un pied ou dernier poing de combo 2. Les spéciaux endommagent aussi les objets. Trois états graphiques : intact, endommagé, débris. Chaque objet ne donne son ramassable et ses 50 points qu'une fois.
+- **Caisses** : 3 unités de résistance, sandwich (+35 PV). **Poubelles** : 4 unités, nourriture (+35 PV ; les canettes rendent 25 énergie). **Barils rouges** : 3 unités, sans loot. Il ne reste que quatre objets destructibles ordinaires par chapitre, avec des rues d’événement dégagées ; chaque ennemi vaincu a 10 % de chance de laisser un sandwich (+35 PV) et 10 % une canette (+25 énergie), sans double drop. Un poing enlève 1 unité, un pied ou dernier poing de combo 2. Les spéciaux endommagent aussi les objets. Trois états graphiques : intact, endommagé, débris. Chaque objet ne donne son ramassable et ses 50 points qu'une fois.
 - **Barils rouges** : 3 unités. Après destruction, cercle d’alerte pendant 0,8 s, explosion de rayon 170 et 45 dégâts de base. Elle touche les deux camps ; reculer, sauter ou esquiver permet de l’éviter. Réactions en chaîne possibles, chaque baril conservant son propre avertissement. Les débris disparaissent après 7 s. Les objets n’agissent pas comme des murs : ils ne peuvent coincer un joueur ni bloquer une sortie.
 
 ### Prise et armes
@@ -98,27 +98,27 @@ Chaque boss dispose de sprites, d'une arrivée cinématique et de séquences dé
 
 ## Spéciaux
 
-Les commandes restent **L / B Xbox / ○ PlayStation**. Coût : 50 énergie, plus un cooldown individuel. L’énergie remonte avec le temps, les coups normaux, les objets et les pauses entre vagues. Un bouton maintenu ne contourne jamais le cooldown.
+Les commandes restent **L / B Xbox / ○ PlayStation**. La barre commence vide. Chaque ennemi touché par un coup direct donne 7 énergie, jusqu’à 100. Le spécial exige et consomme la barre pleine. Aucune recharge automatique, sur dégâts reçus, objets, vagues ou quartiers ; aucun délai supplémentaire lorsque la barre est pleine. Les attaques des spéciaux, invocations et dégâts périodiques ne rechargent pas la barre.
 
-- **Karonux — Tour de Golf blanche** : départ à 0,25 s, trajet de 450 pixels maximum, demi-tour à 1,05 s et retour au départ à 1,85 s. Une collision par ennemi et par passage (puissance ×1,9), portée longitudinale 100 et bande verticale 46. Protection pendant le trajet, puis sommeil vulnérable jusqu’à 3,6 s. Recharge 12 s. La direction s’adapte aux bords pour garder la voiture dans la rue. Les talents raccourcissent la sieste et améliorent les impacts sans changer leurs identifiants sauvegardés.
-- **Jualos — Charge Poporc** : transformation en porc, charge pendant 1,45 seconde ; ajustement vertical possible au stick/clavier, rebond aux limites de la rue. Impacts espacés, rayon 115. Recharge 9 secondes.
-- **Yanu — Instinct du loup** : loup-garou pendant 2,1 secondes, quatre balayages de griffes espacés, rayon 180 ; déplacements conservés mais ralentis. Recharge 10 secondes.
-- **Lorenzo — Clope infernale** : cinq mégots en éventail, vols de 0,5 à 0,86 s, explosions distinctes (puissance ×1,05), puis feu pendant 3,6 s (×0,45 toutes les 0,8 s). Pas de dégâts aux coéquipiers. Recharge 10 secondes. Mégots, explosions et flammes utilisent une planche de sprites transparente animée.
-- **Jo — Tourbillon Mouk** : tourbillon pendant 3 secondes, entièrement dirigé au clavier ou au stick ; il s’arrête lorsque la direction est relâchée. Vitesse horizontale 350, verticale 225, diagonales normalisées et limites de rue respectées. Recharge 12 secondes.
-- **Kikor — Toile vivante** : place le chevalet devant son pinceau à 0,18 s, peint, puis invoque le petit bonhomme vert depuis la toile à 0,65 s. Émergence de 0,3 s, allié présent 10 s, animation de frappe maintenue 0,24 s. Une seule création par propriétaire. La toile alliée disparaît avec son propriétaire ou sa création et ne subit pas les coups amis. Recharge 13 s, geste de peinture 1 s.
-- **Gustavax — Le Catcheur** : transformation de 6 secondes en colosse torse nu, short bleu, lunettes et pieds nus. Déplacement, saut, esquive et attaques restent contrôlables. Les poings ont une portée de 145, les pieds deviennent un coup au sol radial de rayon 180. Vie maximale, attaque, vitesse et puissance spéciale gagnent 30 % ; les dégâts reçus diminuent de 30 %, en complément des talents. Le pourcentage de vie est conservé à l’entrée et à la sortie : aucun soin gratuit ni bonus permanent. Préparation initiale 0,3 s, coût 50 énergie, recharge 14 s. Les talents peuvent prolonger la forme de 3 s et renforcer fortement ses coups. Gustavax reste jouable ; Jualos le remplace comme boss final.
+- **Karonux — Tour de Golf blanche** : entrée à 0,25 s, conduite libre avec les directions pendant 3,15 s, sortie de 0,2 s à la position choisie. Relâcher arrête la Golf ; changer de direction permet de tourner ou reculer. Collisions balayées sur les deux axes, deux impacts maximum par cible et par activation, puissance ×1,9. Protection pendant la conduite, sans sieste ni retour forcé. Les talents ajoutent demi-tour accéléré, dérapage latéral, ennemis rassemblés et convoi pilotable.
+- **Jualos — Charge Poporc** : transformation en porc, charge pendant 1,45 seconde ; ajustement vertical possible au stick/clavier, rebond aux limites de la rue. Impacts espacés, rayon 115.
+- **Yanu — Instinct du loup** : loup-garou pendant 2,1 secondes, quatre balayages de griffes espacés, rayon 180 ; déplacements conservés mais ralentis.
+- **Lorenzo — Clope infernale** : cinq mégots en éventail, vols de 0,5 à 0,86 s, explosions distinctes (puissance ×1,05), puis feu pendant 3,6 s (×0,45 toutes les 0,8 s). Pas de dégâts aux coéquipiers. Mégots, explosions et flammes utilisent une planche de sprites transparente animée.
+- **Jo — Tourbillon Mouk** : tourbillon pendant 3 secondes, entièrement dirigé au clavier ou au stick ; il s’arrête lorsque la direction est relâchée. Vitesse horizontale 350, verticale 225, diagonales normalisées et limites de rue respectées.
+- **Kikor — Toile vivante** : place le chevalet devant son pinceau à 0,18 s, peint, puis invoque le petit bonhomme vert depuis la toile à 0,65 s. Émergence de 0,3 s, allié présent 10 s, animation de frappe maintenue 0,24 s. Une seule création par propriétaire. La toile alliée disparaît avec son propriétaire ou sa création et ne subit pas les coups amis. Geste de peinture : 1 s.
+- **Gustavax — Le Catcheur** : transformation de 6 secondes en colosse torse nu, short bleu, lunettes et pieds nus. Déplacement, saut, esquive et attaques restent contrôlables. Les poings ont une portée de 145, les pieds deviennent un coup au sol radial de rayon 180. Vie maximale, attaque, vitesse et puissance spéciale gagnent 30 % ; les dégâts reçus diminuent de 30 %, en complément des talents. Le pourcentage de vie est conservé à l’entrée et à la sortie : aucun soin gratuit ni bonus permanent. Préparation initiale 0,3 s, coût 100 énergie, sans recharge chronométrée. Les talents peuvent prolonger la forme de 3 s et renforcer fortement ses coups. Gustavax reste jouable ; Jualos le remplace comme boss final.
 
 Les transformations porc/loup/tourbillon utilisent une nouvelle planche transparente. Elle remplace uniquement, dans le moteur Reborn, les anciens extraits de storyboard qui comportaient un fond et des flèches. Les autres ressources d’origine ne sont pas écrasées.
 
 ## Arbres de talents et progression Rogue Like
 
-Chaque héros dispose de **3 branches de 12 talents**, soit 36 talents uniques : six paliers de deux choix, avec deux ultimes mutuellement exclusifs par branche. Les noms et effets sont propres à chaque personnage. Gustavax est désormais **Gustavax le Sheitan** : sa branche dédiée remplace l’ancien philosophe par la malédiction, le feu noir, les chaînes et la Porte des Enfers.
+Chaque héros dispose de **3 branches linéaires de 5 talents**, soit 15 talents. Le cinquième rang est l’ultime de sa branche. Un seul ultime peut être acheté par personnage et par partie ; les quatre premiers rangs des autres branches restent accessibles. Les achats sont définitifs, sans remboursement.
 
 L’XP est gagnée principalement par les vagues (60 %), puis les éliminations (25 %) et les objectifs/boss (15 %). Elle est partagée équitablement en coopération et les invocations ne peuvent pas générer d’XP. Chaque personnage progresse séparément du niveau 1 au niveau 20 ; chaque niveau donne deux points de caractéristiques. Vitalité, Force, Mobilité, Endurance et Maîtrise des armes ont dix rangs maximum.
 
-Les points de talent arrivent aux niveaux impairs à partir du niveau 3, ainsi qu’après les cinq premiers boss. Une branche avance seulement si un talent du palier précédent est acquis ; un seul ultime peut être pris par branche et les ultimes demandent trois boss vaincus. Une sortie complète donne 14 points de talent au maximum. Une nouvelle sortie remet la puissance de combat à zéro, tandis que les records et les victoires permanentes restent mémorisés par personnage.
+Les huit points de talent sont attribués à la fin de la première rue du premier quartier, à la fin de la troisième rue des quartiers 1 et 2, puis après chacun des cinq premiers boss. Le rang précédent et un point suffisent pour acheter un talent, sans condition de quartiers pour les ultimes. Les récompenses sont individuelles et attribuées aussi aux partenaires KO, une seule fois par jalon. Une nouvelle partie remet les talents à zéro ; les records permanents restent conservés. Voir [la refonte](docs/refonte-talents.md) pour les limites et la compatibilité.
 
-Le menu **Progression** contient uniquement les caractéristiques et l’arbre complet des talents. Il est accessible à la souris, au clavier et à la manette, y compris en pause et en coopération. Les rues ne donnent plus de bonus de fin de niveau : l’XP provient des vagues, des éliminations et des objectifs.
+Le menu **Progression** contient uniquement les caractéristiques et l’arbre complet des talents. Il est accessible à la souris, au clavier et à la manette, y compris en pause et en coopération. Les deux jalons de troisième rue donnent un point de talent ; l’XP provient des vagues, des éliminations et des objectifs.
 
 ## Vagues, bestiaire et intelligence ennemie
 
@@ -198,3 +198,97 @@ Les captures sont dans `test-results/`, non versionné. Les commandes navigateur
 
 Autre planche conservée : `assets/shared/specials/transformations-v3.png`, créée avec le skill **imagegen** et l’outil intégré. Le prompt complet est conservé dans `assets/shared/specials/transformations-v3.prompt.md`. Aucun appel d’API payante externe ou déploiement public n’a été effectué par cette mise à jour.
 
+
+Les gains d’XP de combat sont multipliés par 0,5 : première vague 60 XP, ennemi du premier chapitre 10 XP, boss 300 XP. Les seuils de niveau, les deux points par niveau et les acquis des sauvegardes restent identiques. La sélection compare la vie, la force et la vitesse de départ sur une échelle commune par caractéristique. L’endurance reste dans les améliorations à acheter en jeu.
+
+### Rencontres variables du Chêne Maillard
+
+Chaque sortie tire deux rencontres distinctes parmi quatre, dans les rues 2 et 4. Elles remplacent la deuxième vague et le défi chronométré de ces rues : ni la première rue, ni le boss, ni les autres quartiers ne sont affectés par ce tirage. Le tirage est déterministe pour une même sortie et conservé dans les sauvegardes et les instantanés réseau.
+
+- **Livraison renversée** : trois caisses contiennent un repas, une boisson et une batte. Les ennemis éloignés des joueurs cherchent à voler les caisses ; quatre secondes sans intervention suffisent. S’approcher du voleur interrompt le vol. Les caisses intactes sont récupérées à la victoire. Même si tout est volé, la rue reste franchissable.
+- **Vendeur du coffre** : chaque joueur choisit gratuitement entre +35 PV, +50 énergie et une batte de huit coups, ou passe son tour. Aucun achat, aucune monnaie. Un seul cadeau par joueur ; la batte remplace l’arme tenue, qui est déposée au sol.
+- **Voisin encerclé** : choix facultatif avant le combat. Les agresseurs font perdre du courage au voisin s’ils restent près de lui sans joueur pour les détourner. Éliminer la bande avant sa fuite permet au voisin de revenir à la rue suivante : il distrait les premiers ennemis pendant quatre secondes et apporte un repas. Un échec ne bloque pas la progression.
+- **Parking des immeubles** : détour facultatif dans une zone aménagée sur la rue actuelle, sans écran de chargement. Un gardien renforcé protège un fusil à pompe par joueur. Refuser fait simplement continuer le parcours.
+
+Se déplacer vers le panneau souhaité puis **F / RT / R2** (bouton F tactile) pour choisir. En coopération, les deux joueurs actifs doivent confirmer un combat facultatif ; un refus suffit pour continuer. Le vendeur attend un choix individuel de chaque joueur actif. Les rencontres sans combat ne donnent pas d’XP de vague ; les combats gardent les gains réduits habituels. Une sauvegarde prise avant une rencontre la rejoue ; une sauvegarde après son résultat conserve les récompenses et l’aide du voisin sans les attribuer à nouveau.
+
+Vérification : `node --test --test-isolation=none tests/*.test.js` et `node tests/neighborhood-browser.mjs` (Edge installé ou `BROWSER_PATH`). Le test navigateur utilise deux vrais clients coopératifs, les entrées clavier et des captures desktop/mobile.
+
+### Rencontres variables du Château de l’Étang
+
+Deux événements distincts sont tirés parmi quatre dans les zones 2 et 4, en remplacement de la deuxième vague et de l’ancien défi chronométré. Le premier quartier garde son propre tirage ; les autres niveaux disposent de leur propre tirage indépendant. Chaque événement peut être refusé. Les deux joueurs actifs doivent accepter en coopération ; un refus suffit pour continuer.
+
+- **Les vannes de l’étang** : pendant le combat, F / RT / R2 près de chacune des deux vannes. Les deux vannes ouvertes déclenchent une chasse d’eau qui étourdit les ennemis présents pendant trois secondes et donne 30 énergie à chaque joueur vivant, une seule fois. On peut finir le combat sans ouvrir les vannes, mais sans le bonus.
+- **Tu tires ou tu pointes ?** : trois boules par joueur, sans combat. Depuis le cercle, F / RT / R2 quand le curseur entre dans la zone verte. Chaque réussite donne 15 énergie et 100 points de score, sans XP. Les lancers ont une récupération individuelle de 0,55 seconde. Le panneau de droite permet de renoncer aux boules restantes. La pause arrête le curseur.
+- **Le pique-nique des pigeons** : chaque joueur actif donne 25 énergie pour recevoir 35 PV. Si un joueur n’a pas assez d’énergie, personne ne paie et le groupe peut refuser. Dans la zone suivante, les pigeons apportent un soin de 25 PV par joueur, une seule fois.
+- **Les braconniers du parc** : ouvrir les trois cages avec F / RT / R2 pendant le combat. Chaque pigeon libéré étourdit les ennemis proches pendant 2,5 secondes. À la victoire, chaque cage ouverte donne un soin de 15 PV. Les cages restantes ne bloquent pas la progression.
+
+Les pigeons ont un corps gris et la tête chauve et barbue de Lorenzo. Sprites générés avec l’outil imagegen intégré : vanne, pigeon au repos, pigeon ailes déployées, pigeon en cage, panier et boules. La planche source `assets/shared/scenery/estate-events.png` utilise un fond magenta masqué au chargement par le moteur ; les cellules sont détourées et découpées automatiquement. Le prompt et la provenance sont dans `docs/estate-sprites.md`.
+
+Le tirage, les résultats et le cadeau différé sont conservés dans les sauvegardes. Tests : `node --test --test-isolation=none tests/*.test.js` ; `node tests/estate-browser.mjs` pour deux clients réels, clavier, tactile et vérification des six sprites.
+
+### Rencontres variables du Stade Colette Besson
+
+Deux rencontres distinctes parmi quatre remplacent la deuxième vague et le défi chronométré des rues 2 et 4. Le tirage est conservé dans les sauvegardes. F / RT / R2 permet de choisir ; deux accords sont nécessaires en duo, un refus suffit pour passer. Tous les combats se terminent normalement même si l’objectif est raté, avec l’XP de vague habituelle et sans prime d’XP supplémentaire.
+
+- **Le ballon de la discorde** : frapper le ballon (K au pied, J au poing ou avec une arme) pour percuter les ennemis. Marquer dans le but à droite apporte un soin de 20 PV et deux renforts, jusqu’à trois buts par rencontre. Un tir ne touche chaque adversaire qu’une fois.
+- **Le relais des bras cassés** : prendre le témoin avec F puis rejoindre les trois balises dans l’ordre pendant le combat. F le passe à un partenaire proche ou le pose au sol. Un dégât réel ou une déconnexion le fait tomber ; une brève temporisation empêche de le reprendre immédiatement après un choc. Terminer le relais et le combat donne +15 % de vitesse de déplacement durant toute la rue suivante, sans modifier la puissance. La sauvegarde conserve ce bonus et son expiration.
+- **Le coach a craqué** : la consigne apparaît avant le choix : pieds seulement (pas de poing, arme, projection ou spéciale) ou aucune spéciale. Une infraction annule uniquement la récompense. Respecter la règle jusqu’à la victoire donne une batte au sol et 30 énergie par joueur vivant. Une spéciale impossible faute d’énergie n’est pas une infraction.
+- **L’arrosage automatique** : une bande orange annonce le passage d’un jet bleu qui pousse joueurs et ennemis sans infliger de dégâts. Sauter ou esquiver permet d’éviter la poussée. F près d’une vanne coupe sa bande ; fermer les deux arrête l’arrosage. Gagner sans fermer de vanne donne 40 énergie par joueur vivant.
+
+Ballon, témoin, balises et arrosage sont dessinés dans le canvas ; le coach utilise un sprite sportif existant. Aucun nouvel asset externe nécessaire. Validation : tests de simulation et sauvegarde dans `tests/stadium.test.js` ; deux navigateurs coopératifs, commandes clavier et tactile dans `node tests/stadium-browser.mjs`.
+
+### Rencontres variables du Bourg de Saran
+
+Deux rencontres distinctes sont tirées parmi quatre dans les rues 2 et 4 du niveau 4. Elles remplacent la deuxième vague et le défi chronométré de ces rues. Première rue et boss inchangés. Chaque choix est facultatif : F / RT / R2 près du panneau, deux accords en coopération, un refus suffit pour poursuivre.
+
+- **La dernière fournée** : le présentoir propose quatre pains partagés au maximum, un au début puis un toutes les quatre secondes. F prend un pain ; F à nouveau le mange pour +15 PV ; J le lance pour étourdir le premier ennemi touché pendant 2,5 secondes. Le lancer conserve l’arme équipée et ses munitions. Un pain porté par un joueur KO ou déconnecté retourne au présentoir. Les pains inutilisés disparaissent après le combat.
+- **Le scooter mal garé** : le choix annonce l’alarme avant l’ouverture. Accepter ouvre le coffre, dépose une batte de huit coups par joueur et attire Makouille avec deux Rémy, plus Guylux en duo. Refuser ne donne ni arme ni combat.
+- **La terrasse en vrac** : trois tables de six points de résistance peuvent intercepter les coups entre un attaquant et sa cible, dans les deux camps. Les frappes et projectiles ennemis peuvent aussi casser les tables. À la victoire, chaque table encore debout donne 10 énergie à chaque joueur vivant, jusqu’à 30. Tout casser ne bloque pas la progression. Les meubles de la rencontre sont retirés à la vague suivante.
+- **Le bonneteau de Guylux** : trois manches gratuites sans combat. La bille est montrée pendant 1,5 seconde, puis quatre échanges visibles de gobelets durent 3,6 secondes. Le mélange animé et la réponse utilisent exactement les mêmes permutations. Chacun choisit un gobelet en s’en approchant puis F ; chaque bonne réponse rapporte 15 énergie, soit 45 au maximum par joueur. La révélation attend les deux réponses en duo, ou vingt secondes. Le panneau à droite permet à chacun d’arrêter ; les partenaires actifs peuvent continuer. La pause fige le mélange.
+
+Les combats gardent leur XP habituelle, sans prime d’XP d’événement ; le bonneteau n’en donne pas. Le tirage et les résultats sont conservés dans les sauvegardes ; les anciens fichiers reçoivent un tirage valide du Bourg. Les sauvegardes se prennent entre les combats : quitter une rencontre en cours reprend au dernier point sûr.
+
+Le présentoir, les tables, l’ardoise et Guylux réutilisent les sprites existants ; pain, scooter et gobelets sont dessinés dans le canvas. Vérification : `node --test --test-isolation=none tests/*.test.js` et `node tests/bourg-browser.mjs` (deux navigateurs coopératifs, clavier, tactile et captures desktop/mobile).
+
+### Rencontres variables de Saran by Night et du Collège Montjoie
+
+Les niveaux 5 et 6 tirent chacun deux rencontres distinctes dans les rues 2 et 4, à la place de la deuxième vague et du défi chronométré. Première rue et boss final inchangés. Les tirages et résultats sont conservés dans les sauvegardes ; les anciennes sauvegardes reçoivent des plans valides. Tous les événements sont facultatifs, avec deux accords initiaux en duo et un refus suffisant pour continuer. Les récompenses sont plafonnées, sans prime d’XP supplémentaire.
+
+**Saran by Night :**
+
+- **Le dernier bus** : pendant le combat, le bus ouvre ses portes entre la sixième et la quatorzième seconde. F / RT / R2 devant la porte confirme l’embarquement. Tous les joueurs connectés doivent être vivants, au sol et présents devant la porte ; quitter la zone annule son accord. Le bus fait passer à la vague suivante sans XP de vague et abandonne les objets au sol. Le rater laisse le combat continuer normalement.
+- **Le caddie infernal** : F près du caddie arrêté le pousse dans la direction du personnage. Il inflige 22 dégâts et étourdit les ennemis touchés pendant 1,5 seconde ; un même ennemi ne peut être touché qu’une fois par poussée. Trois impacts sur des adversaires ou les limites de la rue cassent le caddie. Il n’est pas nécessaire de l’utiliser pour finir le combat.
+- **La panne de courant** : le décor s’assombrit, mais personnages, annonces d’attaque et contrôles restent lisibles. F au coffret rétablit l’éclairage. Gagner sans rallumer donne 35 énergie par joueur vivant, une seule fois.
+- **Le distributeur récalcitrant** : jusqu’à trois coups. Le premier donne 20 énergie sans risque ; les deux suivants ont respectivement 35 % et 70 % de risque de déclencher une alarme au lieu de donner une boisson. Le risque est affiché avant chaque décision, et chaque coup exige un nouvel accord des deux joueurs actifs. Le panneau de droite arrête l’événement en conservant les gains. Une alarme appelle une seule bande et lance un combat normal. Les boissons seules ne donnent pas d’XP.
+
+Les sprites générés du bus, du caddie, du coffret et du distributeur sont employés dans les événements ; provenance et prompts dans `docs/night-sprites.md`.
+
+**Collège Montjoie :**
+
+- **La sonnerie a retenti** : une bande composée exclusivement de **six Jualos** traverse une ligne de la cour toutes les sept secondes, alternativement dans les deux sens. La sonnerie et la bande jaune préviennent 1,4 seconde avant le passage. Les Jualos renversent joueurs et ennemis : 8 dégâts de base aux joueurs, 20 aux ennemis, avec un impact maximum par personnage et par traversée. Sauter ou esquiver permet d’éviter le passage. Ces Jualos utilisent les sprites de marche du personnage ; ce ne sont pas des ennemis à vaincre et ils ne bloquent jamais une vague.
+- **Le contrôle surprise** : trois fenêtres de dix secondes demandent une esquive précise face à une attaque imminente, une projection réellement relâchée, puis deux adversaires distincts touchés par une même spéciale. Une réussite donne 15 énergie par joueur vivant, une fois par consigne (45 maximum). Les actions hors de la consigne active ne comptent pas. Un échec ne bloque pas le combat.
+- **La réserve du gymnase** : chaque joueur choisit librement un ballon, une batte de huit coups, un soin de 35 PV ou passe son tour. Un choix par joueur, sans combat ni XP. Le ballon est conservé dans la sauvegarde ; J / X le lance pendant un combat à la place du prochain coup de poing, sans consommer l’arme tenue. Il rebondit sur trois ennemis distincts au maximum (22 dégâts et étourdissement de 1,2 seconde), puis disparaît. Aucun empilement de ballons.
+- **La photo de classe** : un cadre fixe accueille trois photos, à 6, 12 et 18 secondes. Chaque joueur vivant au sol dans le cadre reçoit 15 PV au flash ; les ennemis cadrés sont étourdis 2,5 secondes. Le compte à rebours est visible, avec un flash local et un son d’appareil photo. Les prises restantes sont annulées si le combat finit plus tôt.
+
+La pause fige tous les temporisateurs. La sauvegarde reste prise aux points sûrs entre les combats. Coopération réseau, reprise solo et commandes tactiles utilisent les mêmes interactions F / RT / R2 que les premiers quartiers.
+
+Validation : `node --test --test-isolation=none tests/*.test.js`, tests ciblés dans `tests/late-events.test.js`, et `node tests/late-browser.mjs` pour les huit rencontres dans deux navigateurs coopératifs (clavier, tactile et captures).
+
+## Tournée des quartiers
+
+Chaque nouvelle partie mélange les six quartiers, sans répétition. La difficulté, les vagues et les jalons de talents suivent la position dans la tournée ; les décors, boss et événements restent propres au quartier. L’ordre et les victoires sont conservés dans les sauvegardes. Les anciennes sauvegardes gardent leur parcours initial.
+
+Après chaque boss, un tableau circulaire affiche les six portraits : gris avant la victoire, en couleur avec une coche dorée après. En coopération, les deux joueurs confirment le départ. Après les six victoires, le portrait central de Gustavax se révèle et le niveau 7 est débloqué.
+
+## Niveau 7 — Le bureau de Gustavax
+
+Le décor fourni dans `niveau7.png` est conservé dans `assets/shared/levels/level7/gustavax-office.png`. Toute la finale se déroule dans cette pièce : Gustavax fume derrière son bureau pendant six revanches dans un ordre tiré au début du niveau. Deux vagues de trois ennemis (cinq en duo) précèdent chaque boss ; les manches 3 et 5 comptent trois vagues. Les boss reviennent avec 60 % de leurs PV et de leur puissance ; Karonux revient à pied. Chaque revanche rend 30 % de vie. Les portraits se fissurent au fil des victoires.
+
+Gustavax brise son bureau après la sixième revanche. Son duel comporte 1 800 PV (multiplicateur duo habituel), avec trois phases à 100 %, 65 % et 30 % : revers/cigare/fauteuil, fumée/charges/braises, puis balayages/onde à sauter/frappes successives. Les morceaux du bureau interrompent une charge et ouvrent une contre-attaque de trois secondes. Aucun renfort pendant le duel. Les limites de phase empêchent un gros coup de sauter une transformation. Une défaite contre Gustavax permet de reprendre son duel avec vie pleine et au moins deux vies, en solo comme en duo, sans refaire les revanches.
+
+## Menu secret
+
+Depuis l’accueil, taper **GUSTAVAX45** (insensible aux majuscules, moins de cinq secondes entre deux touches). Sur mobile : cinq pressions rapides sur le logo, puis saisir le même code. Le passage reste accessible pendant la session ; « Refermer le passage » ou recharger la page le masque de nouveau.
+
+Choix des sept niveaux, de la rue de départ, du personnage, de la difficulté, de chaque boss et de sa phase. Accès au niveau 7 complet ou au duel seul. Options : invulnérabilité, spécial illimité, niveau 20 et huit points de talents à répartir. Les essais se terminent à la fin du quartier choisi et ne touchent ni sauvegarde de tournée ni records. Retour au menu secret disponible en pause et en fin d’essai.

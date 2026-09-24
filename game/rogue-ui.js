@@ -7,9 +7,7 @@ const DETAILS = {
 };
 export function installRogueUI() {
   const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = '/styles/rogue.css'; document.head.append(link);
-  document.querySelector('.home-buttons').insertAdjacentHTML('afterend', '<div class="run-actions"><button class="text-button" data-action="resume-run">Reprendre la sortie</button><button class="text-button" data-action="export-run">Exporter</button><button class="text-button" data-action="import-run">Importer</button></div><p id="run-status" class="run-status"></p><input id="run-import" type="file" accept="application/json,.json" hidden>');
-  document.querySelector('.lobby-choice').insertAdjacentHTML('beforeend', '<button class="text-button" data-action="restore-coop">Hôte : restaurer la sauvegarde coop</button><p class="run-status">Après restauration, les deux joueurs doivent confirmer « Je suis prêt ».</p>');
-  document.querySelector('#pause-talents').insertAdjacentHTML('afterend', '<button class="button secondary" data-action="attributes">Caractéristiques & XP</button>');
+  document.querySelector('#pause-talents').insertAdjacentHTML('afterend', '<button id="pause-attributes" class="button secondary" data-action="attributes">Caractéristiques & XP</button>');
   document.querySelector('#app').insertAdjacentHTML('beforeend', '<section id="attributes" class="screen modal-screen" aria-labelledby="attributes-title"><div class="modal rogue-modal"><p class="eyebrow">PROGRESSION DE CETTE SORTIE</p><h2 id="attributes-title">CARACTÉRISTIQUES</h2><p id="attribute-progress"></p><div id="attribute-list"></div><p class="evolution-note">Deux points par niveau. Dix rangs maximum par caractéristique. Une nouvelle partie repart au niveau 1.</p><button class="button primary" data-action="close-attributes">Retour</button></div></section>');
 }
 export function renderAttributes(player, spend) {

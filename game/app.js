@@ -1,6 +1,9 @@
+import { installSecretMenu, createSecretSession } from './secret-menu.js';
+import { finalDuelCheckpoint, restoreCheckpoint } from './run-save.js';
+import { installRouteUI, renderRouteUI } from './route-ui.js';
+import { nextDistrict } from './campaign-route.js';
 import { FIGHTERS, CHAPTERS, STEP, fighter, clamp, blankInput } from './data.js';
 import { Simulation } from './simulation.js';
-import { createBossPractice, installBossPracticeUI } from './boss-practice.js';
 import { Assets } from './assets.js';
 import { Input } from './input.js';
 import { Audio } from './audio.js';
@@ -8,13 +11,12 @@ import { Renderer } from './renderer.js';
 import { Network } from './network.js';
 import { normalizeProfile, spendPoint, bonuses, TALENT_SAVE_KEY } from './progression.js';
 import { BALANCE } from './balance.js';
+import { renderStartingStats } from './selection-stats.js';
 import { installEvolutionUI, renderEvolution, renderPauseTalents } from './evolution-ui.js';
 import { installAudioUI, renderAudioUI } from './audio-settings.js';
-import { LevelEditor } from './level-editor.js';
-import { layoutFor } from './level-layouts.js';
 import { installInteractionUI } from './interaction-ui.js';
 import { installRogueUI, renderAttributes } from './rogue-ui.js';
-import { checkpoint, restoreCheckpoint, readCheckpoint, validateCheckpoint, recordRun, RUN_SAVE_KEY, RECORDS_KEY } from './run-save.js';
+import { checkpoint, readCheckpoint, recordRun, RUN_SAVE_KEY, RECORDS_KEY } from './run-save.js';
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -39,19 +41,10 @@ class Game {
     installEvolutionUI();
     installRogueUI();
     installAudioUI(this);
-    this.editor = new LevelEditor(this);
-    installBossPracticeUI();
+    installRouteUI();
+    installSecretMenu(this);
     this.bind(); this.renderSelection(); this.updateRecord(); this.updateSound();
-    this.updateRunStatus();
-    $('#run-import').addEventListener('change', async event => {
-      try {
-        const file = event.target.files[0]; if (!file) return;
-        if (file.size > 64000) throw new Error('Fichier trop volumineux (64 Ko maximum).');
-        const save = validateCheckpoint(JSON.parse(await file.text()));
-        localStorage.setItem(RUN_SAVE_KEY, JSON.stringify(save)); this.updateRunStatus(); this.toast('Sauvegarde importée. Reprends en solo ou restaure-la dans un nouveau salon coop.');
-      } catch (error) { this.toast(error.message); }
-      event.target.value = '';
-    });
+
     const orientationHint = document.createElement('p'); orientationHint.className = 'orientation-hint'; orientationHint.textContent = '↻ Tourne ton téléphone : la rue se joue en paysage.'; $('#app').append(orientationHint);
     requestAnimationFrame(now => this.frame(now));
     // Read-only diagnostics support bug reports and end-to-end verification; no cheats or mutable game state.
@@ -76,7 +69,6 @@ class Game {
     $('#online-fighter').addEventListener('change', () => {
       this.selected = $('#online-fighter').value; this.network.send({ type: 'select', character: this.selected }); this.setLobbyPortrait();
     });
-    $('#online-chapter').addEventListener('change', () => this.network.send({ type: 'select', chapter: Number($('#online-chapter').value) }));
     $('#online-difficulty').addEventListener('change', () => this.network.send({ type: 'select', difficulty: $('#online-difficulty').value }));
     $('#sound-button').addEventListener('click', () => { this.preferences.muted = !this.preferences.muted; this.audio.mute(this.preferences.muted); this.save(); this.updateSound(); });
     $('#fullscreen-button').addEventListener('click', async () => {
@@ -95,15 +87,15 @@ class Game {
   }
   focusables() { return this.screen ? [...$(`#${this.screen}`).querySelectorAll('button:not(:disabled), input:not(:disabled):not([type=hidden]):not([type=file]), select:not(:disabled), a[href]')].filter(el => el.offsetParent !== null && !el.closest('[inert]')) : []; }
   show(screen) {
-    $$('.practice-only').forEach(el => el.classList.toggle('hidden', !this.state?.practice));
     const previousScreen = this.screen;
     this.menuFocus ??= new Map();
     if (this.screen && this.focusables().includes(document.activeElement)) this.menuFocus.set(this.screen, document.activeElement);
     this.screen = screen;
+    $$('.secret-return').forEach(b=>b.hidden=!this.state?.sandbox);
     $$('.screen').forEach(el => { const active = el.id === screen; el.classList.toggle('active', active); el.inert = !active; });
-    const playing = !!this.state && !['home', 'select', 'online', 'lobby', 'boss-lab'].includes(screen);
+    const playing = !!this.state && !['home', 'select', 'online', 'lobby'].includes(screen);
     document.body.classList.toggle('playing', playing);
-    $('#game-ui').classList.toggle('hidden', !playing);
+    $('#game-ui').classList.toggle('hidden', !playing || screen === 'badges');
     this.input.enabled = playing && !screen && !this.state.paused;
     $('#touch-controls').classList.toggle('hidden', !this.input.enabled || !matchMedia('(pointer: coarse)').matches);
     this.input.clear();
@@ -121,10 +113,8 @@ class Game {
     else if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   }
   renderSelection() {
-    $('#roster').innerHTML = FIGHTERS.map((c, i) => `<button class="fighter-card" data-fighter="${c.id}" style="--fighter:${c.color}" aria-label="Choisir ${c.name}" aria-pressed="false"><span class="number">0${i + 1}</span><span class="selected-mark">✓</span><img src="/assets/${c.id}/${c.id}_p.png" alt="" draggable="false"><span class="card-name"><b>${c.name}</b><small>${c.title}</small></span></button>`).join('');
+    $('#roster').innerHTML = FIGHTERS.map((c, i) => `<button class="fighter-card" data-fighter="${c.id}" style="--fighter:${c.color}" aria-label="Choisir ${c.name} — Vie ${c.hp}, Force ${c.power}, Vitesse ${c.speed}" aria-pressed="false"><span class="number">0${i + 1}</span><span class="selected-mark">✓</span><img src="/assets/${c.id}/${c.id}_p.png" alt="" draggable="false"><span class="card-name"><b>${c.name}</b><small>${c.title}</small></span>${renderStartingStats(c)}</button>`).join('');
     $$('[data-fighter]').forEach(el => el.addEventListener('click', () => { this.audio.confirm(); this.select(el.dataset.fighter); }));
-    for (const id of ['chapter-select', 'online-chapter']) $(`#${id}`).innerHTML = CHAPTERS.map((c, i) => `<option value="${i}">0${i + 1} — ${c.name}</option>`).join('');
-    $('#chapter-select').value = this.preferences.chapter;
     $('#online-fighter').innerHTML = FIGHTERS.map(c => `<option value="${c.id}">${c.name} — ${c.title}</option>`).join('');
     this.select(this.selected);
   }
@@ -133,7 +123,7 @@ class Game {
     $$('[data-fighter]').forEach(el => { el.classList.toggle('selected', el.dataset.fighter === this.selected); el.setAttribute('aria-pressed', String(el.dataset.fighter === this.selected)); });
     $('#fighter-title').textContent = c.title; $('#fighter-name').textContent = c.name; $('#fighter-description').textContent = c.description;
     const profile = this.profiles[c.id], special = BALANCE.specials[c.id];
-    $('#fighter-special').textContent = `36 TALENTS · 3 VOIES   /   ${Math.round(c.hp * bonuses(profile).life)} PV   /   L · ${c.special.toUpperCase()} · ${special.cost} ÉNERGIE`;
+    $('#fighter-special').textContent = `15 TALENTS · 3 BRANCHES   /   ${Math.round(c.hp * bonuses(profile).life)} PV   /   L · ${c.special.toUpperCase()} · ${special.cost} ÉNERGIE`;
     try { const record = JSON.parse(localStorage.getItem(RECORDS_KEY) || '{}')[c.id]; if (record) $('#fighter-special').textContent += ` · ${record.title} · ${record.wins} victoire(s)`; } catch {}
     $('#online-fighter').value = this.selected; this.preferences.character = this.selected; this.save();
   }
@@ -141,39 +131,19 @@ class Game {
   updateSound() { const b = $('#sound-button'); b.textContent = this.preferences.muted ? '♪̸' : '♪'; b.setAttribute('aria-label', this.preferences.muted ? 'Activer le son' : 'Couper le son'); b.setAttribute('aria-pressed', String(!this.preferences.muted)); }
   toast(message, duration = 4000) { $('#toast').textContent = message; $('#toast').classList.remove('hidden'); clearTimeout(this.toastTimer); this.toastTimer = setTimeout(() => $('#toast').classList.add('hidden'), duration); }
   async action(action) {
-    if (action === 'boss-lab') { if (this.state && !this.state.paused) this.setPause(true); this.show('boss-lab'); }
-    if (action === 'test-boss-play') await this.startBossTest({ chapter: Number($('#test-boss').value), character: $('#test-fighter').value, phase: Number($('#test-phase').value), difficulty: $('#test-difficulty').value, invulnerable: $('#test-invulnerable').checked, freeSpecial: $('#test-special').checked, cinema: $('#test-cinema').checked });
-    if (action === 'test-boss-retry') await this.startBossTest(this.state.practice);
-    if (action === 'resume-run') {
-      const save = readCheckpoint(); if (!save) throw new Error('Aucune sauvegarde compatible disponible.');
-      if (save.players.length !== 1) throw new Error('Cette sauvegarde est coopérative : crée un salon, invite ton pote puis restaure-la.');
-      this.network.close(true); this.mode = 'solo'; this.resultShown = false; this.state = null;
-      await this.load(save.chapter, () => { this.simulation = restoreCheckpoint(save); this.state = this.simulation.state; this.selected = save.players[0].kind; this.accumulator = 0; this.renderer.reset(); this.input.resetRun(); this.sceneryStreet = ''; this.syncProgression(); this.show(null); });
-    }
-    if (action === 'restore-coop') {
-      const save = readCheckpoint();
-      if (this.network.slot !== 0 || save?.players.length !== 2) throw new Error('L’hôte doit posséder une sauvegarde coopérative.');
-      this.network.send({ type: 'restore', checkpoint: save });
-    }
-    if (action === 'import-run') $('#run-import').click();
-    if (action === 'export-run') {
-      const save = readCheckpoint(); if (!save) throw new Error('Aucune sauvegarde à exporter.');
-      const url = URL.createObjectURL(new Blob([JSON.stringify(save, null, 2)], { type: 'application/json' }));
-      const a = document.createElement('a'); a.href = url; a.download = 'saranfou-sortie.json'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
-    }
-    if (action === 'attributes') { this.rogueReturn = this.screen || 'pause'; if (this.state && !this.state.paused) this.setPause(true); this.show(action); this.renderRogue(); }
-    if (action === 'close-attributes') this.show(this.rogueReturn || 'pause');
-    if (action === 'editor') await this.editor.open();
-    if (action === 'close-editor') { this.editor.save(); this.show('home'); }
+    if(action.startsWith('secret-')){if(!this.secretUnlocked)return;if(action==='secret-menu'){this.quit();this.show('secret-menu');}else if(action==='secret-lock')this.secretLock();else if(action==='secret-play'||action==='secret-final'){const options=this.secretOptions();await this.startSecret(action==='secret-final'?{...options,mode:'level',chapter:6,stage:0}:options);}return;}
+    if(action==='route-next'){if(this.mode==='online')this.network.send({type:'route-ready'});else this.simulation?.confirmRoute(0);return;}
+    if (action === 'attributes') { this.rogueReturn = this.screen; if (this.state && !this.state.paused) this.setPause(true); this.show(action); this.renderRogue(); }
+    if (action === 'close-attributes') this.closeProgressionMenu(this.rogueReturn, 'pause');
     if (action === 'sound') { this.soundReturn = this.screen || 'pause'; if (this.state && !this.state.paused && !this.resultShown) this.setPause(true); this.show('sound'); renderAudioUI(this.audio); }
     if (action === 'close-sound') this.show(this.soundReturn || 'home');
     if (action === 'sound-test') { this.audio.wake(); this.audio.effect({ type: 'pickup' }); }
-    if (action === 'evolution') { this.evolutionReturn = this.screen || 'pause'; if (this.state && !this.state.paused && !this.resultShown) this.setPause(true); this.syncProgression(); this.show('evolution'); this.renderEvolution(); }
-    if (action === 'close-evolution') this.show(this.evolutionReturn || 'select');
+    if (action === 'evolution') { this.evolutionReturn = this.screen; if (this.state && !this.state.paused && !this.resultShown) this.setPause(true); this.syncProgression(); this.show('evolution'); this.renderEvolution(); }
+    if (action === 'close-evolution') this.closeProgressionMenu(this.evolutionReturn, 'select');
     if (action === 'solo') { this.mode = 'solo'; this.show('select'); }
     if (action === 'online') { this.mode = 'online'; this.show('online'); $('#network-status').textContent = ''; }
     if (['home', 'quit', 'leave'].includes(action)) this.quit();
-    if (action === 'play') await this.startSolo(Number($('#chapter-select').value));
+    if (action === 'play') await this.startSolo(0);
     if (action === 'controls') { this.controlsReturn = this.screen || 'pause'; if (this.state && !this.state.paused) this.setPause(true); this.show('controls'); }
     if (action === 'close-controls') this.show(this.controlsReturn || 'home');
     if (action === 'pause') this.setPause(true);
@@ -183,9 +153,9 @@ class Game {
     if (action === 'ready') { const player = this.lobby?.players[this.network.slot]; this.network.send({ type: 'ready', value: !player?.ready }); }
     if (action === 'retry-load') await this.pendingLoad?.();
     if (action === 'retry') {
-      if (this.state?.practice) await this.startBossTest(this.state.practice);
-      else if (this.mode === 'online') this.network.send({ type: 'retry' });
-      else await this.startSolo(this.state.phase === 'won' ? 0 : this.state.chapter);
+      if(this.state?.sandbox){await this.startSecret(this.state.sandbox);return;}
+      if (this.mode === 'online') this.network.send({ type: 'retry' });
+      else {const saved=finalDuelCheckpoint(this.simulation?.snapshot()||this.state);if(saved){this.simulation=restoreCheckpoint(saved);this.state=this.simulation.state;this.resultShown=false;this.renderer.reset();await this.load(6,()=>this.show(null));}else await this.startSolo(0);}
     }
     if (action === 'continue-solo') this.continueSolo();
   }
@@ -197,8 +167,8 @@ class Game {
       await this.assets.prepare(chapter, value => { if (generation === this.loadingGeneration) $('#loading-progress').style.width = `${Math.round(value * 100)}%`; });
       if (generation !== this.loadingGeneration) return;
       this.currentChapter = chapter; this.preferences.chapter = chapter; this.save();
-      this.assets.trimBackgrounds(chapter);
-      this.assets.preloadChapter(chapter + 1).catch(() => {});
+      this.assets.trimBackgrounds(chapter, this.state ? nextDistrict(this.state) : chapter+1);
+      this.assets.preloadChapter(this.state ? nextDistrict(this.state) : chapter+1).catch(() => {});
       complete();
     } catch (error) {
       if (generation !== this.loadingGeneration) return;
@@ -206,20 +176,16 @@ class Game {
       $('#retry-load').classList.remove('hidden'); console.error(error);
     }
   }
-  async startBossTest(options) {
-    this.network.close(true); this.mode = 'solo'; this.resultShown = false; this.state = null; this.simulation = null;
-    await this.load(options.chapter, () => {
-      this.simulation = createBossPractice(options); this.state = this.simulation.state;
-      this.sceneryStreet = ''; this.renderer.reset(); this.input.resetRun(); this.accumulator = 0;
-      this.show(null); this.audio.wake(); this.renderer.hud(this.state, 0, false, 0);
-    });
+  async startSecret(options){
+    this.persistRun();this.network.close(true);this.mode='solo';this.resultShown=false;this.accumulator=0;this.sceneryStreet='';
+    this.simulation=createSecretSession(options);this.state=this.simulation.state;this.simulation.pause(true,'loading');this.renderer.reset();this.input.resetRun();
+    await this.load(this.state.chapter,()=>{this.simulation.pause(false);this.show(null);this.audio.wake();});
   }
-  async startSolo(chapter, stage = 0) {
+  async startSolo(chapter = 0) {
     this.network.close(true); this.mode = 'solo'; this.resultShown = false; this.state = null; this.simulation = null;
     this.resetProgression(); this.clearRunSave();
-    await this.load(chapter, () => {
-      this.simulation = new Simulation([this.selected], chapter, Date.now(), { difficulty: $('#difficulty-select').value, profiles: [this.profiles[this.selected]] }); this.state = this.simulation.state;
-      if (stage) { this.state.stage = clamp(Math.floor(stage), 0, 5); this.simulation.enterStreet(); }
+    this.simulation = new Simulation([this.selected], chapter, Date.now(), { randomRoute:true, difficulty: $('#difficulty-select').value, profiles: [this.profiles[this.selected]] }); this.state = this.simulation.state;
+    await this.load(this.state.chapter, () => {
       this.sceneryStreet = '';
       this.renderer.reset(); this.input.resetRun(); this.accumulator = 0; this.show(null); this.audio.wake();
       this.renderer.hud(this.state, 0, false, 0);
@@ -299,7 +265,6 @@ class Game {
     }).join('');
     const me = room.players[this.network.slot];
     if (me) { $('#online-fighter').value = me.character; this.selected = me.character; }
-    $('#online-chapter').value = room.chapter; $('#online-chapter').disabled = this.network.slot !== 0;
     $('#online-difficulty').value = room.difficulty || 'normal'; $('#online-difficulty').disabled = this.network.slot !== 0;
     $('#ready-button').innerHTML = me?.ready ? '<span>Prêt. J’attends mon pote.</span><span>✓</span>' : '<span>Je suis prêt</span><span>✓</span>';
     $('#lobby-status').textContent = room.players.every(p => p?.connected) ? 'Choisissez vos combattants. La partie commence quand vous êtes tous les deux prêts.' : 'Le salon est ouvert. Plus qu’à réunir la bande.';
@@ -318,15 +283,23 @@ class Game {
     else this.network.send({ type: 'input', input: this.input.neutral() });
   }
   togglePause() {
-    if (this.screen === 'level-editor') { this.editor.paletteKey = null; this.editor.renderPalette(); return; }
     if (this.screen === 'sound') { this.show(this.soundReturn || 'home'); return; }
-    if (this.screen === 'evolution') { this.show(this.evolutionReturn || 'select'); return; }
-    if (this.screen === 'attributes') { this.show(this.rogueReturn || 'pause'); return; }
+    if (this.screen === 'evolution') { this.closeProgressionMenu(this.evolutionReturn, 'select'); return; }
+    if (this.screen === 'attributes') { this.closeProgressionMenu(this.rogueReturn, 'pause'); return; }
     if (this.screen === 'controls') { this.show(this.controlsReturn || 'home'); return; }
     if (!this.state || this.resultShown) { if (this.screen !== 'home') this.quit(); return; }
     if (this.screen === 'loading') return;
     if (this.screen === 'pause' && this.state.pauseReason && this.state.pauseReason !== 'manual') return;
     this.setPause(!this.state.paused);
+  }
+  closeProgressionMenu(returnScreen, fallback) {
+    if (returnScreen === null && this.state && !this.resultShown) {
+      if (this.state.paused && this.state.pauseReason && this.state.pauseReason !== 'manual') {
+        this.pauseScreen(this.state.pauseReason);
+        return;
+      }
+      this.setPause(false);
+    } else this.show(returnScreen || fallback);
   }
   setPause(value) {
     if (!this.state || this.resultShown) return;
@@ -351,6 +324,16 @@ class Game {
     this.simulation = new Simulation([p.kind], this.state.chapter, Date.now(), { difficulty: this.state.difficulty, profiles: [p.progression] });
     this.simulation.state = JSON.parse(JSON.stringify(this.state));
     this.simulation.state.players = [{ ...p, id: 1, connected: true }];
+    const encounter = this.simulation.state.neighborhoodEncounter;
+    if (this.simulation.state.route) this.simulation.state.routeReady={};
+    if (encounter) {
+      if (encounter.carrier) encounter.carrier = encounter.carrier === p.id ? 1 : null;
+      if (encounter.ball?.owner) encounter.ball.owner = encounter.ball.owner === p.id ? 1 : null;
+      for (const key of ['choices', 'shots', 'hits', 'nextThrows', 'held', 'guesses', 'withdrawn', 'wins', 'boarded', 'votes', 'equipment']) if (encounter[key]) {
+        encounter[key] = encounter[key][p.id] != null ? { 1: encounter[key][p.id] } : {};
+      }
+    }
+    this.simulation.state.gymProjectiles = (this.simulation.state.gymProjectiles || []).filter(b => b.owner === p.id).map(b => ({ ...b, owner: 1 }));
     this.simulation.nextId = Math.max(10, ...[...this.state.enemies, ...this.state.props, ...this.state.pickups, ...this.state.hazards, ...this.state.allies].map(e => e.id)) + 1;
     for (const entity of [...this.simulation.state.hazards, ...this.simulation.state.allies, ...this.simulation.state.props]) if (!entity.enemy) entity.owner = entity.owner === p.id ? 1 : -1;
     this.simulation.pause(false); this.state = this.simulation.state;
@@ -361,18 +344,14 @@ class Game {
     if (this.resultShown) return;
     this.persistRun();
     this.resultShown = true; const win = this.state.phase === 'won';
-    if (!this.state.practice) { this.preferences.record = Math.max(this.preferences.record, this.state.score); this.save(); this.updateRecord(); }
+    if (!this.state.practice && !this.state.sandbox) { this.preferences.record = Math.max(this.preferences.record, this.state.score); this.save(); this.updateRecord(); }
     $('#result-kicker').textContent = win ? 'LE JOUR SE LÈVE SUR SARAN.' : 'LA NUIT N’EST PAS FINIE.';
     $('#result-title').innerHTML = win ? 'LA BANDE.<br><em>LA LÉGENDE.</em>' : 'ON REMET<br><em>ÇA ?</em>';
-    $('#result-copy').textContent = win ? 'Six quartiers traversés. Toute la bande debout. Il est temps de rentrer.' : `${CHAPTERS[this.state.chapter].name}, rue ${this.state.stage + 1}. Tu peux retenter ce chapitre avec des forces neuves.`;
+    $('#result-copy').textContent = win ? 'Six quartiers libérés. Les six revanches gagnées. Gustavax est à terre : Saran est à vous.' : this.state.chapter===6&&this.state.stage===6?'Gustavax tient encore debout. Reprends directement son combat, sans refaire les six revanches.':`${CHAPTERS[this.state.chapter].name}, rue ${this.state.stage + 1}. Une nouvelle partie tirera un nouvel itinéraire.`;
+    if(this.state.sandbox)$('#result-copy').textContent=win?'Essai terminé. Choisis un autre niveau ou un autre adversaire dans le menu secret.':'Relance cet essai ou change les paramètres dans le menu secret.';
     $('#result-score').textContent = number(this.state.score); $('#result-combo').textContent = `${this.state.bestCombo} HITS`;
-    if (this.state.practice) {
-      $('#result-kicker').textContent = 'TEST BOSS · ENTRAÎNEMENT';
-      $('#result-title').innerHTML = win ? 'BOSS <em>VAINCU.</em>' : 'NOUVEL <em>ESSAI ?</em>';
-      $('#result-copy').textContent = 'Relance immédiatement ce combat ou choisis un autre boss. Sauvegarde et records conservés.';
-    }
     $('#retry-button').disabled = this.mode === 'online' && this.network.slot !== 0;
-    $('#retry-button').innerHTML = `<span>${this.mode === 'online' && this.network.slot !== 0 ? 'L’hôte peut relancer' : 'Remettre ça'}</span><span>↗</span>`;
+    $('#retry-button').innerHTML = `<span>${this.mode === 'online' && this.network.slot !== 0 ? 'L’hôte peut relancer' : this.state.chapter===6&&this.state.stage===6&&!win?'Reprendre face à Gustavax':'Remettre ça'}</span><span>↗</span>`;
     this.show('result');
   }
   quit() {
@@ -381,12 +360,11 @@ class Game {
     ++this.loadingGeneration; this.network.close(true); this.state = null; this.simulation = null; this.resultShown = false; this.mode = 'solo';
     this.resetProgression();
     this.renderer.reset(); this.pendingLoad = null; this.updateRecord(); this.show('home');
-    this.updateRunStatus();
+
     if (location.search) history.replaceState(null, '', location.pathname);
   }
   gamepadMenu(action) {
     if (action === 'start') {
-      if (this.screen === 'boss-lab') { $('[data-action="test-boss-play"]').click(); return; }
       if (this.screen === 'select') {
         const highlighted = document.activeElement?.dataset.fighter;
         if (highlighted) this.select(highlighted);
@@ -394,14 +372,14 @@ class Game {
       } else if (this.screen === 'pause') this.togglePause();
       return;
     }
-    if (action === 'back' && this.screen === 'attributes') { this.show(this.rogueReturn || 'pause'); return; }
+    if (action === 'back' && this.screen === 'attributes') { this.closeProgressionMenu(this.rogueReturn, 'pause'); return; }
     if (this.screen === 'sound' && action === 'back') { this.show(this.soundReturn || 'home'); return; }
     if (this.screen === 'sound' && document.activeElement?.type === 'range' && ['left', 'right', 'accept'].includes(action)) {
       const slider = document.activeElement;
       if (action !== 'accept') { slider.value = clamp(Number(slider.value) + (action === 'left' ? -5 : 5), 0, 100); slider.dispatchEvent(new Event('input')); }
       return;
     }
-    if (action === 'back') { if (this.screen === 'evolution') this.show(this.evolutionReturn || 'select'); else if (this.screen === 'controls') this.show(this.controlsReturn || 'home'); else if (this.screen === 'pause') this.togglePause(); else this.quit(); return; }
+    if (action === 'back') { if (this.screen === 'evolution') this.closeProgressionMenu(this.evolutionReturn, 'select'); else if (this.screen === 'controls') this.show(this.controlsReturn || 'home'); else if (this.screen === 'pause') this.togglePause(); else this.quit(); return; }
     const items = this.focusables(); if (!items.length) return;
     let index = items.indexOf(document.activeElement);
     if (index < 0) { items[0].focus(); index = 0; if (action !== 'accept') return; }
@@ -412,7 +390,7 @@ class Game {
     }
     if (this.screen === 'evolution' && document.activeElement?.dataset.talent && ['left', 'right'].includes(action)) {
       const nodes = [...document.querySelectorAll('[data-talent]')], n = nodes.indexOf(document.activeElement);
-      nodes[(n + (action === 'right' ? 12 : -12) + nodes.length) % nodes.length]?.focus(); return;
+      nodes[(n + (action === 'right' ? 5 : -5) + nodes.length) % nodes.length]?.focus(); return;
     }
     if (action === 'accept') { if (document.activeElement instanceof HTMLInputElement) { const el = document.activeElement; el.value = el.value.toUpperCase().padEnd(6, 'A'); this.codeCursor = ((this.codeCursor ?? -1) + 1) % 6; el.setSelectionRange(this.codeCursor, this.codeCursor + 1); this.toast(`Code · caractère ${this.codeCursor + 1}/6 : ← → pour changer, A pour avancer. ↓ pour Rejoindre.`); } else document.activeElement?.click(); return; }
     if (document.activeElement?.id === 'room-input' && ['left', 'right'].includes(action)) {
@@ -425,12 +403,12 @@ class Game {
     const delta = ['up', 'left'].includes(action) ? -1 : 1; items[(index + delta + items.length) % items.length].focus();
   }
   syncProgression() {
-    if (this.state?.practice) return;
+    if (this.state?.practice || this.state?.sandbox) return;
     const p = this.state?.players[this.mode === 'online' ? this.network.slot : 0];
     if (!p?.progression) return;
     const profile = normalizeProfile(p.progression);
     if (JSON.stringify(profile) === JSON.stringify(this.profiles[p.kind])) return;
-    if (profile.completed.length > (this.profiles[p.kind]?.completed.length || 0)) this.toast('Chapitre terminé ! +1 point · Pause → Talents pour choisir ton amélioration.', 7000);
+    if (profile.milestones.length > (this.profiles[p.kind]?.milestones.length || 0)) this.toast('Point de talent obtenu ! Choisis ton amélioration.', 3500);
     this.profiles[p.kind] = profile;
     if (this.screen === 'evolution') this.renderEvolution();
     if (this.screen === 'attributes') this.renderRogue();
@@ -455,15 +433,12 @@ class Game {
       else if (this.simulation?.spendAttribute(slot, key)) { this.syncProgression(); this.renderRogue(); }
     });
   }
-  updateRunStatus() {
-    const saved = readCheckpoint();
-    $('#run-status').textContent = saved ? `Sauvegarde ${saved.players.length === 2 ? 'coop' : 'solo'} · quartier ${saved.chapter + 1}, rue ${saved.stage + 1}, vague ${saved.wave + 1} · ${Math.floor(saved.time / 60)} min. Conservée dans ce navigateur.` : 'Sauvegarde automatique entre les vagues. Exporte-la pour la conserver sur un autre appareil.';
-  }
-  clearRunSave() { try { localStorage.removeItem(RUN_SAVE_KEY); } catch {} this.updateRunStatus(); }
+  clearRunSave() { try { localStorage.removeItem(RUN_SAVE_KEY); } catch {}  }
   persistRun() {
-    if (!this.state || this.state.practice) return;
+    if (!this.state || this.state.practice || this.state.sandbox) return;
     try {
       recordRun(this.state, this.mode === 'online' ? this.network.slot : 0);
+      const finalSave=finalDuelCheckpoint(this.simulation?.snapshot()||this.state);if(finalSave){localStorage.setItem(RUN_SAVE_KEY,JSON.stringify(finalSave));return;}
       if (['over', 'won'].includes(this.state.phase)) {
         const saved = readCheckpoint(); if (saved?.runId === this.state.runId) localStorage.removeItem(RUN_SAVE_KEY);
         return;
@@ -476,7 +451,6 @@ class Game {
     requestAnimationFrame(time => this.frame(time));
     const dt = Math.min(.075, (now - this.lastFrame) / 1000); this.lastFrame = now;
     const input = this.input.sample();
-    if (this.screen === 'level-editor') return;
     if (now - (this.lastCheckpoint || 0) > 1000) { this.lastCheckpoint = now; this.persistRun(); }
     if (now - (this.lastProgressSave || 0) > 200) { this.lastProgressSave = now; this.syncProgression(); }
     if (this.simulation && this.state && !this.state.paused) {
@@ -490,12 +464,16 @@ class Game {
       if (['won', 'over'].includes(this.state.phase)) this.finish();
     }
     if (this.mode === 'online' && this.state && now - this.lastInputSend > 1000 / 30) { this.lastInputSend = now; this.network.send({ type: 'input', input }); }
+    if(this.state?.phase==='badges' && ['badges',null].includes(this.screen)){
+      if(this.screen!=='badges') {this.show('badges');this.persistRun();}
+      renderRouteUI(this.state,this.mode==='online'?this.network.slot:0);
+    } else if(this.screen==='badges' && this.state?.phase!=='badges') this.show(null);
     if (this.state) {
       const player = this.state.players[this.mode === 'online' ? this.network.slot : 0];
       const key = `${this.state.chapter}:${this.state.stage}`;
       if (this.sceneryStreet !== key || this.state.decor === null && this.mode === 'solo') {
         this.sceneryStreet = key;
-        const decor = layoutFor(this.state.chapter, this.state.stage);
+        const decor = [];
         if (this.mode === 'solo') this.state.decor = decor;
         else if (this.network.slot === 0) this.network.send({ type: 'scenery', chapter: this.state.chapter, stage: this.state.stage, items: decor.map(d => [d.key, d.x, d.y, d.height, d.facing || 1]) });
       }

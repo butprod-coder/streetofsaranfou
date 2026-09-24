@@ -5,7 +5,7 @@ import { BALANCE } from './balance.js';
 export function createBossPractice({ chapter = 0, character = 'jo', phase = 0, invulnerable = true, freeSpecial = true, cinema = false, difficulty = 'normal' } = {}) {
   chapter = clamp(Math.trunc(Number(chapter)) || 0, 0, CHAPTERS.length - 1);
   const sim = new Simulation([character], chapter, Date.now(), { difficulty });
-  const s = sim.state; s.stage = 5; sim.enterStreet();
+  const s = sim.state; s.stage = chapter===6?6:5; sim.enterStreet();
   s.practice = { chapter, character: s.players[0].kind, phase, invulnerable, freeSpecial, cinema, difficulty };
   s.props = []; s.pickups = []; s.surpriseDone = true;
   s.waves = [{ boss: true, kinds: [], label: 'TEST BOSS' }]; s.wave = -1; sim.spawnWave();

@@ -37,3 +37,8 @@
 /* Keep icon painting within each branch while the mobile modal scrolls. */
 .evolution-modal .talent-branch{isolation:isolate}
 .evolution-modal .talent-node .talent-art,.talent-art svg{filter:none}
+
+/* Linear five-rank trees. */
+.evolution-modal .talent-track{grid-template-columns:1fr!important;grid-template-rows:repeat(5,60px);gap:12px 0!important}.evolution-modal .talent-links{height:348px}
+.evolution-modal .talent-node{filter:none!important;transition:border-color .15s,background .15s;transform:none!important}
+.evolution-modal .talent-node .talent-art{width:40px;height:40px;filter:none}.evolution-modal .talent-node.locked .talent-art{opacity:.62}.evolution-modal .talent-node.owned .talent-art,.evolution-modal .talent-node.available .talent-art{opacity:1}

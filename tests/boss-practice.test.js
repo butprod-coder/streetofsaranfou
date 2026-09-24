@@ -8,7 +8,7 @@ import { checkpoint, recordRun } from '../game/run-save.js';
 test('every boss and phase starts directly in its arena without waves or props', () => {
   for (let chapter = 0; chapter < CHAPTERS.length; chapter++) for (let phase = 0; phase <= BALANCE.bosses[CHAPTERS[chapter].boss].phases.length + 1; phase++) {
     const sim = createBossPractice({ chapter, phase }); const s = sim.state, boss = s.enemies[0];
-    assert.equal(s.stage, 5); assert.equal(s.phase, 'fight'); assert.equal(s.enemies.length, 1);
+    assert.equal(s.stage, chapter===6?6:5); assert.equal(s.phase, 'fight'); assert.equal(s.enemies.length, 1);
     assert.equal(boss.kind, CHAPTERS[chapter].boss); assert.equal(s.spawnQueue.length, 0); assert.equal(s.props.length, 0);
     assert.equal(s.bossCinema, null); assert.equal(boss.vehicle, chapter === 0 && phase === 0);
     if (phase) assert.equal(boss.bossPhase, phase);

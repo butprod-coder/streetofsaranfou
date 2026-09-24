@@ -36,3 +36,56 @@
 @media(max-width:1000px){.hud .hud-portrait{display:none}.hud .player-bars{width:clamp(160px,25vw,240px)}.hud .player-identity b{font-size:17px}.hud .solo-score-panel{width:180px}}
 @media(max-width:650px){.hud{gap:6px!important;grid-template-columns:repeat(2,minmax(0,1fr))}.hud .player-hud{padding:7px;flex:1}.hud .player-bars{width:100%}.hud .mission{display:none}.hud .player-identity small{font-size:8px}.hud .player-identity b{font-size:16px}.hud .hud-meta{font-size:9px;gap:4px}.hud .talent-caption{font-size:9px}.hud .talent-caption small{font-size:9px}.hud .solo-score-panel{width:100%}.pause-modal{padding:18px}.pause-talent-icon{display:none}.pause-talent-copy b{font-size:15px}.talent-branch-title h3{font-size:18px}}
 @media(max-height:520px){.pause-modal{max-height:calc(100dvh - 70px)}.hud .player-hud{padding:5px}.hud .hud-portrait{display:none}.hud .hud-meta,.hud .special-caption{margin-top:2px}.hud .talent-caption{margin-top:3px}.hud .player-identity{margin-bottom:3px}}
+/* The score sizes to its contents; upgrades stay visible and open their own menu. */
+.hud{align-items:start}
+.hud-side{display:flex;flex-direction:column;gap:9px;min-width:0}
+.hud.is-solo .hud-side{width:min(100%,280px);justify-self:end}
+.hud .score-only{padding:10px 13px;min-height:0}
+.hud .score-only .solo-score-panel{display:flex;align-items:center;justify-content:space-between;gap:14px;width:auto;min-width:0}
+.hud .score-only .solo-score-panel>div{margin:0}
+.hud .score-only b{font:700 10px monospace;letter-spacing:.08em;color:#c4cedd}
+.hud .score-only .solo-score{font-size:24px;white-space:nowrap;margin:0;line-height:1.2}
+.upgrade-notice{display:grid;gap:6px;pointer-events:auto;background:#09121ef2;border:1px solid #b59b58;border-radius:5px;padding:9px;box-shadow:0 3px 14px #0008}
+.upgrade-notice[hidden],.upgrade-button[hidden]{display:none}
+.upgrade-title{font:700 10px monospace;letter-spacing:.08em;color:#fff0bf;text-align:left}
+.upgrade-button{display:flex;align-items:center;gap:10px;width:100%;padding:7px 10px;text-align:left;border:1px solid #e8bd65;border-radius:4px;background:#392b16;color:#ffe6a3;cursor:pointer;min-height:43px}
+.upgrade-button.upgrade-stats{background:#102e2e;border-color:#6bddc5;color:#a6ffea}
+.upgrade-count{font:900 27px/1 monospace;min-width:26px;text-align:center}
+.upgrade-button>span{font-size:13px;font-weight:800;line-height:1.25}
+.upgrade-button small{display:block;font:10px/1.5 monospace;color:#eef4ff}
+.upgrade-button:hover{filter:brightness(1.2)}
+.upgrade-button:focus-visible{outline:3px solid white;outline-offset:3px}
+.upgrade-hint{font:9px monospace;color:#bdc9dc;text-align:center}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@media(max-width:650px){.hud-side{gap:5px}.hud .score-only{padding:7px}.hud .score-only .solo-score-panel{gap:5px}.hud .score-only b{font-size:8px}.hud .score-only .solo-score{font-size:20px}.upgrade-notice{padding:6px;gap:5px}.upgrade-button{padding:6px;gap:6px}.upgrade-button>span{font-size:11px}.upgrade-button small{display:none}.upgrade-count{font-size:23px}.upgrade-title,.upgrade-hint{font-size:8px}}
+#pause-attributes.has-points{border:2px solid #6bddc5;background:#102e2e;color:#a6ffea}
+@media(max-height:520px){.upgrade-notice{grid-template-columns:1fr 1fr;padding:6px;gap:5px}.upgrade-title{grid-column:1/-1;font-size:9px}.upgrade-button{gap:5px;padding:5px;min-height:36px}.upgrade-button>span{font-size:10px}.upgrade-count{font-size:21px;min-width:18px}.upgrade-button small,.upgrade-hint{display:none}.hud .score-only{padding:6px 10px}.hud .score-only .solo-score{font-size:21px}}
+/* Mobile combat HUD: essentials at the edges, open space in the middle. */
+@media(max-width:700px),(max-width:1100px) and (max-height:520px){
+ body.playing .topbar{height:28px;padding-inline:10px;background:#090d1660}
+ .playing .brand-mark{width:19px;height:19px;font-size:14px}
+ .playing .brand{font-size:7px}.playing .brand b{font-size:8px}
+ .playing .top-actions .icon-button{width:26px;height:26px}
+ .hud{top:34px;left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));grid-template-columns:minmax(0,190px) minmax(0,190px);justify-content:space-between;gap:12px!important;filter:none}
+ .hud .mission,.hud .hud-portrait,.hud .talent-caption,.hud .special-caption,.hud .weapon-caption,.hud .dodge-caption{display:none}
+ .hud .player-hud{padding:5px 7px;gap:0;border-top-width:2px;background:#08101ec9;box-shadow:none}
+ .hud .player-bars{width:100%;padding:0}
+ .hud .player-identity{margin-bottom:3px}.hud .player-identity b{font-size:14px}.hud .player-identity small{display:block;font-size:8px}
+ .hud .hud-meter{height:16px;margin:0 0 3px;grid-template-columns:26px 1fr auto}
+ .hud .hud-meter>span,.hud .hud-meter>output{display:block;font-size:9px;line-height:14px}
+ .hud .energy-bar{height:10px;margin-bottom:0}.hud .energy-bar>span,.hud .energy-bar>output{font-size:7px;line-height:8px}
+ .hud .hud-meta{display:flex;border:0;padding:0;margin:3px 0 0;line-height:9px}.hud .credits{font-size:8px;margin:0}
+ .hud-side{gap:5px}.hud.is-solo .hud-side{width:100%}
+ .hud .score-only{padding:4px 7px;border-top-width:2px}.hud .score-only b{font-size:8px}.hud .score-only .solo-score{font-size:18px}
+ .upgrade-notice{display:flex;gap:5px;background:none;border:0;padding:0;box-shadow:none}
+ .upgrade-title,.upgrade-hint,.upgrade-button small{display:none}
+ .upgrade-button{flex:1;min-width:0;min-height:44px;padding:5px;gap:5px;justify-content:center;background:#392b16dc}
+ .upgrade-button.upgrade-stats{background:#102e2edc}
+ .upgrade-button>span{font-size:0}.upgrade-button>span::before{content:attr(data-mobile-label);font-size:10px}
+ .upgrade-count{font-size:20px;min-width:14px}
+ .game-footer{min-height:28px;padding:0 8px;gap:6px;font-size:8px;background:#090d1699}
+ .keyboard-hint,.game-footer .ping{display:none}.game-footer .icon-button{margin-left:0}
+ .boss-hud{left:25%;width:50%;bottom:36px;padding:4px 7px;background:#100c12bb;box-shadow:none}
+ .boss-hud>span{font-size:9px;letter-spacing:0;margin-bottom:3px}.boss-hud>div{height:5px}
+ .touch-controls button,#touch-stick{background:#08152745;border-color:#ffffff40}
+}

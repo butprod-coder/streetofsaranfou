@@ -1,5 +1,5 @@
 import { BALANCE } from './balance.js';
-import { randomEnemyKinds } from './encounters.js';
+import { randomEnemyKinds, streetEnemyRoster } from './encounters.js';
 import { hasTalent } from './rogue-talents.js';
 
 export function surprisePlan(chapter, stage) {
@@ -15,19 +15,25 @@ export const streetEvents = {
     return { id: this.nextId++, kind, x, y, hp, maxHp: hp, flash: 0, rubble: 0, ...extra };
   },
   streetProps() {
-    const s = this.state, kind = ['crate', null, 'bin', null, 'barrel', 'crate'][s.stage];
-    // Four ordinary breakables per chapter instead of eighteen. Event streets stay clear.
+    const s = this.state, kind = ['crate', null, null, null, 'barrel', null][s.stage];
+    // Two occasional objects per chapter; other streets and boss arenas stay clear.
     if (!kind) return [];
     return [this.makeProp(kind, [790, 0, 875, 0, 735, 325][s.stage] + s.chapter % 2 * 35, s.stage === 2 ? 619 : 486, {
-      drop: kind === 'barrel' ? null : kind === 'bin' ? 'energy' : 'food',
+      drop: kind === 'crate' ? 'food' : null,
     })];
   },
   hitProp(prop, amount, source) {
     if (prop.hp <= 0 || (prop.kind === 'easel' && !prop.enemy)) return false;
     if (prop.bonus && this.state.surprise?.warning > 0) return false;
+    if (prop.bourgTable) {
+      const key = `${this.state.tick}:${source?.id ?? 'world'}`;
+      if (prop.lastBourgHit === key) return false;
+      prop.lastBourgHit = key;
+    }
     prop.hp = Math.max(0, prop.hp - amount); prop.flash = .16;
     this.event('break', { x: prop.x, y: prop.y - 24, broken: prop.hp === 0, kind: prop.kind });
     if (prop.hp > 0) return true;
+    this.recoverNeighborhoodCargo(prop);
     prop.rubble = prop.kind === 'easel' ? 0 : BALANCE.scenery.debrisTime;
     if (source?.specialState && hasTalent(source, 'Débris volants')) this.rogueBurst(source, prop.x, prop.y, 190, 1, 'DÉBRIS VOLANTS');
     if (prop.drop) this.state.pickups.push({ id: this.nextId++, x: prop.x, y: prop.y, kind: prop.drop });
@@ -45,7 +51,7 @@ export const streetEvents = {
   },
   beginSurprise() {
     const s = this.state, kind = surprisePlan(s.chapter, s.stage), b = BALANCE.surprises;
-    if (!kind || s.surpriseDone) return false;
+    if (s.chapter===6 || !kind || s.surpriseDone) return false;
     s.surpriseDone = true; s.phase = 'surprise'; s.spawnQueue = []; s.hazards = []; s.allies = [];
     s.surprise = { kind, status: 'warning', warning: b.warning, remaining: b[`${kind}Time`], targetIds: [], total: 0 };
     s.props = s.props.filter(p => !p.enemy && p.kind !== 'easel');
@@ -57,14 +63,14 @@ export const streetEvents = {
       s.props.push(car); s.surprise.targetIds = [car.id]; s.surprise.total = hp;
     } else if (kind === 'delivery') {
       for (let i = 0; i < b.deliveryCount; i++) {
-        const p = this.makeProp('crate', 400 + i * 500 / Math.max(1, b.deliveryCount - 1), i % 2 ? 610 : 480, { bonus: true, drop: i === 0 ? (s.chapter % 4 === 1 ? 'energy' : 'food') : null });
+        const p = this.makeProp('crate', 400 + i * 500 / Math.max(1, b.deliveryCount - 1), i % 2 ? 610 : 480, { bonus: true, drop: i === 0 ? 'food' : null });
         s.props.push(p); s.surprise.targetIds.push(p.id);
       }
       s.surprise.total = b.deliveryCount;
     } else {
       const count = b.ambushCount + (s.players.length > 1 ? b.duoExtra : 0) + (s.difficulty === 'hard' ? 1 : 0);
       s.surprise.total = count;
-      s.spawnQueue = randomEnemyKinds(s.chapter, count, () => this.random(), s.enemyBag ||= []);
+      s.spawnQueue = randomEnemyKinds(s.chapter, count, () => this.random(), s.enemyBag ||= [], streetEnemyRoster(s.chapter, s.stage, s.enemyOrder));
       s.spawnTimer = 0;
     }
     return true;
@@ -87,12 +93,17 @@ export const streetEvents = {
   },
   clearStreet() {
     const s = this.state;
+    if(s.chapter===6){this.finishFinalRound();return;}
+    if(s.sandbox&&s.stage===5){s.phase='won';s.hazards=[];this.event('win');return;}
     const key = `${s.chapter}:${s.stage}`;
     if (s.rewardedStreet === key) return;
     s.rewardedStreet = key;
     s.phase = 'clear'; this.event('clear'); s.score += 250;
+    if (s.stage === 0 && this.routeDepth() === 0) this.awardTalentMilestone('street:0:0');
+    if (s.stage === 2 && this.routeDepth() < 2) this.awardTalentMilestone(`street:${this.routeDepth()}:2`);
     if (s.stage === 5) this.awardChapterTalent();
     for (const p of s.players) if (p.hp <= 0) this.revivePlayer(p, .4);
+    if (s.stage === 5 && this.openRouteBoard()) return;
     if (s.stage === 5 && s.players.some(p => p.hp > 0 && p.hp < p.maxHp * BALANCE.scenery.bossReliefHealth) && !s.pickups.some(p => p.kind === 'food')) {
       s.pickups.push({ id: this.nextId++, x: 1060, y: 545, kind: 'food' });
     }

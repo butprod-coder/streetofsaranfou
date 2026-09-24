@@ -59,9 +59,12 @@ export class Audio {
       if (event.label === 'HAHAHA !') { for (let i = 0; i < 3; i++) this.tone(150 + i % 2 * 65, .12, .17, 'triangle', this.context?.currentTime + i * .16, 90); }
     }
     if (['hit', 'explosion', 'thunder', 'special'].includes(event.type)) this.soundtrack?.duck();
+    if (event.type === 'ultimate') { const root = [110,147,196][event.branch || 0]; this.tone(root,.5,.3,'sawtooth',0,root*2); this.hiss(.3,.12); }
     if (event.type === 'talent') { for (const [i, note] of [440, 554, 659, 880].entries()) this.tone(note, .32, .2, 'triangle', this.context?.currentTime + i * .09); }
     if (event.type === 'hit') { this.tone(event.heavy ? 105 : 150, .12, .65, 'triangle', 0, 32); this.hiss(.07, event.heavy ? .22 : .12, 0, 650); }
     else if (event.type === 'swing' && !event.special) this.hiss(.07, .06, 0, 2200);
+    else if(event.type==='gustavaxCharge'){this.tone(320,.13,.2,'sawtooth',0,650);this.tone(650,.18,.18,'triangle',(this.context?.currentTime||0)+.15,180);this.hiss(.3,.07,0,2400);}
+    else if(event.type==='gustavaxCrash'){this.tone(85,.35,.4,'triangle',0,24);this.hiss(.25,.2,0,480);}
     else if (event.type === 'skid') this.hiss(.18, .08, 0, 650);
     else if (event.type === 'freight') { this.tone(240, .16, .16, 'square'); this.tone(180, .24, .16, 'square', this.context?.currentTime + .22); this.hiss(.45, .12, 0, 360); }
     else if (event.type === 'belly') { this.tone(160, .3, .25, 'triangle', 0, 45); this.hiss(.1, .08, 0, 400); }
@@ -71,6 +74,8 @@ export class Audio {
     else if (event.type === 'spit') { this.tone(170, .18, .18, 'sawtooth', 0, 55); this.hiss(.15, .1, 0, 600); }
     else if (event.type === 'pickup' || event.type === 'revive') { this.tone(520, .16, .25); this.tone(780, .22, .2, 'sine', this.context?.currentTime + .08); }
     else if (event.type === 'dodge') this.hiss(.14, .12, 0, 3300);
+    else if (event.type === 'schoolPhoto') { this.hiss(.055,.1); this.tone(1200,.06,.08,'triangle'); }
+    else if (event.type === 'schoolBell') { for (let i=0;i<3;i++) this.tone(880,.18,.12,'square',(this.context?.currentTime || 0)+i*.25); }
     else if (event.type === 'surprise') { this.tone(220, .2, .22, 'square'); this.tone(440, .3, .18, 'triangle', this.context?.currentTime + .18); }
     else if (event.type === 'explosion') { this.tone(90, .4, .6, 'triangle', 0, 22); this.hiss(.4, .35, 0, 180); }
     else if (event.type === 'clear') { this.tone(330, .3, .2); this.tone(440, .35, .15, 'triangle', this.context?.currentTime + .1); this.tone(660, .4, .15, 'triangle', this.context?.currentTime + .2); }

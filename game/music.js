@@ -1,22 +1,38 @@
-// Original arcade club soundtrack. No borrowed melodies, recordings or samples.
+// Original FM / early-1990s house soundtrack, synthesized locally without samples.
 import { MUSIC, themeFor, stepDuration } from './music-score.js';
 export { MUSIC, themeFor, stepDuration } from './music-score.js';
 const hz = midi => 440 * 2 ** ((midi - 69) / 12);
 export function musicScene(active, paused, boss) { return paused ? 'pause' : !active ? 'menu' : boss ? 'boss' : 'street'; }
-
+const PATCHES = {
+  bass:  { wave: 'sine', ratio: 1, index: 2.6, end: .12, cutoff: 2400, tail: 700, attack: .003 },
+  acid:  { wave: 'sawtooth', ratio: 1, index: .1, end: .02, cutoff: 4300, tail: 320, attack: .003, q: 7 },
+  keys:  { wave: 'sine', ratio: 3, index: 1.7, end: .08, cutoff: 6800, tail: 2600, attack: .004 },
+  organ: { wave: 'sine', ratio: 2, index: 1.3, end: .9, cutoff: 6500, tail: 3800, attack: .006 },
+  pluck: { wave: 'sine', ratio: 2, index: 3.5, end: .1, cutoff: 7200, tail: 1600, attack: .002 },
+  lead:  { wave: 'sawtooth', ratio: 2, index: .22, end: .08, cutoff: 4000, tail: 1700, attack: .012 },
+  brass: { wave: 'sawtooth', ratio: 1, index: .3, end: .06, cutoff: 3200, tail: 900, attack: .012 },
+  bell:  { wave: 'sine', ratio: 3.5, index: 1.9, end: .12, cutoff: 8200, tail: 3400, attack: .002 },
+  pad:   { wave: 'triangle', ratio: 2, index: .25, end: .15, cutoff: 2200, tail: 1400, attack: .18 },
+  fm:    { wave: 'sine', ratio: 2, index: 2.1, end: .12, cutoff: 6400, tail: 2500, attack: .004 },
+};
 export class Soundtrack {
   constructor(context, destination, noise) {
     this.ctx = context; this.noise = noise; this.step = 0; this.next = 0; this.scene = ''; this.chapter = -1;
     this.voices = new Set();
     this.bus = context.createGain(); this.bus.gain.value = 0;
-    this.filter = context.createBiquadFilter(); this.filter.type = 'lowpass'; this.filter.frequency.value = 11000;
-    this.compressor = context.createDynamicsCompressor(); this.compressor.threshold.value = -12;
-    this.compressor.ratio.value = 3; this.compressor.attack.value = .006; this.compressor.release.value = .12;
-    this.makeup = context.createGain(); this.makeup.gain.value = 1.5;
+    this.filter = context.createBiquadFilter(); this.filter.type = 'lowpass'; this.filter.frequency.value = 12000;
+    this.compressor = context.createDynamicsCompressor(); this.compressor.threshold.value = -15;
+    this.compressor.knee.value = 15; this.compressor.ratio.value = 4;
+    this.compressor.attack.value = .008; this.compressor.release.value = .16;
+    this.makeup = context.createGain(); this.makeup.gain.value = 1.65;
     this.bus.connect(this.filter).connect(this.compressor).connect(this.makeup).connect(destination);
     this.delay = context.createDelay(1); this.delay.delayTime.value = .18;
-    this.echo = context.createGain(); this.echo.gain.value = .12;
-    this.delay.connect(this.echo).connect(this.bus);
+    this.echo = context.createGain(); this.echo.gain.value = .19;
+    this.echoFilter = context.createBiquadFilter(); this.echoFilter.type = 'lowpass'; this.echoFilter.frequency.value = 3400;
+    this.echoPan = context.createStereoPanner(); this.echoPan.pan.value = -.4;
+    this.delay.connect(this.echoFilter).connect(this.echo).connect(this.echoPan).connect(this.bus);
+    this.feedback = context.createGain(); this.feedback.gain.value = .23;
+    this.echoFilter.connect(this.feedback).connect(this.delay);
     this.duckUntil = 0;
   }
   register(sources, nodes, envelope, at, duration) {
@@ -33,80 +49,112 @@ export class Soundtrack {
       for (const source of sources) source.stop(now + .055);
     }
   }
-  note(midi, at, duration, volume, kind = 'fm') {
-    const c = this.ctx, envelope = c.createGain(), filter = c.createBiquadFilter();
+  note(midi, at, duration, volume, kind = 'fm', pan = 0) {
+    const c = this.ctx, patch = PATCHES[kind] || PATCHES.fm;
+    const envelope = c.createGain(), filter = c.createBiquadFilter(), stereo = c.createStereoPanner();
     const bass = kind === 'bass', acid = kind === 'acid', pad = kind === 'pad';
-    filter.type = 'lowpass'; filter.Q.value = acid ? 5 : bass ? 1.4 : .6;
-    filter.frequency.setValueAtTime(acid ? 5400 : bass ? 2300 : 8500, at);
-    filter.frequency.exponentialRampToValueAtTime(acid ? 380 : bass ? 350 : 2600, at + duration);
+    stereo.pan.value = pan;
+    filter.type = 'lowpass'; filter.Q.value = patch.q || .7;
+    filter.frequency.setValueAtTime(patch.cutoff, at);
+    filter.frequency.exponentialRampToValueAtTime(patch.tail, at + duration);
+    const attack = Math.min(patch.attack, duration * .2);
     envelope.gain.setValueAtTime(.0001, at);
-    envelope.gain.exponentialRampToValueAtTime(volume, at + (pad ? .12 : .004));
-    envelope.gain.setValueAtTime(volume * (pad ? .7 : .55), at + duration * .35);
+    envelope.gain.exponentialRampToValueAtTime(volume, at + attack);
+    envelope.gain.exponentialRampToValueAtTime(volume * (pad ? .8 : .48), at + duration * .45);
     envelope.gain.exponentialRampToValueAtTime(.0001, at + duration);
-    envelope.connect(filter).connect(this.bus);
-    if (!bass && !acid) filter.connect(this.delay);
+    envelope.connect(filter).connect(stereo).connect(this.bus);
+    if (!bass && !acid) stereo.connect(this.delay);
     const carrier = c.createOscillator(), modulator = c.createOscillator(), depth = c.createGain();
-    carrier.type = bass || acid ? 'sawtooth' : kind === 'brass' ? 'sawtooth' : 'sine';
-    carrier.frequency.value = hz(midi);
-    // True two-operator FM for metallic arcade leads; resonant envelopes for acid bass.
-    modulator.frequency.value = hz(midi) * (kind === 'bell' ? 3.5 : 2);
-    depth.gain.setValueAtTime(hz(midi) * (bass || acid ? .18 : kind === 'bell' ? 1.6 : 2.1), at);
-    depth.gain.exponentialRampToValueAtTime(1, at + duration);
+    carrier.type = patch.wave; carrier.frequency.value = hz(midi);
+    modulator.frequency.value = hz(midi) * patch.ratio;
+    depth.gain.setValueAtTime(hz(midi) * patch.index, at);
+    depth.gain.exponentialRampToValueAtTime(hz(midi) * patch.end, at + duration * .8);
     modulator.connect(depth).connect(carrier.frequency); carrier.connect(envelope);
-    this.register([carrier, modulator], [depth, envelope, filter], envelope, at, duration);
+    const sources = [carrier, modulator], nodes = [depth, envelope, filter, stereo];
+    if (bass || kind === 'lead' || pad) {
+      const layer = c.createOscillator(), gain = c.createGain();
+      layer.type = bass ? 'sine' : 'triangle'; layer.frequency.value = hz(midi);
+      layer.detune.value = bass ? 0 : 7; gain.gain.value = bass ? .32 : .24;
+      layer.connect(gain).connect(envelope); sources.push(layer); nodes.push(gain);
+    }
+    this.register(sources, nodes, envelope, at, duration);
   }
   drum(kind, at, volume) {
-    const c = this.ctx, g = c.createGain(), filter = c.createBiquadFilter();
-    const kick = kind === 'kick', snare = kind === 'snare', open = kind === 'open';
-    const length = kick ? .28 : snare ? .17 : open ? .16 : .045;
-    const source = kick ? c.createOscillator() : c.createBufferSource();
-    if (kick) {
-      source.type = 'sine'; source.frequency.setValueAtTime(185, at);
-      source.frequency.exponentialRampToValueAtTime(48, at + .075);
-      filter.type = 'lowpass'; filter.frequency.value = 3200;
+    const c = this.ctx, envelope = c.createGain(), filter = c.createBiquadFilter(), pan = c.createStereoPanner();
+    const kick = kind === 'kick', snare = kind === 'snare', clap = kind === 'clap', tom = kind === 'tom';
+    const open = kind === 'open', crash = kind === 'crash', tonal = kick || tom;
+    const length = kick ? .32 : tom ? .2 : snare ? .19 : clap ? .16 : crash ? .9 : open ? .19 : .045;
+    const source = tonal ? c.createOscillator() : c.createBufferSource();
+    pan.pan.value = kind === 'hat' ? .22 : open ? -.24 : tom ? -.35 : crash ? .38 : 0;
+    if (tonal) {
+      source.type = 'sine'; source.frequency.setValueAtTime(kick ? 165 : 220, at);
+      source.frequency.exponentialRampToValueAtTime(kick ? 47 : 82, at + (kick ? .065 : .14));
+      filter.type = 'lowpass'; filter.frequency.value = 2600;
     } else {
-      source.buffer = this.noise; filter.type = snare ? 'bandpass' : 'highpass';
-      filter.frequency.value = snare ? 2300 : 7100; filter.Q.value = snare ? .8 : .5;
+      source.buffer = this.noise; filter.type = snare || clap ? 'bandpass' : 'highpass';
+      filter.frequency.value = snare ? 1800 : clap ? 1300 : crash ? 5300 : 7600;
+      filter.Q.value = clap ? .65 : .8;
     }
-    g.gain.setValueAtTime(.0001, at); g.gain.exponentialRampToValueAtTime(volume, at + .001);
-    if (snare) { // A short triple transient gives the backbeat a clap-like crack.
-      for (const offset of [.009, .019]) {
-        g.gain.setValueAtTime(volume * .35, at + offset - .003);
-        g.gain.setValueAtTime(volume, at + offset);
-      }
+    envelope.gain.setValueAtTime(.0001, at);
+    envelope.gain.exponentialRampToValueAtTime(volume, at + .001);
+    if (clap) for (const offset of [.009, .018, .027]) {
+      envelope.gain.setValueAtTime(volume * .16, at + offset - .002);
+      envelope.gain.setValueAtTime(volume * .8, at + offset);
     }
-    g.gain.exponentialRampToValueAtTime(.0001, at + length);
-    source.connect(filter).connect(g).connect(this.bus);
-    this.register([source], [filter, g], g, at, length);
-    if (snare) this.note(55, at, .10, volume * .20, 'bass');
+    envelope.gain.exponentialRampToValueAtTime(.0001, at + length);
+    source.connect(filter).connect(envelope).connect(pan).connect(this.bus);
+    const sources = [source], nodes = [filter, envelope, pan];
+    if (snare) {
+      const body = c.createOscillator(), gain = c.createGain();
+      body.type = 'triangle'; body.frequency.setValueAtTime(190, at); body.frequency.exponentialRampToValueAtTime(120, at + .1);
+      gain.gain.value = .35; body.connect(gain).connect(envelope); sources.push(body); nodes.push(gain);
+    }
+    this.register(sources, nodes, envelope, at, length);
   }
   schedule(step, at, scene, chapter) {
-    const t = themeFor(scene, chapter), beat = 60 / (t.bpm + (scene === 'boss' ? MUSIC.bossTempo : 0));
+    const t = themeFor(scene, chapter), boss = scene === 'boss';
+    const beat = 60 / (t.bpm + (boss ? MUSIC.bossTempo : 0));
     const s = step % 16, bar = Math.floor(step / 16) % MUSIC.bars;
-    const bridge = bar >= 16 && bar < 20 && scene !== 'boss';
-    const lift = bar >= 20, chord = t.harmony[Math.floor(bar / 2) % 4];
-    const root = t.root + chord, melody = bar % 8 < 4 ? t.melody : t.answer;
-    if (!bridge || s === 0) {
-      if (t.kick.includes(s)) this.drum('kick', at, 1);
-      if (t.snare.includes(s)) this.drum('snare', at + .003, .65);
-      if (s % 2 === 0) this.drum(s % 4 === 2 ? 'open' : 'hat', at, s % 4 === 2 ? .12 : .15);
-      if ((lift || scene === 'boss') && s % 2 && s > 10) this.drum('hat', at, .075);
+    // 64-bar club form: groove, hook, development, break, return, peak and turnaround.
+    const intro = bar < 4, breakdown = bar >= 24 && bar < 32;
+    const lift = bar >= 40 && bar < 56, outro = bar >= 60;
+    const chord = t.harmony[Math.floor(bar / 2) % t.harmony.length], root = t.root + chord;
+    const melody = Math.floor(bar / 8) % 2 ? t.answer : t.melody;
+    if (!breakdown || boss) {
+      if (t.kick.includes(s)) this.drum('kick', at, .92);
+      if (t.snare.includes(s)) {
+        this.drum('snare', at, .42);
+        this.drum('clap', at + .008, .34);
+      }
+      if (s % 2 === 0) this.drum(s % 4 === 2 && !intro ? 'open' : 'hat', at, s % 4 === 2 ? .18 : .12);
+      if ((lift || boss || t.groove === 'break') && s % 2) this.drum('hat', at, .05 + (s % 4 === 3 ? .025 : 0));
+      if (t.groove === 'break' && [7, 15].includes(s)) this.drum('snare', at, .12);
+    } else if (s % 4 === 2) this.drum('hat', at, .07);
+    if ([4, 16, 32, 40, 56].includes(bar) && s === 0) this.drum('crash', at, .24);
+    if (bar % 8 === 7 && s >= 12 && !intro) {
+      if (s % 2 === 0 || s === 15) this.drum(s < 14 ? 'tom' : 'snare', at, .20 + (s - 12) * .035);
     }
-    if (bar % 8 === 7 && s >= 13) this.drum('snare', at, .20 + (s - 13) * .08);
-    const bass = t.bass[s];
-    if (bass !== null && (!bridge || s % 4 === 0)) this.note(root + bass, at, beat * .44, .30, t.voice === 'acid' ? 'acid' : 'bass');
-    if (t.stabs.includes(s) && (!bridge || s === t.stabs[0])) {
-      for (const n of [0, 3, 7, 10]) this.note(root + 24 + n, at, beat * .42, .085, 'brass');
+    const bass = t.bass[(s + (bar % 4 === 3 ? 8 : 0)) % 16];
+    if (bass !== null && (!breakdown || boss)) {
+      this.note(root + bass, at, beat * (s % 4 === 3 ? .22 : .39), .40, 'bass');
+      if (t.voice === 'acid' && !intro) this.note(root + bass + 12, at, beat * .28, .095, 'acid', -.12);
     }
-    if (s % 2 === 0) {
-      const n = melody[(Math.floor(s / 2) + (bar % 2) * 8) % 16];
-      if (n !== null) this.note(t.root + 24 + n, at, beat * (bridge ? .85 : .55), bridge ? .12 : .20, t.voice);
+    if (t.stabs.includes(s) && !intro && !outro && (!breakdown || s === t.stabs[0])) {
+      // Minor ninth voicings, kept above the bass; staggered attacks avoid a harsh block chord.
+      for (const [i, n] of [3, 7, 10, 14].entries()) {
+        this.note(root + 12 + n, at + i * .004, beat * (breakdown ? 1.6 : .48), .095,
+          t.groove === 'break' || boss ? 'brass' : 'keys', (i - 1.5) * .23);
+      }
     }
-    if ((lift || scene === 'boss') && s % 2 === 1) {
-      this.note(root + 36 + [0, 7, 10, 3][Math.floor(s / 2) % 4], at, beat * .23, .075, 'fm');
+    if (!intro && !outro && s % 2 === 0 && (!breakdown || bar >= 28)) {
+      const n = melody[Math.floor(s / 2) + (bar % 4) * 8];
+      if (n !== null) this.note(t.root + 24 + n, at, beat * (breakdown ? 1.2 : .7), breakdown ? .14 : .19, t.voice, .12);
     }
-    if (bridge && s === 0) for (const n of [0, 7, 10]) this.note(root + 24 + n, at, beat * 3, .06, 'pad');
-    if (scene === 'boss' && [3, 10, 15].includes(s)) this.drum('kick', at, .6);
+    if (lift && s % 4 === 3) this.note(root + 36 + [0, 7, 10, 14][Math.floor(s / 4)], at, beat * .27, .07, 'pluck', -.3);
+    if ((breakdown || scene === 'menu') && s === 0 && bar % 2 === 0) {
+      for (const [i,n] of [3,7,10].entries()) this.note(root + 24 + n, at, beat * 6, .045, 'pad', (i-1)*.5);
+    }
+    if (boss && [3, 11].includes(s) && bar % 4 >= 2) this.drum('kick', at, .58);
   }
   duck() { this.duckUntil = this.ctx.currentTime + .12; }
   update(scene, chapter = 0, muted = false) {
@@ -115,7 +163,8 @@ export class Soundtrack {
     if (scene !== this.scene || chapter !== this.chapter) {
       this.release();
       this.scene = scene; this.chapter = chapter; this.step = 0; this.next = now + .065;
-      this.delay.delayTime.setTargetAtTime(60 / themeFor(scene, chapter).bpm * .375, now, .05);
+      const tempo = themeFor(scene, chapter).bpm + (scene === 'boss' ? MUSIC.bossTempo : 0);
+      this.delay.delayTime.setTargetAtTime(60 / tempo * .75, now, .05);
     }
     const target = muted || scene === 'pause' ? 0 : MUSIC.level * (now < this.duckUntil ? MUSIC.duck : 1);
     if (target !== this.target) { this.bus.gain.setTargetAtTime(target, now, target === 0 ? .06 : .035); this.target = target; }

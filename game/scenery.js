@@ -53,23 +53,7 @@ export const THEME_DECOR = THEME_NAMES.map((theme, chapter) => labels[chapter].m
 }));
 export const DECOR_CATALOG = [...THEME_DECOR.flat(), ...definitions.map(([name, height]) => ({ key: `decor_${name}`, label: `Original · ${name}`, height }))];
 
-// Three silhouettes along the far kerb; one small accent on the near kerb.
-// Each street changes their order and spacing. The boss arena has only the back row.
-const layouts = [
-  [[175, 458, 0, .9], [600, 451, 1, .9], [1030, 467, 2, .9], [930, 644, 0, .56]],
-  [[250, 460, 2, .92], [710, 449, 0, .9], [1035, 462, 1, .84], [470, 642, 2, .55]],
-  [[165, 454, 1, .92], [545, 469, 2, .86], [990, 454, 0, .98], [820, 645, 1, .43]],
-  [[260, 467, 0, .96], [670, 452, 2, .88], [1050, 461, 1, .88], [425, 644, 0, .56]],
-  [[185, 452, 2, .9], [585, 464, 1, .88], [1000, 454, 0, .94], [890, 643, 2, .55]],
-  [[160, 452, 1, .9], [650, 446, 0, .85], [1055, 452, 2, .86]],
-];
-
-export function streetDecor(chapter, stage) {
-  const keys = THEME_DECOR[chapter]?.map(d => d.key), layout = layouts[stage];
-  if (!keys || !layout) return [];
-  return layout.map(([x, y, variant, scale], index) => {
-    const key = keys[(variant + stage * 2 + chapter % 3) % keys.length];
-    const height = SCENERY_SPRITES[key].height * scale;
-    return { scenery: true, key, x, y, height: index === 3 ? Math.min(58, height) : height };
-  });
+// Streets have no ambient props; only gameplay crates and explosive barrels remain.
+export function streetDecor() {
+  return [];
 }

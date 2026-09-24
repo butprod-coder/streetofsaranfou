@@ -2,7 +2,7 @@
 
 Refonte du beat’em up dans les rues de Saran : **solo et coopération à deux en ligne**, sept combattants, six quartiers et 36 rues. Les décors d’origine sont complétés par six planches thématiques de 12 objets, éditables rue par rue.
 
-**Mise à jour v4 — Rogue Like** : vagues espacées et bestiaire équitable, ennemis adaptatifs, six boss à phases, sept spéciaux distincts, 36 talents par héros, XP niveau 1–20 et checkpoints locaux exportables. Gustavax est devenu **Gustavax le Sheitan**. Voir [GAMEPLAY.md](GAMEPLAY.md) pour les règles et les valeurs d’équilibrage.
+**Mise à jour v4 — Rogue Like** : vagues espacées et bestiaire équitable, ennemis adaptatifs, six boss à phases, sept spéciaux distincts, 15 talents par héros, huit points par partie et un ultime exclusif, XP niveau 1–20 et checkpoints locaux exportables. Gustavax est devenu **Gustavax le Sheitan**. Voir [GAMEPLAY.md](GAMEPLAY.md) pour les règles et les valeurs d’équilibrage.
 
 ## Jouer
 

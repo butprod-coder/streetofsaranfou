@@ -1,5 +1,6 @@
 import { FLOOR, clamp } from './data.js';
 import { BALANCE, difficulty } from './balance.js';
+import { streetEnemyRoster } from './encounters.js';
 
 export const lorenzoCombat = {
   beginLorenzoSofa(e) {
@@ -17,8 +18,10 @@ export const lorenzoCombat = {
     if (!sofa || sofa.reinforcements >= 2) return;
     sofa.reinforcements++;
     const count = sofa.reinforcements === 1 ? this.state.players.length > 1 ? 3 : 2 : 1;
+    const roster = streetEnemyRoster(this.state.chapter, this.state.stage, this.state.enemyOrder);
     for (let i = 0; i < count; i++) {
-      this.spawnEnemy(['remy', 'makouille', 'charlingals'][i % 3], {
+      const kind = ['remy', 'makouille', 'charlingals'][i % 3];
+      this.spawnEnemy(roster.includes(kind) ? kind : 'orelsan', {
         owner: e.id, lorenzoMinion: true, hp: 52, maxHp: 52, power: 9, cooldown: 1.5,
       });
     }

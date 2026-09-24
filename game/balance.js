@@ -6,8 +6,10 @@ export const DIFFICULTIES = {
 };
 export const difficulty = id => DIFFICULTIES[id] || DIFFICULTIES.normal;
 export const BALANCE = {
+  progression: { xpMultiplier: .5 },
+  energy: { perHit: 7 },
   dodge: { duration: .26, invincible: .22, cooldown: .95, speedX: 690, speedY: 460, buffer: .14 },
-  scenery: { crateHp: 3, binHp: 4, barrelHp: 3, explosionDelay: .8, explosionRadius: 170, explosionDamage: 45, debrisTime: 7, food: 35, energy: 40, enemyFoodChance: .04, bossReliefHealth: .4 },
+  scenery: { crateHp: 3, binHp: 4, barrelHp: 3, explosionDelay: .8, explosionRadius: 170, explosionDamage: 45, debrisTime: 7, food: 35, energy: 25, enemyFoodChance: .10, enemyEnergyChance: .10, bossReliefHealth: .4 },
   surprises: { carTime: 25, carHp: 24, carDuoHp: 1.55, deliveryTime: 22, deliveryCount: 2, ambushTime: 30, ambushCount: 5, duoExtra: 2, score: 650, warning: 2.2 },
   waves: { early: 2, standard: 3, late: 4, rest: 2.5, calmRest: 4, spawnDelay: .85, activeSolo: 5, activeDuo: 7, attackersSolo: 2, attackersDuo: 3 },
   enemy: { chapterHp: .14, chapterPower: .1, duoHp: 1.18, chapterSpeed: .025, chapterRecovery: .065, eliteChance: .09, eliteChapterChance: .02 },
@@ -17,15 +19,16 @@ export const BALANCE = {
   embers: { count: 5, flight: .5, stagger: .09, ignition: 1.05, duration: 3.6, pulse: .8 },
   triso: { range: 410, distance: 240, windup: 1.05, recovery: 2.8, flight: .6, duration: 4.5, radius: 76, pulse: 1, maxPuddles: 3 },
   specials: {
-    karonux: { cost: 50, cooldown: 12, duration: 3.6, damage: 1.9, radius: 100, golfDistance: 450, golfAt: .25, turnAt: 1.05, sleepAt: 1.85 },
-    jualos: { cost: 50, cooldown: 9, duration: 1.45, damage: 1.6, radius: 115 },
-    yanu: { cost: 50, cooldown: 10, duration: 2.1, damage: 1.15, radius: 180 },
-    lorenzo: { cost: 50, cooldown: 10, duration: .65, damage: .45, radius: 78 },
-    jo: { cost: 50, cooldown: 12, duration: 3, damage: .85, radius: 130 },
-    kikor: { cost: 50, cooldown: 13, duration: 1, damage: .75, radius: 105, paintAt: .18, spawnAt: .65, allyDuration: 10, emergeDuration: .3 },
-    gustavax: { cost: 50, cooldown: 14, duration: 6 },
+    karonux: { cost: 100, cooldown: 0, duration: 3.6, damage: 1.9, radius: 100, golfAt: .25, exitDuration: .2, speedX: 510, speedY: 240, reverseSpeed: 700, reverseDuration: .24, reverseCooldown: .8, driftSpeed: 420, maxHits: 2, hitCooldown: .65 },
+    jualos: { cost: 100, cooldown: 0, duration: 1.45, damage: 1.6, radius: 115 },
+    yanu: { cost: 100, cooldown: 0, duration: 2.1, damage: 1.15, radius: 180 },
+    lorenzo: { cost: 100, cooldown: 0, duration: .65, damage: .45, radius: 78 },
+    jo: { cost: 100, cooldown: 0, duration: 3, damage: .85, radius: 130 },
+    kikor: { cost: 100, cooldown: 0, duration: 1, damage: .75, radius: 105, paintAt: .18, spawnAt: .65, allyDuration: 10, emergeDuration: .3 },
+    gustavax: { cost: 100, cooldown: 0, duration: 6 },
   },
   bosses: {
+    gustavax: {hp:1800,power:27,phases:[.65,.3],recovery:1.7},
     karonux: { hp: 640, power: 20, carHp: 240, phases: [.4], recovery: 1.6, healing: 36, healUses: 3 },
     kikor: { hp: 620, power: 20, phases: [.5], recovery: 1.25, creationHp: 70 },
     yanu: { hp: 650, power: 22, phases: [.5], recovery: 1.5 },
