@@ -80,8 +80,9 @@ test('enraged phase throws two spaced rings and all three phases can be practice
 
 test('co-op sofa scales, pause freezes the wave and snapshots serialize the encounter', () => {
   const { sim, e } = arena(); const partner = sim.makePlayer('jo', 1); applyProfile(partner, {}, false); sim.state.players.push(partner);
-  land(sim, e); assert.equal(e.sofa.maxHp, 270); assert.equal(sim.state.enemies.filter(a => a.lorenzoMinion).length, 3);
+  land(sim, e); assert.equal(e.sofa.maxHp, 540); assert.equal(sim.state.enemies.filter(a => a.lorenzoMinion).length, 3);
   sim.lorenzoRing(e, { targetX: 500, targetY: 550 }); sim.pause(true);
   const before = sim.snapshot(); sim.step(); assert.deepEqual(sim.snapshot(), before);
-  assert.equal(JSON.parse(JSON.stringify(before)).enemies[0].sofa.maxHp, 270);
+  assert.equal(JSON.parse(JSON.stringify(before)).enemies[0].sofa.maxHp, 540);
 });
+

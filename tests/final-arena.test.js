@@ -11,7 +11,7 @@ test('final arena has six distinct shortened rematches, two or three waves each,
     const s=sim.state;assert.equal(s.stage,stage);assert.ok(s.waves.length===3||s.waves.length===4);
     assert.ok(s.waves.slice(0,-1).every(w=>!w.boss&&w.kinds.length===3));
     s.wave=s.waves.length-2;sim.spawnWave();const b=s.enemies.find(e=>e.boss);seen.push(b.kind);
-    assert.ok(b.maxHp<600);assert.equal(s.chapter,6);assert.equal(s.neighborhoodEncounter,null);
+    assert.ok(b.maxHp<1200);assert.equal(s.chapter,6);assert.equal(s.neighborhoodEncounter,null);
     s.enemies=[];s.spawnQueue=[];s.bossCinema=null;sim.clearStreet();
   }
   assert.equal(new Set(seen).size,6);assert.equal(sim.state.stage,6);assert.equal(sim.state.phase,'intro');
@@ -58,3 +58,4 @@ test('same seed produces the same final encounter order and attacks in solo/serv
   for(let i=0;i<500;i++){a.step();b.step();}assert.deepEqual(a.state,b.state);
   function restoreLike(g){const copy=new Simulation(['jo'],6,1);copy.state=structuredClone(g.state);copy.seed=g.seed;copy.nextId=g.nextId;return copy;}
 });
+

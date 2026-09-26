@@ -18,7 +18,7 @@ function money(sim, e, p, options = {}) { return sim.hazard(e, { kind: 'jualosCa
 
 test('Jualos replaces only the final boss and Gustavax remains a playable fighter', () => {
   assert.equal(CHAPTERS[5].boss, 'jualos'); assert.ok(FIGHTERS.some(f => f.id === 'gustavax'));
-  assert.equal(arena().e.kind, 'jualos'); assert.equal(arena().e.maxHp, 800);
+  assert.equal(arena().e.kind, 'jualos'); assert.equal(arena().e.maxHp, 1600);
 });
 
 test('belly dance has three timed impacts, avoided by distance, jumping or invulnerability', () => {
@@ -37,8 +37,8 @@ test('belly dance has three timed impacts, avoided by distance, jumping or invul
 
 test('strong blows cannot skip commercial phase and costume change has bounded protection', () => {
   const { sim, e, p } = arena(); sim.damage(e, 9999, p, true);
-  assert.equal(e.hp, 400); assert.equal(e.bossPhase, 2); assert.equal(e.commercial, true); assert.equal(e.pattern.kind, 'jualosSuit');
-  sim.damage(e, 9999, p, true); assert.equal(e.hp, 400);
+  assert.equal(e.hp, 800); assert.equal(e.bossPhase, 2); assert.equal(e.commercial, true); assert.equal(e.pattern.kind, 'jualosSuit');
+  sim.damage(e, 9999, p, true); assert.equal(e.hp, 800);
   for (let i = 0; i < 140; i++) sim.updateJualos(e, STEP);
   assert.equal(sim.jualosChanging(e), false); assert.ok(e.recovering > 1);
   e.hp = e.maxHp; sim.updateJualos(e, STEP); assert.equal(e.bossPhase, 2); assert.equal(e.commercial, true);
@@ -96,3 +96,4 @@ test('pause, boss KO, street change and revival never leave a player stuck on th
     assert.equal(p.jualosSlip, null);
   }
 });
+

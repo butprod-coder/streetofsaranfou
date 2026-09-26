@@ -18,7 +18,7 @@ test('practice options control damage, energy and intro; replay resets boss stat
   const sim = createBossPractice({ phase: 1 }), p = sim.state.players[0], boss = sim.state.enemies[0];
   sim.damage(p, 25, boss, true); assert.equal(p.hp, p.maxHp);
   p.energy = 1; p.specialCd = 5; sim.step(); assert.equal(p.energy, 100); assert.equal(p.specialCd, 0);
-  boss.hp = 12; const replay = createBossPractice(sim.state.practice); assert.equal(replay.state.enemies[0].hp, 640);
+  boss.hp = 12; const replay = createBossPractice(sim.state.practice); assert.equal(replay.state.enemies[0].hp, BALANCE.bosses.karonux.hp);
   const regular = createBossPractice({ invulnerable: false, freeSpecial: false });
   regular.damage(regular.state.players[0], 25, regular.state.enemies[0], true); assert.ok(regular.state.players[0].hp < regular.state.players[0].maxHp);
   assert.ok(createBossPractice({ cinema: true }).state.bossCinema);
