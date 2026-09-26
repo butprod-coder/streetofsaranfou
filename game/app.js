@@ -1,3 +1,4 @@
+import { usesTransformationTree, TRANSFORMATION_MILESTONES } from './transformation-rules.js';
 import { installSecretMenu, createSecretSession } from './secret-menu.js';
 import { finalDuelCheckpoint, restoreCheckpoint } from './run-save.js';
 import { installRouteUI, renderRouteUI } from './route-ui.js';
@@ -182,8 +183,10 @@ class Game {
     await this.load(this.state.chapter,()=>{this.simulation.pause(false);this.show(null);this.audio.wake();});
   }
   async startSolo(chapter = 0) {
+    const startingChoice = !this.state ? this.profiles[this.selected]?.talents.slice(0, 1) : [];
     this.network.close(true); this.mode = 'solo'; this.resultShown = false; this.state = null; this.simulation = null;
     this.resetProgression(); this.clearRunSave();
+    if (startingChoice?.length) this.profiles[this.selected] = normalizeProfile({ talents: startingChoice }, this.selected);
     this.simulation = new Simulation([this.selected], chapter, Date.now(), { randomRoute:true, difficulty: $('#difficulty-select').value, profiles: [this.profiles[this.selected]] }); this.state = this.simulation.state;
     await this.load(this.state.chapter, () => {
       this.sceneryStreet = '';
@@ -390,7 +393,8 @@ class Game {
     }
     if (this.screen === 'evolution' && document.activeElement?.dataset.talent && ['left', 'right'].includes(action)) {
       const nodes = [...document.querySelectorAll('[data-talent]')], n = nodes.indexOf(document.activeElement);
-      nodes[(n + (action === 'right' ? 5 : -5) + nodes.length) % nodes.length]?.focus(); return;
+      const ranks = nodes.length / 3;
+      nodes[(n + (action === 'right' ? ranks : -ranks) + nodes.length) % nodes.length]?.focus(); return;
     }
     if (action === 'accept') { if (document.activeElement instanceof HTMLInputElement) { const el = document.activeElement; el.value = el.value.toUpperCase().padEnd(6, 'A'); this.codeCursor = ((this.codeCursor ?? -1) + 1) % 6; el.setSelectionRange(this.codeCursor, this.codeCursor + 1); this.toast(`Code · caractère ${this.codeCursor + 1}/6 : ← → pour changer, A pour avancer. ↓ pour Rejoindre.`); } else document.activeElement?.click(); return; }
     if (document.activeElement?.id === 'room-input' && ['left', 'right'].includes(action)) {
@@ -481,7 +485,8 @@ class Game {
     this.renderer.draw(this.state, dt, { online: this.mode === 'online', slot: this.mode === 'online' ? this.network.slot : 0, input, age: (now - this.lastSnapshot) / 1000, ping: this.network.ping });
     this.audio.update(!!this.state && !this.screen, this.state?.chapter || 0,
       this.state?.enemies.some(e => e.boss && e.hp > 0),
-      document.hidden || (!!this.state?.paused && ['pause', 'evolution', 'attributes', 'loading', 'controls', 'sound', null].includes(this.screen)));
+        document.hidden || (!!this.state?.paused && ['pause', 'evolution', 'attributes', 'loading', 'controls', 'sound', null].includes(this.screen)),
+        this.state?.players.some(p=>p.specialState?.transformation&&p.kind==='yanu'&&p.specialState.branch===1&&p.specialState.rank===6));
   }
 }
 

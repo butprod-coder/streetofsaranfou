@@ -94,9 +94,52 @@ export const TALENT_ART = {
   'Descente du coude':['elbow','wave'], 'Réception musclée':['elbow','crash'], 'Rebond du champion':['elbow','bounce'], 'De coin en coin':['ring','leap'], 'Le ring est partout':['ring','star'],
   'Mauvais présage':['skull','eye'], 'Feu noir':['skull','fire'], 'Dette infernale':['skull','gauge'], 'Malédiction contagieuse':['skull','chains'], 'Sheitan incarné':['skull','crown'],
 };
+art.ice = '<path d="M16 2v28M4 9l24 14M4 23 28 9M11 5l5 5 5-5M11 27l5-5 5 5M4 14l7-2-2-7m19 13-7 2 2 7M4 18l7 2-2 7m19-13-7-2 2-7"/>';
+art.crutch = '<path d="m6 3 10 3-3 13-5 10M4 7l11 3M6 14l7 2m9-12 6 1-1 14-4 10m-3-20 8 1m-8 6 7 1"/>';
+BRANCH_ICONS.karonux = ['car', 'ice', 'crutch'];
+art.pigeon='<path d="M4 23 10 15 6 5l12 8c9-13 15 0 8 3l-4 8-10 3ZM18 13l-8 2m12 9 2 5m-8-3 1 3M25 11h1"/>';
+BRANCH_ICONS.lorenzo = ['cigarette','pigeon','head'];
+BRANCH_ICONS.jualos = ['hand','boar','notes'];
+art.neon='<path d="M4 3h24v26H4ZM9 8h14v16H9ZM1 16h6m18 0h6M16 1v6m0 18v6"/>';
+art.plant='<path d="M16 29V17M16 23 6 18l-4 2 8 6m6-3 10-5 4 2-8 6M5 5l11 6L27 5c6 17-28 17-22 0ZM9 7l1 5m13-5-1 5M12 16l1-4m6 4-1-4"/>';
+art.seed='<path d="M16 29V14M16 18C0 17 1 2 1 2s16-1 15 16ZM16 14C32 14 31 1 31 1S16 0 16 14Z"/>';
+BRANCH_ICONS.yanu=['wolf','neon','plant'];
+art.pallet='<path d="M4 22h24v4H4ZM4 22V8h7v14M8 8V3m0 0h6M15 18h14v4H15Z"/><circle cx="8" cy="27" r="3"/><circle cx="25" cy="27" r="2"/>';
+art.hair='<path d="M5 28C-2 12 13 11 8 2c12 3 2 14 13 5 9 7 12 16 5 21ZM11 28c-3-7 6-8 4-16 9 5 2 8 8 12l-1 4Z"/>';
+art.weasel='<path d="M5 20c-7-9 1-13 3-4m0 0 9-5 4-7 4 6 6 3-7 5-7 1-3 8H9l2-6-6-1ZM20 12h2m-7 7 7 7h5"/>';
+BRANCH_ICONS.jo=['pallet','hair','weasel'];
+art.summon='<path d="M7 29V18l9-5 9 5v11M10 21v8m12-8v8M13 13V7h6v6M3 6l2-4 2 4 4 2-4 2-2 4-2-4-3-2Zm22 0h5m-2-3v6"/>';
+art.bike='<circle cx="7" cy="23" r="6"/><circle cx="25" cy="23" r="6"/><path d="m7 23 7-12 7 12H7l5-8h11m-9-4-2-5h5m8 17-5-17h7"/>';
+BRANCH_ICONS.kikor=['palette','summon','bike'];
+BRANCH_ICONS.gustavax=['skull','crowd','belt'];
+art.clock='<circle cx="16" cy="16" r="12"/><path d="M16 6v10l7 4"/>';
+art.pierce='<path d="M2 16h28l-7-6m7 6-7 6M8 5v8m0 6v8m8-22v8m0 6v8"/>';
+Object.assign(TALENT_ART, {
+'Sheitan':['skull','claw'],'Flammes infernales':['claw','fire'],'Téléportation':['fire','swap'],'Démon supérieur':['skull','pack'],'Possession':['skull','eye'],'GRAND SHEITAN':['skull','fortress'],
+'Patron':['crowd','hand'],'Délégation':['crowd','chains'],'Réunion d’équipe':['crowd','reverse'],'Heures supplémentaires':['crowd','clock'],'Middle Management':['crowd','crown'],'COMITÉ DE DIRECTION':['crown','fortress'],
+'Catcheur':['belt','fist'],'Body Slam':['belt','crash'],'Projectile humain':['fist','ring'],'Main Event':['belt','wave'],'Prises aériennes':['belt','leap'],'WRESTLEMANIA SARANFOU':['belt','crown'],
+  'Peintre':['palette','fist'],'Bombe de peinture':['palette','crash'],'Graffiti vivant':['palette','ghost'],'Street Artist':['palette','gauge'],'Fresques vivantes':['palette','crowd'],'MAÎTRE DE SARANFOU':['palette','crown'],
+  'Bonhomme vert':['summon','flag'],'La bande':['summon','crowd'],'Spécialisation':['summon','swap'],'Armée verte':['summon','clock'],'kikor:Reproduction':['summon','seed'],'INVASION KIKOR':['summon','crown'],
+  'Cycliste':['bike','flag'],'Wheeling':['bike','shoe'],'Bunny Hop':['bike','leap'],'Descente':['bike','gauge'],'Freeride':['bike','steer'],'TOUR DE SARANFOU':['bike','crown'],
+  'Transpalette':['pallet','flag'],'Palette':['pallet','layers'],'Chargement':['pallet','hand'],'Livraison express':['pallet','gauge'],'Charge maximale':['pallet','crowd'],'LOGISTIQUE DE L’ENFER':['pallet','crown'],
+  'Roux incandescent':['hair','fist'],'Tignasse explosive':['hair','crash'],'Traînée de feu':['hair','shoe'],'Surchauffe':['hair','gauge'],'Incendiaire':['hair','chains'],'SUPER ROUX':['hair','crown'],
+  'Fouine':['weasel','dodge'],'Attaque sournoise':['weasel','fist'],'Chapardeur':['weasel','hand'],'Disparition':['weasel','ghost'],'Embuscade':['weasel','target'],'MAÎTRE FOUINE':['weasel','crown'],
+  'Bête sauvage':['wolf','flag'], 'Griffes':['wolf','fist'], 'Prédateur':['wolf','bounce'], 'Frénésie':['wolf','gauge'], 'Chasse':['wolf','chains'], 'BÊTE DE SARANFOU':['wolf','crown'],
+  'Fluo':['neon','fist'], 'Stroboscope':['neon','wave'], 'Dancefloor':['neon','shoe'], 'Rave':['neon','crowd'], 'BPM maximum':['neon','gauge'], 'RAVE PARTY SARANFOU':['neon','crown'],
+  'Jardinier carnivore':['plant','flag'], 'Racines':['plant','chains'], 'Multiplication':['plant','crowd'], 'Croissance accélérée':['plant','gauge'], 'Reproduction':['plant','seed'], 'SERRE DE L’ENFER':['plant','crown'],
+  'Commercial':['hand','flag'], 'Argumentaire commercial':['hand','gauge'], 'Vente additionnelle':['hand','crowd'], 'Contrat longue durée':['hand','clock'], 'Responsable commercial':['hand','chains'], 'OPA HOSTILE':['hand','crown'],
+  'Gros Porc':['boar','flag'], 'Coup de groin':['boar','crash'], 'Roulé-boulé':['boar','bounce'], 'Cochon sauvage':['boar','gauge'], 'Gros lard':['boar','leap'], 'MÉGA PORC':['boar','crown'],
+  'Guitariste':['notes','fist'], 'Distorsion':['notes','pierce'], 'Larsen':['notes','storm'], 'Ampli à 11':['notes','fortress'], 'Mur du son':['notes','reverse'], 'CONCERT DE SARANFOU':['notes','crown'],
+  'Chimère':['cigarette','storm'], 'Hallucinations':['cigarette','ghost'], 'Mauvais voyage':['cigarette','swap'], 'Brouillard total':['cigarette','crowd'], 'Des cigarettes brûlantes':['cigarette','fire'], 'CHIMÈRE TOTALE':['cigarette','crown'],
+  'Transformation Pigeon':['pigeon','wind'], 'Fiente tactique':['pigeon','drops'], 'Piqué':['pigeon','crash'], 'Pigeon Alpha':['pigeon','hand'], 'Appel de la nuée':['pigeon','crowd'], 'ROI DES PIGEONS':['pigeon','crown'],
+  'Crâne d’acier':['head','shield'], 'Bélier':['head','gauge'], 'Ricochet':['head','bounce'], 'Crâne blindé':['head','reverse'], 'Bowling humain':['head','domino'], 'CRÂNE TITANE':['head','star'],
+  'Golf IV':['car','flag'], 'Marche arrière':['car','reverse'], 'Frein à main':['car','steer'], 'Moteur préparé':['car','gauge'], 'Délit de fuite':['car','chains'], 'GOLF IV GTI DE SARANFOU':['car','crown'],
+  'Reine des Neiges':['ice','fist'], 'Brise-glace':['ice','crash'], 'Patinoire':['ice','dodge'], 'Blizzard':['ice','storm'], 'Contagion glaciale':['ice','chains'], 'REINE DE SARANFOU':['ice','crown'],
+  'Handikaron':['crutch','shoe'], 'Béquilles de combat':['crutch','fist'], 'Coup de plâtre':['crutch','gauge'], 'Saut à la béquille':['crutch','leap'], 'Toupie médicale':['crutch','storm'], 'Handikaron Ultime':['crutch','crown'],
+});
 const colors={karonux:'#ffc36b',jualos:'#ffa5ba',yanu:'#8df5cc',lorenzo:'#ff997d',jo:'#d5b5ff',kikor:'#95caff',gustavax:'#f4dca0'};
 export function talentIcon(kind, node) {
-  const [subject,action]=TALENT_ART[node.name] || [];
+  const [subject,action]=TALENT_ART[`${kind}:${node.name}`] || TALENT_ART[node.name] || [];
   if(!art[subject]||!art[action])throw new Error('Missing talent illustration: '+node.name);
   const accent=['#ffc46b','#cfadff','#78eacb'][node.branchIndex];
   return `<svg viewBox="0 0 48 48" aria-hidden="true" focusable="false" fill="none" stroke-linecap="round" stroke-linejoin="round" data-talent-art="${subject}-${action}"><path d="M4 2h31l11 11v31H4Z" fill="${colors[kind]}" fill-opacity=".08" stroke="${accent}" stroke-opacity=".35"/><g transform="translate(3 3) scale(1.1)" stroke="${colors[kind]}" stroke-width="1.8" fill="${colors[kind]}" fill-opacity=".13">${art[subject]}</g><rect x="27" y="27" width="20" height="20" rx="5" fill="#101722" stroke="${accent}" stroke-width="1.2"/><g transform="translate(28 28) scale(.56)" stroke="${accent}" stroke-width="2.3">${art[action]}</g>${node.ultimate?'<path d="m39 2 2 4 4 1-3 3v4l-3-2-3 2v-4l-3-3 4-1Z" fill="#ffe4a1"/>':''}</svg>`;

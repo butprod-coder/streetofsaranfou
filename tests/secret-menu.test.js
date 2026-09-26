@@ -38,7 +38,7 @@ test('secret menu selects any boss phase and supports the direct Gustavax cinema
 });
 test('secret modifiers work in full levels without ending at the first wave and cannot overwrite a run or records',()=>{
   const sim=createSecretSession({chapter:6,invulnerable:true,freeSpecial:true,boost:true}),p=sim.state.players[0];
-  assert.equal(p.progression.level,20);assert.equal(p.progression.points,8);
+  assert.equal(p.progression.level,20);assert.equal(p.progression.points,6);
   assert.equal(checkpoint(sim.snapshot()),null);recordRun(sim.snapshot(),0,{setItem(){throw Error('must not write');}});
   sim.damage(p,999,{x:100,y:500,power:999,enemy:true},true);assert.equal(p.hp,p.maxHp);
   sim.state.phase='fight';sim.state.wave=0;sim.state.enemies=[];sim.state.spawnQueue=[];p.energy=0;sim.step();

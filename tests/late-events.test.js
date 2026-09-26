@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { applyProfile, TALENTS } from '../game/progression.js';
 import assert from 'node:assert/strict';
 import { Simulation } from '../game/simulation.js';
 import { blankInput } from '../game/data.js';
@@ -37,7 +38,7 @@ test('school bell is exclusively six Jualos with warning before collision and on
 test('exam rewards only current actual skills, precise dodge, released throw and distinct special targets',()=>{
  const g=arena('exam');start(g);const p=g.state.players[0],e=g.state.neighborhoodEncounter;g.schoolAction('throw');assert.equal(p.energy,0);g.rogueOnDodge(p);assert.equal(p.energy,0);const foe=g.spawnEnemy('remy',{x:p.x+90,y:p.y,invincible:0});foe.attack={hit:false,windup:.6,elapsed:.5};g.rogueOnDodge(p);assert.equal(p.energy,15);g.rogueOnDodge(p);assert.equal(p.energy,15);
  e.elapsed=12;foe.x=p.x+25;foe.attack=null;foe.z=0;p.cooldown=0;p.grabCd=0;assert.equal(g.tryGrab(p),true);g.updateInteraction(p,true,.01,{x:-1,punch:true});g.updateInteraction(p,false,.3,{x:-1});assert.ok(e.examDone.includes(1));
- g.releaseGrab(p);e.elapsed=22;p.energy=100;g.activateSpecial(p);const a=g.spawnEnemy('remy',{x:800,y:540,hp:999,maxHp:999}),b=g.spawnEnemy('remy',{x:850,y:540,hp:999,maxHp:999});g.damage(a,5,p,false);g.damage(a,5,p,false);assert.ok(!e.examDone.includes(2));g.damage(b,5,p,false);assert.ok(e.examDone.includes(2));win(g);assert.equal(e.status,'success');
+ g.releaseGrab(p);e.elapsed=22;applyProfile(p,{talents:[TALENTS[p.kind][0].id]});p.energy=100;g.activateSpecial(p);const a=g.spawnEnemy('remy',{x:800,y:540,hp:999,maxHp:999}),b=g.spawnEnemy('remy',{x:850,y:540,hp:999,maxHp:999});g.damage(a,5,p,false);g.damage(a,5,p,false);assert.ok(!e.examDone.includes(2));g.damage(b,5,p,false);assert.ok(e.examDone.includes(2));win(g);assert.equal(e.status,'success');
 });
 test('gym choices are individual, bounded and carry the ricochet ball through checkpoint',()=>{
  const g=arena('gym',['jo','yanu']);start(g);at(g,GYM_CHOICES[0]);assert.equal(g.state.players[0].gymBalls,1);assert.equal(g.state.phase,'encounter');at(g,GYM_CHOICES[1]);assert.ok(!g.state.players[0].weapon);g.state.players[1].hp=40;at(g,GYM_CHOICES[2],1);assert.equal(g.state.players[1].hp,75);assert.equal(g.state.phase,'rest');assert.equal(g.state.players[0].progression.xp,0);

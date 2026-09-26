@@ -84,7 +84,11 @@ export class Simulation {
     s.decor = null;
     for (const p of s.players) { this.releaseGrab(p); p.interaction = null; this.clearRogueTransient(p); }
     s.enemies = []; s.pickups = this.streetWeapons(); s.combo = 0; s.comboTime = 0;
-    s.gymProjectiles = []; s.hazards = []; s.allies = []; s.wave = -1; s.spawnQueue = []; s.spawnTimer = 0;
+    s.gymProjectiles = []; s.hazards = []; s.allies = s.allies.filter(a => (a.recruit || a.gustavaxMinion) && a.permanent && a.hp > 0); s.wave = -1; s.spawnQueue = []; s.spawnTimer = 0;
+    s.jualosWaves = []; s.lorenzoClouds = []; s.lorenzoShots = []; s.lorenzoBirds = [];
+    s.yanuPlants = []; s.yanuTiles = [];
+    s.kikorPaintZones=[];s.kikorPots=[];s.kikorDrawings=[];
+    for (const a of s.allies) { a.x = 130; a.y = 500 + a.id % 4 * 35; a.attack = null; }
     s.rogueZones = []; s.rogueBalls = [];
     s.enemyOrder ||= createEnemyOrder(() => this.random());
     s.streetSeed = this.seed; s.streetBag = [...(s.enemyBag || [])];
@@ -149,9 +153,9 @@ export class Simulation {
   awardChapterTalent() {
     const s = this.state;
     for (const p of s.players) {
-      const previous = p.progression.completed.length, profile = s.route ? awardTalent({ ...p.progression, completed: [...p.progression.completed,s.chapter] }, `boss:${this.routeDepth()}`) : completeChapter(p.progression, s.chapter);
+      const previous = p.progression.milestones.length, profile = s.route ? awardTalent({ ...p.progression, completed: [...p.progression.completed,s.chapter] }, `boss:${this.routeDepth()}`) : completeChapter(p.progression, s.chapter);
       applyProfile(p, profile);
-      if (profile.completed.length > previous && this.routeDepth() < 5) this.event('talent', { actor: p.id, x: p.x, y: p.y - 155, label: 'CHAPITRE TERMINÉ · +1 TALENT · PAUSE' });
+      if (profile.milestones.length > previous) this.event('talent', { actor: p.id, x: p.x, y: p.y - 155, label: 'CHAPITRE TERMINÉ · +1 TALENT · PAUSE' });
     }
   }
 
@@ -252,7 +256,7 @@ export class Simulation {
       }
     }
     if (s.phase === 'rest') { s.phaseTime -= dt; if (s.phaseTime <= 0) this.spawnWave(); }
-    if (s.phase === 'fight' && s.players.some(alive) && !s.enemies.some(alive) && !s.spawnQueue.length) {
+    if (s.phase === 'fight' && s.players.some(alive) && !s.enemies.some(alive) && !s.allies.some(a=>a.recruit&&!a.permanent&&alive(a)) && !s.spawnQueue.length) {
       if (s.practice || s.sandbox?.mode === 'enemy') { s.phase = 'won'; s.hazards = []; return; }
       this.finishNeighborhoodWave();
       this.awardXP(120 + this.routeDepth() * 30, 'wave:' + s.chapter + ':' + s.stage + ':' + s.wave);
@@ -320,7 +324,7 @@ export class Simulation {
     }
     this.updateRoguePlayer(p, input, dt);
     if (p.rogueLastNap > 0 && !p.specialState) return;
-    if (p.specialState) { const free = p.specialState.free; this.updateSpecial(p, input, dt); if (p.kind !== 'gustavax' && !free) return; }
+    if (p.specialState) { const controlled=p.specialState.transformation||!p.specialState.free; this.updateSpecial(p,input,dt); if(controlled)return; }
     if (this.updateInteraction(p, pressed.punch && input.x * (p.grapple?.facing || p.facing) < -.35, dt, input)) return;
     if (p.stun > 0) return;
     if (p.action !== 'dodge' && !p.specialState) {
@@ -466,6 +470,7 @@ export class Simulation {
   damage(target, amount, source, heavy, chargeEnergy = false) {
     const s = this.state;
     if (target.hp <= 0) return;
+    if(target.gustavaxMinion){if(!source?.enemy||s.bossCinema)return;target.hp=Math.max(0,target.hp-amount);target.flash=.15;if(target.hp<=0)target.ttl=0;this.event('impact',{x:target.x,y:target.y-65});return;}
     if (amount > 0 && this.bourgCover(target, source, heavy)) return;
     if ((s.practice?.invulnerable || s.sandbox?.invulnerable) && !target.enemy) return;
     if (s.bossCinema) return;
@@ -495,6 +500,7 @@ export class Simulation {
     if (amount > 0 && chargeEnergy && source?.progression && !source.enemy && !source.ally && !source.specialState && !this.rogueDepth) source.energy = Math.min(100, source.energy + BALANCE.energy.perHit);
     if (!target.enemy) this.dropStadiumBaton(target);
     if (target.enemy && amount > 0 && source?.specialState && !source.enemy) this.schoolSpecialHit(source, target);
+    amount=this.kikorProtect(target,amount);
     target.hp = Math.max(0, target.hp - amount); target.flash = .12;
     if (target.boss && target.kind === 'lorenzo' && !target.sofa && !target.sofaBroken && target.hp <= target.maxHp * BALANCE.bosses.lorenzo.phases[0]) this.beginLorenzoSofa(target);
     if (target.boss && target.kind === 'jualos' && !target.commercial && target.hp <= target.maxHp * BALANCE.bosses.jualos.phases[0]) this.beginJualosCommercial(target);
@@ -533,6 +539,8 @@ export class Simulation {
       this.event('ko', { x: target.x, y: target.y, actor: target.id, enemy: target.enemy, boss: target.boss });
       if (target.enemy) {
         this.rogueOnKill(source, target);
+        this.yanuTransformationKill(source);
+        this.kikorParticipationKill(source,target);
         if (!target.owner && !source?.ally) this.awardXP(target.boss ? 600 : 20 + this.routeDepth() * 3, 'enemy:' + target.id);
         s.kills++; s.score += target.value + Math.min(10, Math.floor(s.combo / 3)) * 20;
         if (target.boss) { s.hazards = s.hazards.filter(h => h.owner !== target.id); for (const e of s.enemies) if (e.owner === target.id) { e.hp = 0; e.deadTime = 0; } }
@@ -546,8 +554,18 @@ export class Simulation {
   }
 
   updateEnemy(e, dt) {
+    if (this.updateGustavaxEnemy(e, dt)) return;
+    if (this.updateJoCargo(e, dt)) return;
+    if (this.updateYanuRoots(e, dt)) return;
+    if (this.updateLorenzoEnemy(e, dt)) return;
+    if (this.updateJualosRecruitTarget(e, dt)) return;
     const speed = e.speed;
+    if (e.hp > 0 && e.karonuxFrost?.frozenUntil > this.state.time) {
+      e.attack = null; this.tickActor(e, dt); e.vx = e.vy = 0; return;
+    }
+    if (e.karonuxFrost?.until > this.state.time) e.speed *= .55;
     if (e.rogueSlow > 0) e.speed *= .55;
+    if (e.kikorPaintUntil > this.state.time) e.speed *= .5;
     try { this.updateEnemyAction(e, dt); } finally { e.speed = speed; }
   }
 
@@ -567,7 +585,7 @@ export class Simulation {
     if (e.hp > 0 && e.boss) { this.updateBoss(e, dt); return; }
     if (e.hp <= 0 || e.attack || e.stun > 0 || !['fight', 'surprise'].includes(this.state.phase)) return;
     if (e.boss && e.hp < e.maxHp * .4 && !e.enraged) { e.enraged = true; e.speed *= 1.25; this.event('rage', { actor: e.id, label: `${fighter(e.kind).name} s’énerve !` }); }
-    const targets = this.state.players.filter(alive);
+    const targets = this.state.players.filter(p=>alive(p)&&!p.joInvisible);
     if (!targets.length) return;
     const target = targets.length === 1 ? targets[0] : targets[e.id % targets.length];
     const dx = target.x - e.x, dy = target.y - e.y;
@@ -578,7 +596,7 @@ export class Simulation {
     if (e.kind === 'triso' && Math.abs(dx) < BALANCE.triso.range && Math.abs(dy) < 100 && e.cooldown <= 0 && attacking < limit && this.state.hazards.filter(h => h.kind === 'slime').length < BALANCE.triso.maxPuddles) {
       e.spitTarget = { x: target.x, y: target.y }; this.startAttack(e, 'special'); return;
     }
-    if (['guylux', 'orelsan', 'papy_jala', 'charlingals', 'kikor_e'].includes(e.kind) && Math.abs(dx) >= e.reach - 12 && Math.abs(dx) < (e.kind === 'orelsan' ? 620 : 500) && Math.abs(dy) < 70 && e.cooldown <= 0 && attacking < limit) { this.startAttack(e, 'special'); return; }
+    if (!e.joDisarmed && ['guylux', 'orelsan', 'papy_jala', 'charlingals', 'kikor_e'].includes(e.kind) && Math.abs(dx) >= e.reach - 12 && Math.abs(dx) < (e.kind === 'orelsan' ? 620 : 500) && Math.abs(dy) < 70 && e.cooldown <= 0 && attacking < limit) { this.startAttack(e, 'special'); return; }
     if (['remy', 'makouille'].includes(e.kind) && Math.abs(dx) < 430 && Math.abs(dy) < 75 && e.cooldown <= 0 && attacking < limit && e.attackCount % 3 === 2) { e.attackCount++; this.startAttack(e, 'special'); return; }
     if (Math.abs(dx) < e.reach - 12 && Math.abs(dy) < 38 && e.cooldown <= 0 && attacking < limit) {
       if (e.boss) e.attackCount++;
@@ -597,7 +615,7 @@ export class Simulation {
   }
 
   separateEnemies(dt) {
-    const enemies = this.state.enemies.filter(e => alive(e) && !e.joPallet && !e.grabbedBy && !e.thrown);
+    const enemies = this.state.enemies.filter(e => alive(e) && !e.joPallet && !e.grabbedBy && !e.thrown && !e.gustavaxGrip && !e.lorenzoCarry && !e.joCargo);
     for (let i = 0; i < enemies.length; i++) for (let j = i + 1; j < enemies.length; j++) {
       const a = enemies[i], b = enemies[j], dx = a.x - b.x, dy = a.y - b.y;
       const d = Math.hypot(dx, dy * 1.4);
@@ -610,6 +628,7 @@ export class Simulation {
   }
 
   physics(a, dt) {
+    if (a.gustavaxGrip || a.lorenzoCarry || a.joCargo || a.yanuRoots?.until > this.state.time || a.specialState?.transformation && ['lorenzo','jualos','yanu','jo','kikor','gustavax'].includes(a.kind)) return;
     if (a.joPallet || a.grabbedBy || a.thrown || a.caughtBy || a.kikorGrip || a.yanuFrozen || a.jualosSlip || a.sofa && !a.sofaBroken) return;
     a.x = clamp(a.x + a.vx * dt, FLOOR.left, FLOOR.right);
     a.y = clamp(a.y + a.vy * dt, FLOOR.top, FLOOR.bottom);

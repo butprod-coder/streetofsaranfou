@@ -1,3 +1,4 @@
+import { usesTransformationTree, TRANSFORMATION_MILESTONES } from './transformation-rules.js';
 import { fighter, clamp } from './data.js';
 import { BALANCE } from './balance.js';
 import { TALENTS, hasTalent } from './rogue-talents.js';
@@ -6,12 +7,13 @@ export const TALENT_SAVE_KEY = 'saranfou-talents-v1';
 export const ATTRIBUTES = { vitality: 'Vitalité', strength: 'Force', mobility: 'Mobilité', endurance: 'Endurance', weapons: 'Maîtrise des armes' };
 export const xpForLevel = level => Math.round(65 * (level - 1) ** 2 + 120 * (level - 1));
 const finite = (n, max) => Number.isFinite(n) ? clamp(Math.floor(n), 0, max) : 0;
-export const TALENT_MILESTONES = ['street:0:0', 'street:0:2', 'boss:0', 'street:1:2', 'boss:1', 'boss:2', 'boss:3', 'boss:4'];
+export const TALENT_MILESTONES = ['start', 'street:0:2', 'boss:0', 'street:1:2', 'boss:1', 'boss:2', 'boss:3', 'boss:4'];
 export function awardTalent(profile, milestone) {
   return normalizeProfile({ ...profile, milestones: [...(profile.milestones || []), milestone] });
 }
 export function canLearn(profile, node) {
   if (!node || profile.talents.includes(node.id)) return false;
+  if (usesTransformationTree(profile.kind) && TALENTS[profile.kind].some(n => profile.talents.includes(n.id) && n.branchIndex !== node.branchIndex)) return false;
   const branch = TALENTS[profile.kind].filter(n => n.branch === node.branch);
   if (node.tier && !branch.some(n => n.tier === node.tier - 1 && profile.talents.includes(n.id))) return false;
   if (node.ultimate && (TALENTS[profile.kind].some(n => n.ultimate && profile.talents.includes(n.id)))) return false;
@@ -22,11 +24,12 @@ export function normalizeProfile(raw = {}, kind = raw?.kind || 'karonux') {
   const completed = [...new Set(Array.isArray(raw.completed) ? raw.completed.filter(n => Number.isInteger(n) && n >= 0 && n < 6) : [])].sort();
   const xp = finite(raw.xp, xpForLevel(20));
   let level = 1; while (level < 20 && xp >= xpForLevel(level + 1)) level++;
-  const milestones = TALENT_MILESTONES.filter(key => Array.isArray(raw.milestones) && raw.milestones.includes(key));
+  const milestones = (usesTransformationTree(kind) ? TRANSFORMATION_MILESTONES : TALENT_MILESTONES).filter(key => key === 'start' || Array.isArray(raw.milestones) && raw.milestones.includes(key));
   const total = milestones.length;
   const p = { kind, xp, level, completed, milestones, talents: [], points: total, attributes: {}, statPoints: (level - 1) * 2 };
   const requested = new Set(Array.isArray(raw.talents) ? raw.talents : []);
-  for (const node of TALENTS[kind]) if (requested.has(node.id) && p.points > 0 && canLearn(p, node)) { p.talents.push(node.id); p.points--; }
+  const firstBranch = usesTransformationTree(kind) ? TALENTS[kind].find(n => n.id === [...requested].find(id => TALENTS[kind].some(t => t.id === id)))?.branchIndex : undefined;
+  for (const node of TALENTS[kind]) if ((firstBranch === undefined || node.branchIndex === firstBranch) && requested.has(node.id) && p.points > 0 && canLearn(p, node)) { p.talents.push(node.id); p.points--; }
   for (const key of Object.keys(ATTRIBUTES)) { p.attributes[key] = Math.min(p.statPoints, finite(raw.attributes?.[key], 10)); p.statPoints -= p.attributes[key]; }
   return p;
 }
@@ -56,7 +59,7 @@ export function bonuses(profile) {
 export function refreshPlayerStats(player, proportionalHealth = false) {
   const oldMax = player.maxHp, ratio = oldMax > 0 ? player.hp / oldMax : 1, c = fighter(player.kind);
   player.bonuses = bonuses(player.progression);
-  const b = player.bonuses, boost = player.specialState?.kind === 'gustavax' ? 1 + BALANCE.wrestler.statBonus : 1;
+  const b = player.bonuses, boost = player.specialState?.kind === 'gustavax' && !player.specialState.transformation ? 1 + BALANCE.wrestler.statBonus : 1;
   player.maxHp = Math.round(c.hp * b.life * boost); player.power = c.power * b.attack * boost; player.speed = c.speed * b.speed * boost;
   player.specialPower = c.power * b.attack * b.special * boost;
   b.defense = 1 - (1 - b.defense) * (boost > 1 ? 1 - BALANCE.wrestler.statBonus : 1);

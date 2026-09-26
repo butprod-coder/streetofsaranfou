@@ -1,9 +1,10 @@
+import { usesTransformationTree, TRANSFORMATION_MILESTONES } from './transformation-rules.js';
 import { DIFFICULTIES } from './balance.js';
 import { TALENTS, normalizeProfile, spendPoint, xpForLevel } from './progression.js';
 import { fighter, CHAPTERS } from './data.js';
 import { branchIcon, talentIcon } from './talent-icons.js';
 export function installEvolutionUI() {
-  document.querySelector('.edition').textContent = 'ROGUELIKE · UNE NUIT, UNE VIE';
+  document.querySelector('.edition').textContent = 'SARANFOU · UNE NUIT, UNE VIE';
   document.querySelector('#join-form').insertAdjacentHTML('beforeend', '<p class="evolution-note">À la manette : sélectionne le code, A / ✕ choisit le caractère, ← → le modifient, ↓ passe à Rejoindre.</p>');
   const options = Object.entries(DIFFICULTIES).map(([id, d]) => `<option value="${id}" ${id === 'normal' ? 'selected' : ''}>${d.name}</option>`).join('');
   document.querySelector('.departure').insertAdjacentHTML('afterbegin', `<label for="difficulty-select">AMBIANCE</label><select id="difficulty-select">${options}</select>`);
@@ -17,16 +18,20 @@ export function installEvolutionUI() {
 }
 export function renderEvolution(kind, raw, spend) {
   const $ = s => document.querySelector(s), f = fighter(kind), profile = normalizeProfile(raw, kind), active = document.activeElement?.dataset.talent;
+  const pilot = usesTransformationTree(kind), ranks = pilot ? 6 : 5, budget = pilot ? 6 : 8;
+  $('.evolution-modal').classList.toggle('karonux-talents', pilot);
+  const chosen = TALENTS[kind].find(n => profile.talents.includes(n.id))?.branch;
+  $('.talent-help [role=tooltip]').textContent = pilot ? '6 points : un dès le début, puis après les boss des cinq quartiers suivants. Le premier achat verrouille la branche pour toute la partie. 6 rangs successifs. Spécial : 5 s, 7 s au N4, 9 s au N6. Nouvelle partie : remise à zéro.' : '8 points par partie : fin de la première rue, troisième rue des quartiers 1 et 2, puis les cinq premiers boss. Rang précédent requis. Un seul ultime par partie. Achats définitifs, sans remboursement. Nouvelle partie : remise à zéro.';
   $('#evolution-portrait').src = `/assets/${kind}/${kind}_p.png`; $('#evolution-portrait').alt = f.name;
   $('#evolution-title').textContent = f.name;
-  $('#talent-progress').textContent = `NIVEAU ${profile.level}/20 · ${profile.xp} XP${profile.level < 20 ? ' / ' + xpForLevel(profile.level + 1) : ''} · ${profile.talents.length}/8 TALENTS ACTIFS`;
+  $('#talent-progress').textContent = `NIVEAU ${profile.level}/20 · ${profile.xp} XP${profile.level < 20 ? ' / ' + xpForLevel(profile.level + 1) : ''} · ${profile.talents.length}/${budget} TALENTS ACTIFS`;
   $('#talent-progress').title = profile.completed.map(i => CHAPTERS[i].name).join(' · ');
   $('.evolution-modal').style.setProperty('--fighter-color', f.color);
-  $('.evolution-points').innerHTML = `<strong>${profile.points}</strong><span>POINTS DE TALENT<br><small>3 branches · 5 rangs · 15 talents · 8 achats définitifs</small></span>`;
+  $('.evolution-points').innerHTML = `<strong>${profile.points}</strong><span>POINTS DE TALENT<br><small>${pilot ? `3 branches · 6 rangs · ${chosen ? 'BRANCHE VERROUILLÉE : ' + chosen : 'LE PREMIER ACHAT ENGAGE UNE SEULE BRANCHE'}` : '3 branches · 5 rangs · 15 talents · 8 achats définitifs'}</small></span>`;
   const nodes = TALENTS[kind], branches = [...new Set(nodes.map(n => n.branch))];
-  $('#talent-tree').innerHTML = branches.map((branch, branchIndex) => `<div class="talent-branch" style="--branch-color:${['#ffb454', '#b891ff', '#59d6be'][branchIndex]}"><div class="talent-branch-title"><span class="branch-icon">${branchIcon(kind, branchIndex)}</span><div><span>VOIE 0${branchIndex + 1}</span><h3>${branch}</h3></div><b class="branch-count">${nodes.filter(n => n.branch === branch && profile.talents.includes(n.id)).length}/5</b></div><div class="talent-track">${talentLinks(nodes.filter(n => n.branch === branch), profile)}${nodes.filter(n => n.branch === branch).map(node => {
+  $('#talent-tree').innerHTML = branches.map((branch, branchIndex) => `<div class="talent-branch ${pilot && chosen && chosen !== branch ? 'branch-disabled' : ''}" style="--branch-color:${['#ffb454', '#b891ff', '#59d6be'][branchIndex]}"><div class="talent-branch-title"><span class="branch-icon">${branchIcon(kind, branchIndex)}</span><div><span>VOIE 0${branchIndex + 1}${pilot && chosen && chosen !== branch ? ' · DÉSACTIVÉE' : ''}</span><h3>${branch}</h3></div><b class="branch-count">${nodes.filter(n => n.branch === branch && profile.talents.includes(n.id)).length}/${ranks}</b></div><div class="talent-track">${talentLinks(nodes.filter(n => n.branch === branch), profile)}${nodes.filter(n => n.branch === branch).map(node => {
     const owned = profile.talents.includes(node.id), available = !!spendPoint(profile, node.id);
-    const reason = owned ? '✓ ACTIF' : available ? node.ultimate ? '1 POINT · VERROUILLE LES AUTRES ULTIMES DÉFINITIVEMENT' : 'DÉBLOQUER · 1 POINT' : node.ultimate && nodes.some(n => n.ultimate && profile.talents.includes(n.id)) ? 'AUTRE ULTIME CHOISI' : !profile.points ? 'POINT NÉCESSAIRE' : 'PALIER PRÉCÉDENT REQUIS';
+    const reason = owned ? '✓ ACTIF' : pilot && chosen && chosen !== node.branch ? 'AUTRE BRANCHE CHOISIE · DÉSACTIVÉE' : available ? pilot && !chosen ? '1 POINT · ENGAGE CETTE BRANCHE DÉFINITIVEMENT' : node.ultimate && !pilot ? '1 POINT · VERROUILLE LES AUTRES ULTIMES DÉFINITIVEMENT' : 'DÉBLOQUER · 1 POINT' : node.ultimate && nodes.some(n => n.ultimate && profile.talents.includes(n.id)) ? 'AUTRE ULTIME CHOISI' : !profile.points ? 'POINT NÉCESSAIRE' : 'PALIER PRÉCÉDENT REQUIS';
     return `<button class="talent-node ${node.ultimate ? 'ultimate' : ''} ${owned ? 'owned' : available ? 'available' : 'locked'}" data-talent="${node.id}" data-tier="${node.tier + 1}" aria-disabled="${!available}" aria-label="${node.name} : ${node.description} — ${reason}" data-reason="${reason}"><span class="talent-art">${talentIcon(kind, node)}</span><span class="talent-rank">${owned ? '1/1' : '0/1'}</span>${node.ultimate ? '<span class="talent-star" aria-hidden="true">★</span>' : ''}</button>`;
 
   }).join('')}</div></div>`).join('');
@@ -66,7 +71,7 @@ export function renderPauseTalents(player) {
   attributes.textContent = profile.statPoints > 0 ? `Caractéristiques · ${profile.statPoints} points à dépenser` : 'Caractéristiques & XP';
   button.style.setProperty('--fighter-color', f.color); button.classList.toggle('has-points', profile.points > 0);
   button.querySelector('.pause-talent-icon').innerHTML = branchIcon(player.kind);
-  document.querySelector('#pause-talent-summary').textContent = `${f.name} · Niv. ${profile.level} · ${profile.talents.length}/8 talents actifs`;
+  document.querySelector('#pause-talent-summary').textContent = `${f.name} · Niv. ${profile.level} · ${profile.talents.length}/${usesTransformationTree(player.kind) ? 6 : 8} talents actifs`;
   document.querySelector('#pause-talent-points').innerHTML = `${profile.points}<small>POINT${profile.points > 1 ? 'S' : ''}</small>`;
   document.querySelector('#pause-talent-branches').innerHTML = [...new Set(TALENTS[player.kind].map(n => n.branch))].map((name, i) => `<span>${branchIcon(player.kind, i)}${name}</span>`).join('');
   button.setAttribute('aria-label', `Arbre de talents de ${f.name} : ${profile.points} point${profile.points > 1 ? 's' : ''} à dépenser, ${profile.talents.length} talents actifs`);
@@ -75,5 +80,5 @@ export function renderPauseTalents(player) {
 // Each owned rank opens only the next rank of the same branch.
 function talentLinks(nodes, profile) {
   const lines = nodes.slice(0,-1).map(node => '<path class="'+(profile.talents.includes(node.id)?'lit':'')+'" d="M100 '+(node.tier*72+30)+' L100 '+((node.tier+1)*72+30)+'"/>').join('');
-  return '<svg class="talent-links" viewBox="0 0 200 348" preserveAspectRatio="none" aria-hidden="true">'+lines+'</svg>';
+  return '<svg class="talent-links" viewBox="0 0 200 '+(nodes.length*72-12)+'" preserveAspectRatio="none" aria-hidden="true">'+lines+'</svg>';
 }

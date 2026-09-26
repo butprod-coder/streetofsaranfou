@@ -1,9 +1,16 @@
+import { gustavaxTransformations } from './gustavax-transformations.js';
 import { BALANCE, difficulty } from './balance.js';
 import { FLOOR, fighter, clamp } from './data.js';
 import { refreshPlayerStats } from './progression.js';
 import { ENCORE_RULES } from './elite-encore-data.js';
 import { hasTalent } from './rogue-talents.js';
 import { golfCombat } from './golf.js';
+import { karonuxTransformations } from './karonux-transformations.js';
+import { lorenzoTransformations } from './lorenzo-transformations.js';
+import { jualosTransformations } from './jualos-transformations.js';
+import { yanuTransformations } from './yanu-transformations.js';
+import { joTransformations } from './jo-transformations.js';
+import { kikorTransformations } from './kikor-transformations.js';
 const SIGNATURES = { karonux: 'rainbowStorm', kikor: 'preciousHunt', yanu: 'kayakRush', lorenzo: 'sofaDrop', jo: 'ferretHunt', gustavax: 'finalRing' };
 const live = a => a.hp > 0;
 const distance = (a, b) => Math.hypot(a.x - b.x, (a.y - b.y) * 1.4);
@@ -12,7 +19,20 @@ const nearest = (a, actors) => actors.filter(live).sort((x, y) => distance(a, x)
 /** Serializable combat extensions, stepped exclusively by the shared simulation. */
 export const combat = {
   ...golfCombat,
+  ...karonuxTransformations,
+  ...lorenzoTransformations,
+  ...jualosTransformations,
+  ...yanuTransformations,
+  ...joTransformations,
+  ...kikorTransformations,
+  ...gustavaxTransformations,
   endSpecial(p) {
+    if (p.specialState?.transformation && p.kind === 'gustavax') this.endGustavaxTransformation(p);
+    if (p.specialState?.transformation && p.kind === 'kikor') this.endKikorTransformation(p);
+    if (p.specialState?.transformation && p.kind === 'jo') this.endJoTransformation(p);
+    if (p.specialState?.transformation && p.kind === 'yanu') this.endYanuTransformation(p);
+    if (p.specialState?.transformation && p.kind === 'jualos') this.endJualos(p);
+    if (p.specialState?.transformation && p.kind === 'lorenzo') this.endLorenzo(p);
     const wrestling = p.specialState?.kind === 'gustavax';
     const after = p.specialState?.after;
     if (after && p.hp > 0) { p[after] = this.state.time + 6; this.rogueFX(p, after === 'rogueDrift' ? 'ROND-POINT DE L’ENFER' : 'DÉMOLITION EXPRESS', 180); }
@@ -31,6 +51,12 @@ export const combat = {
   },
   updateWorld(dt) {
     const s = this.state;
+    this.updateKaronuxWorld(dt);
+    this.updateLorenzoWorld(dt);
+    this.updateJualosWorld(dt);
+    this.updateYanuWorld(dt);
+    this.updateKikorWorld(dt);
+    this.updateGustavaxWorld(dt);
     this.updateRogueWorld(dt);
     for (const h of s.hazards) {
       if (h.bossOwner && !s.enemies.some(e => e.id === h.owner && live(e))) { h.ttl = 0; continue; }
@@ -57,7 +83,7 @@ export const combat = {
       if (h.kind === 'jualosCash') { this.updateJualosCash(h); continue; }
       const intersects = target => { const dx = target.x - h.x, dy = target.y - h.y, extent = target.halfWidth || 0; return h.shape === 'line' ? dx * h.facing >= -25 - extent && dx * h.facing <= h.width + extent && Math.abs(dy) < h.band : Math.hypot(Math.max(0, Math.abs(dx) - extent), dy * 1.45) < h.radius; };
         const armed = h.kind !== 'plant' || h.activeAge % ENCORE_RULES.plantCycle < ENCORE_RULES.plantBite;
-        for (const target of h.damage > 0 && armed ? h.both ? [...s.players, ...s.enemies] : h.enemy ? s.players : s.enemies : []) {
+        for (const target of h.damage > 0 && armed ? h.both ? [...s.players, ...s.enemies] : h.enemy ? [...s.players,...s.allies.filter(m=>m.gustavaxMinion)] : s.enemies : []) {
         if (!live(target) || target.invincible > 0 || ((h.enemy || h.both) && !target.enemy && target.z > 28) || s.time < (h.hits[target.id] || 0)) continue;
         const dx = target.x - h.x, dy = target.y - h.y;
         const distance = Math.hypot(dx, dy * (h.verticalScale || 1.45));
@@ -76,6 +102,7 @@ export const combat = {
     }
     s.hazards = s.hazards.filter(h => h.ttl > 0);
     for (const a of s.allies) {
+      if (a.recruit || a.kikorSummon || a.gustavaxMinion) continue;
       a.ttl -= dt; a.cooldown -= dt; a.actionTime += dt;
       const owner = s.players.find(p => p.id === a.owner);
       const target = s.enemies.find(e => e.hp > 0 && e.id === owner?.rogueTarget) || (a.rogueForm === 'wolf' ? s.enemies.find(e => e.hp > 0 && e.rogueBurns?.[owner?.id]) : null) || nearest(a, s.enemies);
@@ -121,6 +148,8 @@ export const combat = {
   activateSpecial(p) {
     const b = BALANCE.specials[p.kind], bonus = p.bonuses;
     if (p.hp <= 0 || p.specialState || p.energy < b.cost) return false;
+    const begin={karonux:'beginKaronux',lorenzo:'beginLorenzo',jualos:'beginJualos',yanu:'beginYanuTransformation',jo:'beginJoTransformation',kikor:'beginKikorTransformation',gustavax:'beginGustavaxTransformation'}[p.kind];
+    if(begin){const activated=this[begin](p);if(activated){this.stadiumAction('special');p.examTargets=[];}return activated;}
     this.stadiumAction('special');
     p.examTargets = [];
     p.energy -= b.cost; p.specialCd = b.cooldown * bonus.cooldown;
@@ -135,6 +164,10 @@ export const combat = {
     this.event('special', { actor: p.id, kind: fighter(p.kind).technique, label: fighter(p.kind).special, x: p.x, y: p.y, facing: p.facing });
   },
   updateSpecial(p, input, dt) {
+    if (p.specialState?.transformation) {
+      const update={karonux:'updateKaronuxTransformation',lorenzo:'updateLorenzoTransformation',jualos:'updateJualosTransformation',yanu:'updateYanuTransformation',jo:'updateJoTransformation',kikor:'updateKikorTransformation',gustavax:'updateGustavaxTransformation'}[p.kind];
+      return this[update](p,input,dt);
+    }
     const a = p.specialState, b = BALANCE.specials[p.kind], s = this.state;
     a.elapsed += dt; if (p.kind !== 'gustavax' && !a.free) p.action = 'special';
     if (a.override) { if (a.elapsed >= a.duration) { this.endSpecial(p); p.cooldown = 0; } return; }

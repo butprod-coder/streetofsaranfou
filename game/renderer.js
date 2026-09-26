@@ -1,3 +1,10 @@
+import { drawGustavaxTransformation, drawGustavaxMinion, drawGustavaxWorld } from './gustavax-transform-renderer.js';
+import { drawLorenzoTransformation, drawLorenzoWorld } from './lorenzo-transform-renderer.js';
+import { drawJualosTransformation, drawJualosWorld } from './jualos-transform-renderer.js';
+import { drawYanuTransformation, drawYanuWorld } from './yanu-transform-renderer.js';
+import { drawJoTransformation } from './jo-transform-renderer.js';
+import { drawKikorTransformation, drawKikorWorld, drawKikorMinion } from './kikor-transform-renderer.js';
+import { usesTransformationTree, TRANSFORMATION_MILESTONES } from './transformation-rules.js';
 import { drawFinalArena, drawGustavax, drawFinalSmoke } from './final-renderer.js';
 import { routeDepth } from './campaign-route.js';
 import { drawNightDarkness } from './late-renderer.js';
@@ -78,7 +85,8 @@ export class Renderer {
       if (e.type === 'ko' && e.boss) { this.shake = 8; this.effects.push({ type: 'announcement', text: 'LE PATRON EST À TERRE', color: '#ffe0a3', ttl: 2.6, life: 2.6 }); }
       if (e.type === 'elite') this.effects.push({ type: 'announcement', text: `ÉLITE · ${e.label.toUpperCase()}`, color: '#d6b4ff', ttl: 1.5, life: 1.5 });
       if (e.type === 'taunt') this.effects.push({ type: 'number', x: e.x, y: e.y, text: e.label, color: '#ffe5a7', ttl: 1.7, life: 1.7 });
-      if (e.type === 'spectacle') { this.shake = Math.max(this.shake, 5); this.effects.push({ ...e, type: 'atlasFX', ttl: .5, life: .5 }); }
+      if (e.type === 'spectacle') { if (e.atlas !== 'karonuxFX' || e.cell >= 12) this.shake = Math.max(this.shake, 5); this.effects.push({ ...e, type: 'atlasFX', ttl: .5, life: .5 }); }
+      if (e.type === 'karonuxWave') this.effects.push({ ...e, type: 'karonuxWave', ttl: .65, life: .65 });
       if (!e.neighborhood && (['wave', 'breather'].includes(e.type) || e.type === 'surprise' && state.phase !== 'surprise')) this.effects.push({ type: 'announcement', text: e.label, color: e.type === 'surprise' ? '#94efdb' : '#ffdb91', ttl: 1.8, life: 1.8 });
       if (['heal', 'opening'].includes(e.type)) this.effects.push({ type: 'number', x: e.x, y: e.y, text: e.type === 'heal' ? `+${e.amount} PV` : e.label, color: '#9feecb', ttl: 1.1, life: 1.1 });
       if (e.type === 'talent' && !this.effects.some(f => f.type === 'announcement' && f.text === e.label && f.ttl > 0)) this.effects.push({ type: 'announcement', text: e.label, color: '#ffe084', ttl: 4, life: 4 });
@@ -118,7 +126,8 @@ export class Renderer {
     drawNightDarkness(this, state);
     for (const h of state.hazards || []) {this.drawHazard(h,state.time);if(h.kind==='finalChair')this.arcadeSprite('bossGustavax',h.x,h.y,2,135,h.facing);}
     if (state.phase === 'clear') this.exit(state);
-    drawNeighborhoodWorld(this, state);
+    drawNeighborhoodWorld(this, state); drawLorenzoWorld(this, state); drawJualosWorld(this, state); drawYanuWorld(this,state); drawKikorWorld(this,state); drawGustavaxWorld(this,state);
+    for (const trail of state.karonuxTrails || []) this.arcadeSprite('karonuxFX', trail.x, trail.y, 8 + Math.floor(state.time * 6) % 4, 30);
     for (const p of state.props.filter(p => p.hp <= 0 && p.rubble > 0)) this.prop(p);
     const entities = [...state.props.filter(p => p.hp > 0).map(p => ({ ...p, prop: true })), ...state.pickups.map(p => ({ ...p, pickup: true })), ...state.enemies, ...state.players, ...(state.allies || [])].sort((a, b) => a.y - b.y || Number(a.enemy) - Number(b.enemy));
     for (const entity of entities) {
@@ -671,6 +680,8 @@ export class Renderer {
     c.restore();
   }
   actor(a, state, slot, age) {
+    if(a.gustavaxMinion){drawGustavaxMinion(this,a);return;}
+    if(a.kikorSummon){drawKikorMinion(this,a,state);return;}
     if (a.joPallet) { this.drawJoPallet(a, state); return; }
     const c = this.ctx, dead = a.hp <= 0, t = a.actionTime + (state.paused ? 0 : age);
     const color = a.enemy ? '#ec6569' : a.id === 1 ? '#ffbf66' : '#91c6ff';
@@ -684,6 +695,26 @@ export class Renderer {
       c.strokeStyle = color; c.globalAlpha = .65; c.lineWidth = 1.6; c.beginPath(); c.ellipse(a.x, a.y + 2, 29, 9, 0, 0, TAU); c.stroke(); c.globalAlpha = 1;
     }
     if (a.enemy && !dead && !a.boss) this.enemyBar(a);
+    if (a.enemy && !dead && a.karonuxFrost?.until > state.time) {
+      this.arcadeSprite('karonuxFX', a.x, a.y, a.karonuxFrost.frozenUntil > state.time ? 6 : 4, a.boss ? 190 : 145);
+      if (a.karonuxFrost.frozenUntil > state.time) return;
+    }
+    if (!dead && a.specialState?.transformation && a.kind === 'lorenzo') { drawLorenzoTransformation(this,a,state); return; }
+    if (!dead && a.specialState?.transformation && a.kind === 'jualos') { drawJualosTransformation(this,a,state); return; }
+    if (!dead && a.specialState?.transformation && a.kind === 'yanu') { drawYanuTransformation(this,a,state); return; }
+    if (!dead && a.specialState?.transformation && a.kind === 'jo') { drawJoTransformation(this,a,state); return; }
+    if (!dead && a.specialState?.transformation && a.kind === 'gustavax') { drawGustavaxTransformation(this,a); return; }
+    if (!dead && a.specialState?.transformation && a.kind === 'kikor') { drawKikorTransformation(this,a,state); return; }
+    if (!dead && a.specialState?.transformation) {
+      const form = a.specialState, key = ['karonuxGolf', 'karonuxIce', 'karonuxHandi'][form.branch];
+      const pose = form.finished && form.branch === 0 && form.rank === 6 ? 5 + Math.floor(state.time * 15) % 2 : form.pose;
+      this.arcadeSprite(key, a.x, a.y - a.z, (form.rank === 6 ? 8 : 0) + pose, form.branch === 0 ? 110 : 155, a.facing);
+      c.fillStyle = ['#ffe0a0', '#b9f4ff', '#fff0c9'][form.branch]; c.font = 'bold 11px monospace'; c.textAlign = 'center';
+      const label = ['GOLF IV', 'REINE DES NEIGES', 'HANDIKARON'][form.branch];
+      c.fillText(`${label} · N${form.rank} · ${Math.max(0, form.duration - form.elapsed).toFixed(1)} s`, a.x, a.y - 180 - a.z);
+      if (form.charge > 0) c.fillText(`CHARGE ${Math.round(form.charge / 1.2 * 100)} %`, a.x, a.y - 200);
+      return;
+    }
     if(a.boss&&a.kind==='gustavax'){drawGustavax(this,a,state);return;}
     if (a.boss && a.kind === 'karonux') { this.drawKaronux(a, state); return; }
     if (a.boss && a.kind === 'kikor') { this.drawKikor(a, state); return; }
@@ -698,9 +729,9 @@ export class Renderer {
     }
     let action = a.action;
     if (a.elite) { this.drawElite(a, state); return; }
-    if (a.enemy && STREET_ENEMIES[a.kind]) { this.drawStreetEnemy(a, state); return; }
+    if ((a.enemy || a.recruit) && STREET_ENEMIES[a.kind]) { this.drawStreetEnemy(a, state); return; }
     if (!a.enemy && !dead && !a.specialState && this.drawInteraction(a, state)) return;
-    if (a.enemy && !a.boss && CLASSIC_SPRITES[a.kind]) { this.drawClassic(a, state); return; }
+    if ((a.enemy || a.recruit) && !a.boss && CLASSIC_SPRITES[a.kind]) { this.drawClassic(a, state); return; }
     if (!dead && a.specialState?.kind === 'karonux') {
       const b = BALANCE.specials.karonux;
       if (a.specialState.elapsed >= b.golfAt && a.specialState.elapsed < a.specialState.duration - b.exitDuration) {
@@ -1004,7 +1035,8 @@ export class Renderer {
           c.strokeStyle = '#fffbea'; c.lineWidth = 1.5; c.stroke();
         }
       }
-      if (e.type === 'atlasFX') this.arcadeSprite(e.atlas, e.x, e.y, e.cell, 110 + (1 - e.ttl / e.life) * 30);
+      if (e.type === 'karonuxWave') { c.fillStyle = `rgba(140,220,255,${e.ttl / e.life * .22})`; c.fillRect(0, 0, W, H); }
+      if (e.type === 'atlasFX') this.arcadeSprite(e.atlas, e.x, e.y, e.atlas === 'karonuxFX' && e.cell < 4 ? Math.min(3, Math.floor((1-e.ttl/e.life)*4)) : e.cell, 110 + (1 - e.ttl / e.life) * 30);
       if (e.type === 'rogueFX' && e.visual === 'arms') { c.save();c.strokeStyle=e.color;c.lineWidth=12*e.ttl/e.life;c.beginPath();c.moveTo(e.x,e.y-65);c.lineTo(e.x+(e.facing||1)*e.radius*.75,e.y-70);c.moveTo(e.x,e.y-60);c.lineTo(e.x-(e.facing||1)*e.radius*.5,e.y-55);c.stroke();c.restore(); }
       if (e.type === 'rogueFX') { const progress=1-e.ttl/e.life;c.strokeStyle=e.color;c.lineWidth=5*(1-progress);c.beginPath();c.ellipse(e.x,e.y-15,Math.max(1,e.radius*(.3+progress*.7)),Math.max(1,e.radius*.3),0,0,TAU);c.stroke();if(e.label){c.font='bold 14px monospace';c.textAlign='center';c.fillStyle=e.color;c.fillText(e.label,clamp(e.x,180,W-180),e.y-180-progress*15);} }
       if (e.type === 'dash' && !this.reducedMotion) this.arcadeSprite('dash', e.x, e.y, Math.min(2, Math.floor((1 - e.ttl / e.life) * 3)), 34, e.facing);
@@ -1047,7 +1079,7 @@ export class Renderer {
       const cost = BALANCE.specials[p.kind].cost;
       el.querySelector('.dodge-caption').textContent = p.dodgeCd > 0 ? `ESQUIVE ${p.dodgeCd.toFixed(1)}s` : 'ESQUIVE ✓';
       el.querySelector('.credits').textContent = `${'◆'.repeat(p.lives) || '◇'} VIE${p.lives > 1 ? 'S' : ''}`;
-      const specialState = p.specialState ? 'SPÉCIAL EN COURS' : p.energy >= cost ? 'SPÉCIAL PRÊT' : `FRAPPE POUR CHARGER · ${Math.floor(p.energy)} %`;
+      const specialState = usesTransformationTree(p.kind) && !p.progression?.talents.length ? 'CHOISIS UNE BRANCHE · PAUSE → TALENTS' : p.specialState ? 'SPÉCIAL EN COURS' : p.energy >= cost ? 'SPÉCIAL PRÊT' : `FRAPPE POUR CHARGER · ${Math.floor(p.energy)} %`;
       el.querySelector('.energy-bar').classList.toggle('ready', !p.specialState && p.energy >= cost);
       const r = p.progression;
       if (!el.querySelector('.special-caption')) el.querySelector('.player-bars').insertAdjacentHTML('beforeend', '<span class="special-caption"></span>');

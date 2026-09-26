@@ -157,8 +157,17 @@ export class Soundtrack {
     if (boss && [3, 11].includes(s) && bar % 4 >= 2) this.drum('kick', at, .58);
   }
   duck() { this.duckUntil = this.ctx.currentTime + .12; }
-  update(scene, chapter = 0, muted = false) {
+  raveBeat(beat) {
+    if(this.raveMuted||this.ctx.state==='suspended')return;
+    const now=this.ctx.currentTime+.01;
+    this.drum('kick',now,.55);this.drum(beat%2?'hat':'clap',now,.2);
+    this.note(36+[0,0,3,7][beat%4],now,.2,.35,'bass');
+    this.note(72+[0,7,10,7,3,7,12,10][beat%8],now,.18,.18,'acid',.15);
+  }
+  update(scene, chapter = 0, muted = false, rave = false) {
     const now = this.ctx.currentTime;
+    this.raveMuted=muted||scene==='pause';
+    if(rave!==this.rave){this.release();this.rave=rave;this.next=now+.04;}
     chapter = scene === 'menu' ? 0 : Math.max(0, Math.min(5, Math.trunc(chapter) || 0));
     if (scene !== this.scene || chapter !== this.chapter) {
       this.release();
@@ -169,6 +178,7 @@ export class Soundtrack {
     const target = muted || scene === 'pause' ? 0 : MUSIC.level * (now < this.duckUntil ? MUSIC.duck : 1);
     if (target !== this.target) { this.bus.gain.setTargetAtTime(target, now, target === 0 ? .06 : .035); this.target = target; }
     if (muted || scene === 'pause' || this.ctx.state === 'suspended') { this.next = now + .04; return; }
+    if(rave){this.next=now+.04;return;}
     if (this.next < now - .2) { this.release(); this.next = now + .065; }
     while (this.next < now + .10) {
       this.schedule(this.step, this.next, scene, chapter);

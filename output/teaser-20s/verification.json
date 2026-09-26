@@ -1,0 +1,94 @@
+{
+  "mime": "video/mp4;codecs=avc1.640028,mp4a.40.2",
+  "proof": [
+    {
+      "time": 1.513,
+      "scene": 0,
+      "special": [
+        null,
+        null,
+        null,
+        null
+      ],
+      "boss": "jualos"
+    },
+    {
+      "time": 4.81159999999404,
+      "scene": 1,
+      "special": [
+        null,
+        null,
+        null,
+        null
+      ],
+      "boss": "jualos"
+    },
+    {
+      "time": 8.0105,
+      "scene": 2,
+      "special": [
+        null,
+        null,
+        null,
+        null
+      ],
+      "boss": "jualos"
+    },
+    {
+      "time": 11.009399999976159,
+      "scene": 3,
+      "special": [
+        null,
+        "karonux",
+        null,
+        null
+      ],
+      "boss": "jualos"
+    },
+    {
+      "time": 13.009199999988079,
+      "scene": 4,
+      "special": [
+        null,
+        "karonux",
+        "yanu",
+        null
+      ],
+      "boss": "jualos"
+    },
+    {
+      "time": 16.50759999999404,
+      "scene": 5,
+      "special": [
+        null,
+        "karonux",
+        "yanu",
+        "gustavax"
+      ],
+      "boss": "jualos"
+    },
+    {
+      "time": 18.80679999998212,
+      "scene": 6,
+      "special": [
+        null,
+        "karonux",
+        "yanu",
+        "gustavax"
+      ],
+      "boss": "jualos"
+    }
+  ],
+  "stats": {
+    "combattants": 7,
+    "specialites": 21,
+    "talents": 126,
+    "chapitres": 7,
+    "ennemis": 34,
+    "boss": 7
+  },
+  "sources": [
+    "game/data.js",
+    "game/rogue-talents.js"
+  ]
+}

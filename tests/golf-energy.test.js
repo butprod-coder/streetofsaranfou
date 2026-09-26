@@ -1,21 +1,23 @@
+import { KARONUX_MILESTONES } from '../game/karonux-talents.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Simulation } from '../game/simulation.js';
 import { blankInput, FLOOR } from '../game/data.js';
-import { TALENTS } from '../game/progression.js';
+import { TALENTS, applyProfile } from '../game/progression.js';
 import { TALENT_ART, talentIcon } from '../game/talent-icons.js';
 
 function arena(kind='jo',duo=false){
   const sim=new Simulation(duo?[kind,kind]:[kind],0,731);sim.spawnWave();sim.state.props=[];sim.state.enemies=[];sim.state.spawnQueue=[];
   const p=sim.state.players[0];p.x=500;p.y=550;p.invincible=0;
   const e=sim.spawnEnemy('remy',{x:580,y:550,hp:10000,maxHp:10000,cooldown:999,speed:0,invincible:0});
+  if(['karonux','lorenzo','jualos','yanu','jo','kikor','gustavax'].includes(kind)) applyProfile(p,{milestones:KARONUX_MILESTONES,talents:[TALENTS[kind][0].id]});
   return {sim,p,e};
 }
 function hit(sim,p,type='punch'){p.attack=null;p.cooldown=0;sim.startAttack(p,type);sim.resolveAttack(p);p.attack=null;}
 
-test('the first point is earned only by clearing the first street, once per player including KO',()=>{
-  const sim=new Simulation(['jo','karonux']);assert.deepEqual(sim.state.players.map(p=>p.progression.points),[0,0]);
-  sim.awardXP(1000,'xp');assert.deepEqual(sim.state.players.map(p=>p.progression.points),[0,0]);
+test('the first point is available at startup and never duplicated by the first street',()=>{
+  const sim=new Simulation(['jo','karonux']);assert.deepEqual(sim.state.players.map(p=>p.progression.points),[1,1]);
+  sim.awardXP(1000,'xp');assert.deepEqual(sim.state.players.map(p=>p.progression.points),[1,1]);
   sim.state.players[1].hp=0;sim.clearStreet();sim.clearStreet();assert.deepEqual(sim.state.players.map(p=>p.progression.points),[1,1]);
   sim.state.stage=1;sim.clearStreet();assert.deepEqual(sim.state.players.map(p=>p.progression.points),[1,1]);
 });
@@ -82,8 +84,8 @@ test('steered Golf resumes identically from a network snapshot mid-special',()=>
   for(let i=0;i<180;i++){const inputs=[{...blankInput(),x:i%80<40?-1:1,y:i%50<25?.5:-.5},blankInput()];sim.step(inputs);replica.step(inputs);}
   assert.deepEqual(replica.snapshot(),sim.snapshot());
 });
-test('all 105 talent illustrations are explicitly mapped, distinct and meaningful by name',()=>{
+test('all 126 talent illustrations are explicitly mapped, distinct and meaningful by name',()=>{
   const images=new Set(),motifs=new Set();
-  for(const [kind,nodes] of Object.entries(TALENTS))for(const n of nodes){assert.ok(TALENT_ART[n.name],n.name);const svg=talentIcon(kind,n);assert.match(svg,/<svg/);assert.match(svg,/data-talent-art=/);images.add(svg);motifs.add(TALENT_ART[n.name].join('-'));}
-  assert.equal(images.size,105);assert.equal(motifs.size,105);
+  for(const [kind,nodes] of Object.entries(TALENTS))for(const n of nodes){assert.ok((TALENT_ART[`${kind}:${n.name}`]||TALENT_ART[n.name]),n.name);const svg=talentIcon(kind,n);assert.match(svg,/<svg/);assert.match(svg,/data-talent-art=/);images.add(svg);motifs.add((TALENT_ART[`${kind}:${n.name}`]||TALENT_ART[n.name]).join('-'));}
+  assert.equal(images.size,126);assert.equal(motifs.size,126);
 });

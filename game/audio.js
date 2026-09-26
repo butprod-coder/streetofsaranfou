@@ -53,6 +53,7 @@ export class Audio {
     source.connect(filter).connect(gain).connect(this.effectsBus); source.start(at); source.stop(at + length); source.onended = () => { source.disconnect(); filter.disconnect(); gain.disconnect(); };
   }
   effect(event) {
+    if(event.type==='yanuBeat')this.soundtrack?.raveBeat(event.beat);
     if (event.type === 'taunt') {
       this.say(event.label);
       if (event.label === 'BUUUUUUUUU') { this.tone(115, .65, .28, 'sawtooth', 0, 55); this.hiss(.5, .12, 0, 450); }
@@ -94,8 +95,8 @@ export class Audio {
     line.volume = this.volumes.master * this.volumes.effects * .45;
     window.speechSynthesis.cancel(); window.speechSynthesis.speak(line);
   }
-  update(active, chapter = 0, boss = false, paused = false) {
+  update(active, chapter = 0, boss = false, paused = false, rave = false) {
     if (paused) window.speechSynthesis?.cancel();
-    this.soundtrack?.update(musicScene(active, paused, boss), chapter, this.muted);
+    this.soundtrack?.update(musicScene(active, paused, boss), chapter, this.muted, rave && active && !paused);
   }
 }

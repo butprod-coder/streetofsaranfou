@@ -1,3 +1,10 @@
+import { GUSTAVAX_BRANCHES } from './gustavax-talents.js';
+import { KARONUX_BRANCHES } from './karonux-talents.js';
+import { LORENZO_BRANCHES } from './lorenzo-talents.js';
+import { JUALOS_BRANCHES } from './jualos-talents.js';
+import { YANU_BRANCHES } from './yanu-talents.js';
+import { JO_BRANCHES } from './jo-talents.js';
+import { KIKOR_BRANCHES } from './kikor-talents.js';
 // Linear per-run trees. Versioned IDs reject incompatible old purchases.
 export const TALENT_BRANCHES = {
   "karonux": [
@@ -1170,5 +1177,12 @@ export const TALENT_BRANCHES = {
     }
   ]
 };
+TALENT_BRANCHES.karonux = KARONUX_BRANCHES;
+TALENT_BRANCHES.lorenzo = LORENZO_BRANCHES;
+TALENT_BRANCHES.jualos = JUALOS_BRANCHES;
+TALENT_BRANCHES.yanu = YANU_BRANCHES;
+TALENT_BRANCHES.jo = JO_BRANCHES;
+TALENT_BRANCHES.kikor = KIKOR_BRANCHES;
+TALENT_BRANCHES.gustavax = GUSTAVAX_BRANCHES;
 export const TALENTS = Object.fromEntries(Object.entries(TALENT_BRANCHES).map(([kind,branches])=>[kind,branches.flatMap(b=>b.nodes)]));
 export const hasTalent = (p, name) => TALENTS[p.kind]?.some(n=>n.name === name && p.progression?.talents.includes(n.id)) || false;

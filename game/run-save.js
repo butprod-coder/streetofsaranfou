@@ -1,6 +1,6 @@
 import { cleanRoute } from './campaign-route.js';
 import { Simulation } from './simulation.js';
-import { FIGHTERS, clamp } from './data.js';
+import { FIGHTERS, ENEMIES, clamp } from './data.js';
 import { normalizeProfile, refreshPlayerStats } from './progression.js';
 import { ENCOUNTER_ROSTER, STARTING_ENEMIES } from './encounters.js';
 import { WEAPONS } from './weapons.js';
@@ -18,7 +18,9 @@ export function checkpoint(state) {
     time: state.time, seed: state.rngSeed, streetSeed: state.streetSeed, streetBag: state.streetBag, enemyOrder: state.enemyOrder, randomOpening: true, nextId: state.nextEntityId,
     difficulty: state.difficulty, score: state.score, kills: state.kills, bestCombo: state.bestCombo, neighborhood: state.neighborhood, estate: state.estate, stadium: state.stadium, bourg: state.bourg, night: state.night, school: state.school,
     players: state.players.map(p => ({ kind: p.kind, profile: p.progression, health: p.hp / p.maxHp, energy: p.energy, lives: p.lives,
-      weapon: p.weapon, gymBalls: p.gymBalls, rewards: {}, choices: [], supportRole: p.supportRole, sleepSaveChapter: p.sleepSaveChapter })),
+      weapon: p.weapon, gymBalls: p.gymBalls, rewards: {}, choices: [], supportRole: p.supportRole, sleepSaveChapter: p.sleepSaveChapter,
+      staff: (state.allies||[]).filter(a=>a.gustavaxMinion&&a.permanent&&a.owner===p.id&&a.hp>0).map(a=>({role:a.role,health:a.hp/a.maxHp})),
+      recruits: (state.allies || []).filter(a=>a.recruit&&a.permanent&&a.owner===p.id&&a.hp>0).map(a=>({kind:a.kind,health:a.hp/a.maxHp})) })),
     props: state.props.filter(p => p.kind !== 'easel').map(p => [p.id, p.hp]),
     pickups: state.pickups.map(p => ({ kind: p.kind, amount: p.amount, weapon: p.weapon, uses: p.uses, x: p.x, y: p.y })),
   });
@@ -32,7 +34,10 @@ export function validateCheckpoint(raw) {
     if (!p || !FIGHTERS.some(f => f.id === p.kind)) throw new Error('Personnage invalide.');
     const rewards = {};
     const choices = [];
-    return { kind: p.kind, profile: normalizeProfile(p.profile, p.kind), health: number(p.health, 1), energy: number(p.energy,100), lives: integer(p.lives,5),
+    const profile=normalizeProfile(p.profile,p.kind);
+    const recruits=p.kind==='jualos'&&profile.talents.includes('jualos_v3_0_4')&&Array.isArray(p.recruits)?p.recruits.slice(0,128).filter(a=>a&&Object.hasOwn(ENEMIES,a.kind)&&a.health>0).map(a=>({kind:a.kind,health:number(a.health,1)})):[];
+    const staff=p.kind==='gustavax'&&profile.talents.includes('gustavax_v3_1_5')&&Array.isArray(p.staff)?p.staff.slice(0,6).filter(a=>a&&['staff','manager'].includes(a.role)&&a.health>0).map(a=>({role:a.role,health:number(a.health,1)})):[];
+    return { kind: p.kind, profile, recruits, staff, health: number(p.health, 1), energy: number(p.energy,100), lives: integer(p.lives,5),
       weapon: p.weapon && Object.hasOwn(WEAPONS,p.weapon.kind) ? { kind: p.weapon.kind, uses: integer(p.weapon.uses,24) } : null,
       gymBalls: integer(p.gymBalls,1), rewards, choices, supportRole: ['heal','guard','attack'].includes(p.supportRole) ? p.supportRole : 'attack', sleepSaveChapter: integer(p.sleepSaveChapter,5,-1) };
   });
@@ -62,6 +67,11 @@ export function restoreCheckpoint(raw) {
   save.players.forEach((p,i)=>{
     const actor=s.players[i];actor.rogueRewards={};refreshPlayerStats(actor);actor.hp=actor.maxHp*p.health;actor.energy=p.energy;actor.lives=p.lives;actor.weapon=p.weapon; actor.gymBalls=p.gymBalls;
     actor.rewardOptions=[];actor.rewardStreet=save.chapter+':'+save.stage;actor.supportRole=p.supportRole;actor.sleepSaveChapter=p.sleepSaveChapter;
+    for(const saved of p.staff)sim.spawnGustavaxMinion(actor,saved.role,saved);
+    for(const saved of p.recruits){
+      const a=sim.spawnEnemy(saved.kind,{x:actor.x-60,y:actor.y});s.enemies=s.enemies.filter(e=>e!==a);
+      Object.assign(a,{hp:a.maxHp*saved.health,enemy:false,ally:true,recruit:true,owner:actor.id,permanent:true,ttl:1,aggressive:true,cooldown:.3});s.allies.push(a);
+    }
   });
   sim.seed=save.seed;s.events=[];s.eventSeq=0;return sim;
 }

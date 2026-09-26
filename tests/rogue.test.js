@@ -1,3 +1,4 @@
+import { KARONUX_MILESTONES } from '../game/karonux-talents.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Simulation } from '../game/simulation.js';
@@ -8,7 +9,7 @@ import { ENCOUNTER_ROSTER, randomEnemyKinds, activeEnemyLimit } from '../game/en
 
 function learn(p, name) {
   const node=TALENTS[p.kind].find(n=>n.name===name), path=TALENTS[p.kind].filter(n=>n.branch===node.branch&&n.tier<node.tier&&TALENTS[p.kind].find(q=>q.branch===n.branch&&q.tier===n.tier)===n).map(n=>n.id);
-  applyProfile(p,{milestones:TALENT_MILESTONES,xp:xpForLevel(20),completed:[0,1,2,3,4],talents:[...path,node.id]});
+  applyProfile(p,{milestones:[...TALENT_MILESTONES, ...KARONUX_MILESTONES],xp:xpForLevel(20),completed:[0,1,2,3,4],talents:[...path,node.id]});
   assert.ok(p.progression.talents.includes(node.id),name);
 }
 function arena(kind) {
@@ -17,16 +18,16 @@ function arena(kind) {
   const e=sim.spawnEnemy('remy',{x:540,y:550,hp:10000,maxHp:10000,cooldown:999,speed:0,invincible:0});
   return {sim,p,e};
 }
-test('105 unique nodes, three branches, five ranks, legal investments and exclusive ultimates',()=>{
+test('126 unique nodes, three branches, character-specific ranks, legal investments and exclusive ultimates',()=>{
   const ids=new Set();
-  for(const f of FIGHTERS){const nodes=TALENTS[f.id];assert.equal(nodes.length,15);assert.equal(new Set(nodes.map(n=>n.branch)).size,3);
+  for(const f of FIGHTERS){const nodes=TALENTS[f.id];assert.equal(nodes.length,['karonux','lorenzo','jualos','yanu','jo','kikor','gustavax'].includes(f.id) ? 18 : 15);assert.equal(new Set(nodes.map(n=>n.branch)).size,3);
     for(const n of nodes){assert.ok(!ids.has(n.id));ids.add(n.id);const {p}=arena(f.id);learn(p,n.name);assert.ok(n.description.length>12);}
-    let p=normalizeProfile({milestones:TALENT_MILESTONES,xp:xpForLevel(20),completed:[0,1,2,3,4,5]},f.id);assert.equal(p.points,8);assert.equal(p.statPoints,38);
+    let p=normalizeProfile({milestones:[...TALENT_MILESTONES, ...KARONUX_MILESTONES],xp:xpForLevel(20),completed:[0,1,2,3,4,5]},f.id);assert.equal(p.points,['karonux','lorenzo','jualos','yanu','jo','kikor','gustavax'].includes(f.id) ? 6 : 8);assert.equal(p.statPoints,38);
     for(const n of nodes.filter(n=>n.branchIndex===0&&nodes.find(q=>q.branch===n.branch&&q.tier===n.tier)===n))p=spendPoint(p,n.id);
     assert.equal(spendPoint(p,nodes[11].id),null);assert.equal(spendPoint(p,nodes[0].id),null);
-    assert.equal(normalizeProfile({xp:Infinity,points:999},f.id).points,0);
+    assert.equal(normalizeProfile({xp:Infinity,points:999},f.id).points,1);
     for(let i=0;i<10;i++)p=spendAttribute(p,'vitality');assert.equal(spendAttribute(p,'vitality'),null);
-  }assert.equal(ids.size,105);
+  }assert.equal(ids.size,126);
 });
 test('enemy bags have exactly equal frequencies and arrivals obey active cap',()=>{
   const bag=[],sim=new Simulation(['jo'],0,10);const kinds=randomEnemyKinds(0,ENCOUNTER_ROSTER.length*4,()=>sim.random(),bag);
@@ -49,10 +50,10 @@ test('all 21 ultimate paths run finite in solo and serialize without errors',()=
     const state=sim.snapshot();assert.ok(Number.isFinite(p.hp)&&Number.isFinite(e.hp),n.name);assert.ok(state.allies.length<=6,n.name);assert.ok((state.rogueZones||[]).length<=8,n.name);assert.equal(p.specialState,null,n.name);
   }
 });
-test('paint, fire and food trigger the new combat mechanics',()=>{
-  const paint=arena('kikor');learn(paint.p,'Peinture fraîche');paint.p.attack={type:'punch'};paint.sim.damage(paint.e,1,paint.p,false);assert.ok(paint.e.rogueSlow>0);
-  const burn=arena('lorenzo');learn(burn.p,'Braises collantes');burn.p.attack={type:'punch'};burn.p.comboStep=3;burn.sim.damage(burn.e,1,burn.p,false);const hp=burn.e.hp;burn.sim.updateRogueWorld(.8);assert.ok(burn.e.hp<hp);
-  const tank=arena('jualos');learn(tank.p,'Deuxième service');tank.p.hp=tank.p.maxHp;tank.sim.state.pickups=[{kind:'food',x:tank.p.x,y:tank.p.y}];tank.sim.collectPickups();assert.ok(tank.p.rogueDouble);assert.equal(tank.sim.state.pickups.length,0);
+test('paint, fire and recruitment trigger the new combat mechanics',()=>{
+  const paint=arena('kikor');learn(paint.p,'Peintre');paint.p.energy=100;paint.sim.activateSpecial(paint.p);paint.sim.kikorPaint(paint.p,paint.e.x,paint.e.y);paint.sim.updateWorld(.1);assert.ok(paint.e.kikorPaintUntil>0);
+  const burn=arena('lorenzo');learn(burn.p,'Des cigarettes brûlantes');burn.p.energy=100;burn.sim.activateSpecial(burn.p);burn.sim.updateSpecial(burn.p,{...blankInput(),kick:true},.1);burn.sim.updateWorld(.4);assert.equal(burn.sim.state.hazards.filter(h=>h.lorenzoCigarette).length,3);
+  const tank=arena('jualos');learn(tank.p,'Responsable commercial');tank.p.energy=100;tank.sim.activateSpecial(tank.p);tank.sim.recruitJualos(tank.p,tank.e);assert.ok(tank.e.permanent);
 });
 test('rest checkpoints round trip without replaying wave XP, restoring consumed props or carrying buffs',()=>{
   const sim=new Simulation(['gustavax','kikor'],2,442);sim.spawnWave();sim.state.enemies=[];sim.state.spawnQueue=[];sim.step();assert.equal(sim.state.phase,'rest');

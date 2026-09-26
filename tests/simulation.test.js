@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Simulation } from '../game/simulation.js';
 import { blankInput, neutralInput, sanitizeInput, STEP, FLOOR } from '../game/data.js';
+import { applyProfile, TALENTS } from '../game/progression.js';
 
 const input = values => ({ ...blankInput(), ...values });
 function arena(characters = ['karonux']) {
@@ -46,8 +47,8 @@ test('neutralizing a stale network input never replays old special-button presse
   assert.ok(game.state.players[0].energy >= before); assert.equal(game.state.players[0].attack, null);
 });
 test('special consumes energy, grants protection and cannot fire when empty', () => {
-  const game = arena(), p = game.state.players[0];p.energy=100;
-  game.step([input({ special: true })]); assert.equal(p.energy,0); assert.ok(p.invincible > .5);
+  const game = arena(['jo']), p = game.state.players[0];applyProfile(p,{talents:[TALENTS.jo[0].id]});p.energy=100;
+  game.step([input({ special: true })]); assert.equal(p.energy,0); assert.ok(p.invincible > .3);
   p.energy = 0; p.attack = null; p.cooldown = 0;
   game.step([input({ special: true })]); assert.equal(p.attack, null);
 });
