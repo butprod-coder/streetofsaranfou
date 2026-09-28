@@ -47,7 +47,11 @@ export function createGameServer({ root = ROOT, maxRooms = 100, reconnectMs = 45
       if (!info.isFile()) { response.writeHead(404); response.end(); return; }
       const etag = `W/"${info.size}-${Math.trunc(info.mtimeMs)}"`;
       response.setHeader('ETag', etag);
-      response.setHeader('Cache-Control', requested.startsWith('/assets/') ? 'public, max-age=86400' : 'no-cache');
+      // Le client charge des modules JS directement depuis /game/. Une ancienne
+      // copie de app.js (ou d'un module importé) peut conserver un ancien mapping
+      // de manette après un déploiement. Les assets immuables restent cacheables,
+      // mais le HTML et le code doivent toujours être revalidés côté Render/CDN.
+      response.setHeader('Cache-Control', requested.startsWith('/assets/') ? 'public, max-age=86400' : 'no-store');
       if (request.headers['if-none-match'] === etag) { response.writeHead(304); response.end(); return; }
       response.writeHead(200, { 'Content-Type': MIME[path.extname(resolved)] || 'application/octet-stream', 'Content-Length': info.size });
       if (request.method === 'HEAD') response.end();
