@@ -31,6 +31,24 @@ CHAPTERS.push({name:'Le bureau de Gustavax',short:'Le dernier mot',quote:'« Vou
 export const ENEMIES = {
   ...Object.fromEntries(Object.entries(ELITES).map(([id, data]) => [id, { ...data, elite: true }])),
   ...STREET_ENEMIES,
+  damps: { name:'Damps', hp:470, speed:132, power:16, reach:100, score:900, color:'#b8a7d0', miniBoss:true, walk:4, attack:4 },
+  cainri: { name:'Cainri', hp:560, speed:150, power:18, reach:100, score:1100, color:'#d9a35d', miniBoss:true, walk:4, attack:4 },
+  jalatrix: { name:'Jalatrix Le Pécheur', hp:720, speed:140, power:20, reach:125, score:1400, color:'#9bb9a8', miniBoss:true, walk:4, attack:4 },
+  mazzuka: { name:'Mazzuka', hp:820, speed:146, power:22, reach:145, score:1600, color:'#c2c9d4', miniBoss:true, walk:4, attack:4 },
+  maire: { name:'Le Maire', hp:900, speed:132, power:23, reach:126, score:1800, color:'#b9a88c', miniBoss:true, storyBossOnly:true, walk:4, attack:4 },
+  mairePolice: { name:'Policier municipal', hp:150, speed:155, power:13, reach:84, score:120, color:'#f0d94d', summonOnly:true, walk:4, attack:4 },
+  remyGeek: { name:'Rémy le no life', hp:1080, speed:82, power:18, reach:105, score:2000, color:'#bf8cff', miniBoss:true, storyBossOnly:true, walk:4, attack:4 },
+  remyOrc: { name:'Orc', hp:190, speed:166, power:16, reach:92, score:0, color:'#8dcc61', summonOnly:true, walk:4, attack:4 },
+  remyPaladin: { name:'Paladin', hp:280, speed:112, power:17, reach:105, score:0, color:'#f5d971', summonOnly:true, walk:4, attack:4 },
+  remyElf: { name:'Elfe', hp:145, speed:180, power:14, reach:440, score:0, color:'#81dd9b', summonOnly:true, walk:4, attack:4 },
+  remyOnyxia: { name:'Onyxia', hp:680, speed:105, power:24, reach:165, score:0, color:'#ae69cf', summonOnly:true, walk:2, attack:2 },
+  remyTauren: { name:'Tauren', hp:350, speed:96, power:20, reach:118, score:0, color:'#bd916c', summonOnly:true, walk:4, attack:4 },
+  harmelin: { name:'Mme Harmelin', hp:1160, speed:72, power:18, reach:110, score:2100, color:'#b77b68', miniBoss:true, storyBossOnly:true, walk:4, attack:4 },
+  harmelinProviseur:{name:'Le Proviseur',hp:420,speed:165,power:22,reach:105,score:0,color:'#ac566d',summonOnly:true,walk:2,attack:2},
+  harmelinStudent1: { name:'Élève pressé', hp:95, speed:470, power:12, reach:70, score:0, color:'#f2785a', summonOnly:true },
+  harmelinStudent2: { name:'Élève du fond', hp:115, speed:430, power:13, reach:70, score:0, color:'#a8c778', summonOnly:true },
+  harmelinStudent3: { name:'Élève discret', hp:82, speed:500, power:11, reach:70, score:0, color:'#c09fff', summonOnly:true },
+  harmelinStudent4: { name:'Élève en retard', hp:105, speed:450, power:12, reach:70, score:0, color:'#e1aa5e', summonOnly:true },
   remy: { name: 'Rémy', hp: 54, speed: 145, power: 10, reach: 88, score: 115, color: '#ff8873', walk: 3, attack: 3, style: 'scooter' },
   orelsan: { name: 'Orelsan', hp: 64, speed: 154, power: 11, reach: 92, score: 150, color: '#c2a3ff', walk: 3, attack: 3, style: 'tennis' },
   charlingals: { name: 'Charlingals', hp: 82, speed: 118, power: 13, reach: 98, score: 190, color: '#ffc46e', walk: 4, attack: 4, style: 'knife' },
@@ -56,6 +74,12 @@ export function animation(id, action = 'idle', enemy = false) {
     const cells = { idle: [0], walk: [1, 2], punch: [3, 4], special: [7, 8], hurt: [5], dead: [6] }[action] || [0];
     return cells.map(cell => ({ url: `/assets/enemies/street/${id}.png`, atlas: `street_${id}`, cell }));
   }
+  if(enemy&&ENEMIES[id]?.miniBoss){const prefix={damps:'miniBossDamps',cainri:'miniBossCainri',jalatrix:'miniBossJalatrix',mazzuka:'miniBossMazzuka',maire:'miniBossMaire',remyGeek:'miniBossRemy',harmelin:'miniBossHarmelin'}[id],folder=({jalatrix:'chateau_etang',mazzuka:'stade_colette',maire:'bourg_saran',remyGeek:'cap_saran',harmelin:'college_montjoie'})[id]||'mini_chene',file=id==='remyGeek'?'remy':id==='harmelin'?'harmelin':id,cells={idle:0,walk:id==='remyGeek'?2:1,punch:id==='maire'?10:id==='remyGeek'?9:id==='harmelin'?3:3,kick:id==='mazzuka'?4:id==='maire'?10:id==='remyGeek'?7:id==='harmelin'?15:7,special:id==='maire'?4:id==='remyGeek'?4:id==='harmelin'?6:6,hurt:id==='remyGeek'?8:id==='harmelin'?12:14,dead:15};return[{url:`/assets/boss/${folder}/${file}.png`,atlas:prefix,cell:cells[action]??0}];}
+  if(enemy&&id==='mairePolice'){const cells={idle:[0],walk:[1,2],punch:[8,9],special:[10,6],hurt:[11],dead:[15]};return(cells[action]||[0]).map(cell=>({url:'/assets/boss/bourg_saran/police.png',atlas:'miniBossPolice',cell}));}
+  if(enemy&&id==='remyOnyxia')return[{url:'/assets/boss/cap_saran/onyxia.png',atlas:'miniBossOnyxia',cell:({idle:0,walk:1,punch:2,kick:2,special:2,hurt:3,dead:3}[action]??0)}];
+  if(enemy&&['remyOrc','remyPaladin','remyElf','remyTauren'].includes(id)){const row={remyOrc:0,remyPaladin:4,remyElf:8,remyTauren:12}[id],pose={idle:0,walk:1,punch:2,kick:2,special:2,hurt:3,dead:3}[action]??0;return[{url:'/assets/boss/cap_saran/summons.png',atlas:'miniBoss'+id[0].toUpperCase()+id.slice(1),cell:row+pose}];}
+  if(enemy&&id==='harmelinProviseur')return[{url:'/assets/boss/college_montjoie/proviseur.png',atlas:'miniBossProviseur',cell:({idle:0,walk:1,punch:2,kick:2,special:2,hurt:3,dead:3}[action]??0)}];
+  if(enemy&&/^harmelinStudent[1-4]$/.test(id)){const column=Number(id.slice(-1))-1,pose={idle:0,walk:1,punch:1,kick:1,special:1,hurt:2,dead:3}[action]??0;return[{url:'/assets/boss/college_montjoie/students.png',atlas:'miniBossHarmelinStudent'+(column+1),cell:pose*4+column}];}
   if (enemy && CLASSIC_SPRITES[id]) return (CLASSIC_POSES[action] || [0]).map(cell => ({ url: `/assets/enemies/classics/${id}.png`, atlas: id, cell }));
   if (enemy && ELITES[id]) {
     const cells = { idle: [0], walk: [1, 2], punch: [3, 4], special: [3, 4], hurt: [5], dead: [6] }[action] || [0];

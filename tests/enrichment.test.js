@@ -18,7 +18,7 @@ test('all 36 streets have varied multi-wave plans, delayed reinforcement and loc
   for (let c = 0; c < 6; c++) for (let street = 0; street < 6; street++) {
     const waves = wavePlan(c, street); assert.ok(waves.length >= 2);
     assert.ok(new Set(waves.map(w => JSON.stringify(w.kinds))).size > 1);
-    assert.equal(waves.at(-1).boss, street === 5);
+    assert.equal(waves.at(-1).boss, street === 5 || street === 2 && c <= 5);
     const g = new Simulation(['jo'], c, 1); g.state.stage = street; g.enterStreet(); g.state.surpriseDone = true; g.spawnWave();
     g.state.players[0].x = 1200; g.state.players[0].invincible = 999;
     assert.ok(g.state.spawnQueue.length > 0); assert.equal(g.state.enemies.length, 1);

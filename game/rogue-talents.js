@@ -1,3 +1,4 @@
+import { ULTIMATE_SPECIALS, ULTIMATE_COOLDOWN } from './ultimate-specials.js';
 import { GUSTAVAX_BRANCHES } from './gustavax-talents.js';
 import { KARONUX_BRANCHES } from './karonux-talents.js';
 import { LORENZO_BRANCHES } from './lorenzo-talents.js';
@@ -1184,5 +1185,6 @@ TALENT_BRANCHES.yanu = YANU_BRANCHES;
 TALENT_BRANCHES.jo = JO_BRANCHES;
 TALENT_BRANCHES.kikor = KIKOR_BRANCHES;
 TALENT_BRANCHES.gustavax = GUSTAVAX_BRANCHES;
+for(const [kind,branches] of Object.entries(TALENT_BRANCHES))for(const [index,branch] of branches.entries()){const node=branch.nodes[5];if(node&&ULTIMATE_SPECIALS[kind])node.description+=` ${ULTIMATE_SPECIALS[kind][index][1]} Récupération : ${ULTIMATE_COOLDOWN} s, sans énergie supplémentaire.`;}
 export const TALENTS = Object.fromEntries(Object.entries(TALENT_BRANCHES).map(([kind,branches])=>[kind,branches.flatMap(b=>b.nodes)]));
 export const hasTalent = (p, name) => TALENTS[p.kind]?.some(n=>n.name === name && p.progression?.talents.includes(n.id)) || false;

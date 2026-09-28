@@ -12,7 +12,7 @@ export const karonuxTransformations = {
     p.specialState = { kind: 'karonux', transformation: true, branch, rank, ultimate: rank === 6,
       duration: rank >= 6 ? 9 : rank >= 4 ? 7 : 5, elapsed: 0, nextAttack: 0,
       nextDodge: 0, nextJump: 0, nextPulse: 0, pose: 7, poseUntil: .25, hits: {}, speed: 0,
-      chain: 0, chainUntil: 0, combo: 0, charge: 0, held: {}, taps: { ...p.taps } };
+      chain: 0, chainUntil: 0, combo: 0, charge: 0, held: { special: true }, taps: { ...p.taps } };
     p.specialCd = 0; p.action = 'special'; p.invincible = Math.max(p.invincible, .4);
     if (branch === 1 && rank === 6) {
       for (const e of this.state.enemies) if (e.hp > 0) this.karonuxFrost(p, e, 1.5);
@@ -72,7 +72,7 @@ export const karonuxTransformations = {
   updateKaronuxTransformation(p, input, dt) {
     const a = p.specialState; a.elapsed += dt; p.action = 'special'; p.attack = null; p.vx = p.vy = 0;
     const fresh = {};
-    for (const key of ['punch', 'kick', 'dodge', 'jump']) {
+    for (const key of ['punch', 'kick', 'dodge', 'jump', 'special']) {
       fresh[key] = !!input[key] && !a.held[key] || (input.taps?.[key] || 0) > (a.taps[key] || 0);
       a.held[key] = !!input[key]; a.taps[key] = input.taps?.[key] || 0;
     }

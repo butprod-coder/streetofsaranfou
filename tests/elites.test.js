@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Simulation } from '../game/simulation.js';
 import { ELITES, ELITE_RULES } from '../game/elite-data.js';
-import { randomEnemyKinds, wavePlan } from '../game/encounters.js';
+import { ENCOUNTER_ROSTER, randomEnemyKinds, wavePlan } from '../game/encounters.js';
 import { blankInput, ENEMIES, FLOOR, STEP } from '../game/data.js';
 import { audioSettings, AUDIO_DEFAULTS } from '../game/audio-settings.js';
 
@@ -19,8 +19,9 @@ test('audio defaults are quiet, persisted values are bounded and malformed setti
 });
 test('the complete enemy roster appears equally from chapter one across consecutive bags', () => {
   const sim = new Simulation(['jo'], 0, 17), bag = [];
-  const values = randomEnemyKinds(0, Object.keys(ENEMIES).length * 3, () => sim.random(), bag);
-  for (const kind of Object.keys(ENEMIES)) assert.equal(values.filter(v => v === kind).length, 3);
+  const values = randomEnemyKinds(0, ENCOUNTER_ROSTER.length * 3, () => sim.random(), bag);
+  for (const kind of ENCOUNTER_ROSTER) assert.equal(values.filter(v => v === kind).length, 3);
+  assert.equal(values.includes('maire'), false); assert.equal(values.includes('mairePolice'), false);
 });
 test('each elite executes its ability, respects bounds and finite hazards, and is killable', () => {
   for (const kind of Object.keys(ELITES)) {

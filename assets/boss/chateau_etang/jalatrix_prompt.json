@@ -1,0 +1,5 @@
+{
+  "tool": "Imagegen intégré",
+  "character": "Planche de 16 poses 4x4 de Jalatrix Le Pécheur, homme âgé grand et mince à la barbe pleine et cheveux grisonnants, tenue de pêche usée et canne à pêche longue. Poses : repos, marche, préparation, balayage, poussée, lancer de ligne, rembobinage, esquive, blessure, frappe verticale et phase renforcée. Pixel art arcade 16 bits, fond transparent demandé.",
+  "effects": "Atlas VFX 4x4 : hameçon et ligne, étincelle, arc de balayage, impact, ligne qui tracte, indicateur au sol, éclaboussures, gouttes, ondes concentriques, projectile flotteur, étoiles d'étourdissement et ligne cassée. Fond transparent demandé. L'export du VFX utilise un détourage des dégradés continus par cellule."
+}

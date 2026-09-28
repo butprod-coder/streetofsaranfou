@@ -1,4 +1,6 @@
+import { ultimateSpecials } from './ultimate-specials.js';
 import { gustavaxTransformations } from './gustavax-transformations.js';
+import { miniBossCombat } from './mini-bosses.js';
 import { BALANCE, difficulty } from './balance.js';
 import { FLOOR, fighter, clamp } from './data.js';
 import { refreshPlayerStats } from './progression.js';
@@ -18,6 +20,7 @@ const nearest = (a, actors) => actors.filter(live).sort((x, y) => distance(a, x)
 
 /** Serializable combat extensions, stepped exclusively by the shared simulation. */
 export const combat = {
+  ...ultimateSpecials,
   ...golfCombat,
   ...karonuxTransformations,
   ...lorenzoTransformations,
@@ -26,6 +29,7 @@ export const combat = {
   ...joTransformations,
   ...kikorTransformations,
   ...gustavaxTransformations,
+  ...miniBossCombat,
   endSpecial(p) {
     if (p.specialState?.transformation && p.kind === 'gustavax') this.endGustavaxTransformation(p);
     if (p.specialState?.transformation && p.kind === 'kikor') this.endKikorTransformation(p);
@@ -56,6 +60,7 @@ export const combat = {
     this.updateJualosWorld(dt);
     this.updateYanuWorld(dt);
     this.updateKikorWorld(dt);
+    this.updateMiniBossWorld(dt);
     this.updateGustavaxWorld(dt);
     this.updateRogueWorld(dt);
     for (const h of s.hazards) {
@@ -90,6 +95,7 @@ export const combat = {
         const hit = h.shape === 'ring' ? distance >= h.previousRadius - h.thickness && distance <= h.radius + h.thickness : h.shape === 'line' ? dx * h.facing >= -25 && dx * h.facing <= h.width && Math.abs(dy) < h.band : distance < h.radius;
         if (hit) {
           this.damage(target, Math.round(ignition ? h.ignitionDamage || h.damage : h.damage), source, true);
+          if (h.electric && target.hp > 0) target.electrifiedUntil = s.time + .85;
           if (h.sticky && target.hp > 0 && !target.sticky) target.sticky = { owner: h.owner, remaining: 1.25 };
           if (h.stunDuration && target.hp > 0) target.stun = Math.max(target.stun, h.stunDuration);
           h.hits[target.id] = s.time + h.pulse;
@@ -149,7 +155,7 @@ export const combat = {
     const b = BALANCE.specials[p.kind], bonus = p.bonuses;
     if (p.hp <= 0 || p.specialState || p.energy < b.cost) return false;
     const begin={karonux:'beginKaronux',lorenzo:'beginLorenzo',jualos:'beginJualos',yanu:'beginYanuTransformation',jo:'beginJoTransformation',kikor:'beginKikorTransformation',gustavax:'beginGustavaxTransformation'}[p.kind];
-    if(begin){const activated=this[begin](p);if(activated){this.stadiumAction('special');p.examTargets=[];}return activated;}
+    if(begin){const activated=this[begin](p);if(activated){p.specialState.ultimateInput={held:true,tap:p.taps?.special||0,next:0};this.stadiumAction('special');p.examTargets=[];}return activated;}
     this.stadiumAction('special');
     p.examTargets = [];
     p.energy -= b.cost; p.specialCd = b.cooldown * bonus.cooldown;
@@ -165,6 +171,8 @@ export const combat = {
   },
   updateSpecial(p, input, dt) {
     if (p.specialState?.transformation) {
+      this.updateUltimateSpecial(p,input,dt);
+      if(this.updateUltimateRush(p,dt))return;
       const update={karonux:'updateKaronuxTransformation',lorenzo:'updateLorenzoTransformation',jualos:'updateJualosTransformation',yanu:'updateYanuTransformation',jo:'updateJoTransformation',kikor:'updateKikorTransformation',gustavax:'updateGustavaxTransformation'}[p.kind];
       return this[update](p,input,dt);
     }
@@ -222,6 +230,7 @@ export const combat = {
     if (a.elapsed >= a.duration) { this.endSpecial(p); p.action = 'idle'; p.cooldown = Math.min(p.cooldown, .15); }
   },
   bossPhase(e) {
+    if(e.miniBoss)return e.bossPhase||1;
     const b = BALANCE.bosses[e.kind];
     return e.vehicle ? 0 : 1 + b.phases.filter(threshold => e.hp / e.maxHp <= threshold).length;
   },

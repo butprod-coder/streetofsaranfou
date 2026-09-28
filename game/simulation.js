@@ -92,7 +92,7 @@ export class Simulation {
     s.rogueZones = []; s.rogueBalls = [];
     s.enemyOrder ||= createEnemyOrder(() => this.random());
     s.streetSeed = this.seed; s.streetBag = [...(s.enemyBag || [])];
-    s.waves = wavePlan(this.routeDepth(), s.stage, s.players.length, s.difficulty, () => this.random(), s.enemyBag ||= [], s.enemyOrder);
+    s.waves = wavePlan(this.routeDepth(), s.stage, s.players.length, s.difficulty, () => this.random(), s.enemyBag ||= [], s.enemyOrder, s.chapter);
     s.props = this.streetProps(); s.surprise = null; s.surpriseDone = false;
     this.prepareNeighborhood();
     for (const [i, p] of s.players.entries()) {
@@ -118,6 +118,13 @@ export class Simulation {
     s.spawnQueue = [...wave.kinds]; s.spawnTimer = 1.6;
     if (s.spawnQueue.length) this.spawnEnemy(s.spawnQueue.shift());
     if (wave.boss) {
+      if(wave.miniBoss){
+        const bosses=(wave.bossKinds||[wave.bossKind]).map((kind,i)=>{
+          const c=ENEMIES[kind],hp=Math.round(c.hp*(duo?BALANCE.bossCombat.duoHp:1));
+          return {...this.actor(kind,this.nextId++,true),enemy:true,boss:true,miniBoss:true,hp,maxHp:hp,power:c.power*(duo?1.1:1),speed:c.speed,reach:c.reach,value:c.score,x:960+i*150,y:500+i*95,cooldown:1.3+i*.5,attackCount:0,bossPhase:1,invincible:.5,pattern:null,...(kind==='remyGeek'?{remyShielded:true,remyPartySpawned:false}: {})};
+        });
+        s.enemies.push(...bosses);this.startBossCinema(bosses[0]);s.bossCinema.duration=2.6;s.bossCinema.miniBossPair=bosses.length>1;s.phase='fight';this.event('wave',{label:`MINI-BOSS · ${bosses.map(e=>ENEMIES[e.kind].name.toUpperCase()).join(' & ')}`});this.neighborAssist();return;
+      }
       const c = fighter(wave.bossKind || CHAPTERS[s.chapter].boss), b = BALANCE.bosses[c.id], hp = Math.round((c.id === 'karonux' ? b.carHp : b.hp) * (duo ? BALANCE.bossCombat.duoHp : 1));
       s.enemies.push({ ...this.actor(c.id, this.nextId++, true), boss: true, hp, maxHp: hp, power: b.power,
         routeBossScale: s.chapter===6 ? (c.id==='gustavax'?1:.6) : s.route ? (.8+.07*this.routeDepth())/(.8+.07*s.chapter) : 1, speed: 145 + this.routeDepth() * 7, reach: 115, value: 1800 + s.chapter * 300, x: 1010, y: 540,
@@ -351,7 +358,7 @@ export class Simulation {
       else if (pressed.kick) this.startAttack(p, 'kick');
       else if (pressed.punch) this.startAttack(p, 'punch');
     }
-    let move = p.rogueFortress > this.state.time ? .65 : p.attack ? .32 : 1;
+    let move = (p.dampsSmokeUntil > this.state.time ? .64 : 1) * (p.rogueFortress > this.state.time ? .65 : p.attack ? .32 : 1);
     if (input.revive && p.z === 0 && !p.attack) {
       const down = this.state.players.find(other => other.id !== p.id && other.hp <= 0 && distance(p, other) < 105);
       if (down) {
@@ -406,6 +413,23 @@ export class Simulation {
         this.event('spit', { x: a.x, y: a.y - 95 });
       }
       return;
+    }
+    if(a.enemy&&a.remySummon&&attack.type==='special'){
+      if(a.kind==='remyOrc')this.hazard(a,{kind:'remySlash',x:a.x+a.facing*35,y:a.y,facing:a.facing,shape:'line',width:165,band:58,delay:0,ttl:.24,damage:a.power*1.35,pulse:10});
+      else if(a.kind==='remyPaladin')this.hazard(a,{kind:'remyHolyNova',x:a.x,y:a.y,radius:110,delay:.12,ttl:.22,damage:a.power*1.25,pulse:10});
+      else if(a.kind==='remyElf'){
+        const target=s.players.filter(alive).sort((x,y)=>distance(a,x)-distance(a,y))[0];
+        if(target){const angle=Math.atan2(target.y-a.y,target.x-a.x);this.hazard(a,{kind:'remyArrow',x:a.x+a.facing*28,y:a.y-48,radius:19,vx:Math.cos(angle)*510,vy:Math.sin(angle)*510,delay:0,ttl:1.7,damage:a.power*1.2,pulse:10});}
+      }
+      else if(a.kind==='remyTauren'){
+        const target=s.players.filter(alive).sort((x,y)=>distance(a,x)-distance(a,y))[0];
+        if(target)this.hazard(a,{kind:'remyStomp',x:target.x,y:target.y,radius:122,delay:.48,ttl:.2,damage:a.power*1.45,pulse:10});
+      }
+      const cell={remyOrc:4,remyPaladin:5,remyElf:6,remyTauren:7}[a.kind];this.remyFX(a.x+a.facing*65,a.y-70,cell);return;
+    }
+    if(a.enemy&&a.kind==='remyGeek'&&attack.type==='special'){
+      for(let i=-1;i<=1;i++){const target=s.players.filter(alive).sort((x,y)=>distance(a,x)-distance(a,y))[0];if(!target)break;const angle=Math.atan2(target.y-a.y,target.x-a.x)+i*.15;this.hazard(a,{kind:'remyPixelBolt',x:a.x+a.facing*44,y:a.y-90,radius:25,vx:Math.cos(angle)*370,vy:Math.sin(angle)*370,delay:Math.abs(i)*.1,ttl:2,damage:a.power*.85,pulse:10});}
+      this.remyFX(a.x+a.facing*70,a.y-100,13);return;
     }
     if (a.enemy && attack.type === 'special' && ['remy', 'makouille', 'orelsan', 'guylux', 'papy_jala', 'charlingals', 'kikor_e'].includes(a.kind)) {
       const style = a.kind === 'remy' ? 'scooter' : a.kind === 'makouille' ? 'motorcycle' : a.kind === 'orelsan' ? 'tennis' : a.kind === 'guylux' ? 'magic' : a.kind === 'papy_jala' ? 'pepper' : a.kind === 'charlingals' ? 'knife' : 'skateboard';
@@ -470,6 +494,7 @@ export class Simulation {
   damage(target, amount, source, heavy, chargeEnergy = false) {
     const s = this.state;
     if (target.hp <= 0) return;
+    if(target.kind==='remyGeek'&&target.remyShielded){if(s.time>=(target.remyShieldHintAt||0)){target.remyShieldHintAt=s.time+1.1;this.event('opening',{x:target.x,y:target.y-205,label:'BOUCLIER ACTIF · ÉLIMINE LES 4 INVOCATIONS !'});}return;}
     if(target.gustavaxMinion){if(!source?.enemy||s.bossCinema)return;target.hp=Math.max(0,target.hp-amount);target.flash=.15;if(target.hp<=0)target.ttl=0;this.event('impact',{x:target.x,y:target.y-65});return;}
     if (amount > 0 && this.bourgCover(target, source, heavy)) return;
     if ((s.practice?.invulnerable || s.sandbox?.invulnerable) && !target.enemy) return;
@@ -506,12 +531,16 @@ export class Simulation {
     if (target.boss && target.kind === 'jualos' && !target.commercial && target.hp <= target.maxHp * BALANCE.bosses.jualos.phases[0]) this.beginJualosCommercial(target);
     if (!target.enemy) { this.releaseGrab(target); target.interaction = null; }
     if (target.elite) this.eliteHit(target, heavy);
+    if (target.miniBoss) {
+      if(target.hp>0&&heavy&&target.pattern&&!target.pattern.hit){target.pattern=null;target.cooldown=.8;target.recovering=.8;}
+      if(target.hp<=0)s.hazards=s.hazards.filter(h=>h.owner!==target.id);
+    }
     if (STREET_ENEMIES[target.kind]) {
       if (target.hp <= 0) s.hazards = s.hazards.filter(h => h.owner !== target.id);
       if (heavy && target.pattern && !target.pattern.hit) { target.pattern = null; target.cooldown = .8; target.recovering = .8; }
     }
     const preservedAttack = target.rogueArmor ? { attack:target.attack, action:target.action, comboStep:target.comboStep } : null;
-    target.stun = (target.boss ? .09 : heavy ? .34 : .23) * (target.enemy ? 1 : target.bonuses.stagger);
+    target.stun = (target.miniBoss ? .18 : target.boss ? .09 : heavy ? .34 : .23) * (target.enemy ? 1 : target.bonuses.stagger);
     // Boss wind-ups remain readable and cannot be stun-locked indefinitely.
     if (!target.boss || !target.attack) { target.attack = null; target.action = 'hurt'; target.actionTime = 0; }
     target.vx = (Math.sign(target.x - source.x) || source.facing) * (target.boss ? 65 : heavy ? 340 : 110);
@@ -554,6 +583,7 @@ export class Simulation {
   }
 
   updateEnemy(e, dt) {
+    if(e.kind==='mairePolice')this.updateMairePolice(e,dt);
     if (this.updateGustavaxEnemy(e, dt)) return;
     if (this.updateJoCargo(e, dt)) return;
     if (this.updateYanuRoots(e, dt)) return;
@@ -566,13 +596,14 @@ export class Simulation {
     if (e.karonuxFrost?.until > this.state.time) e.speed *= .55;
     if (e.rogueSlow > 0) e.speed *= .55;
     if (e.kikorPaintUntil > this.state.time) e.speed *= .5;
-    try { this.updateEnemyAction(e, dt); } finally { e.speed = speed; }
+    try { if(e.harmelinRush)this.updateHarmelinStudent(e,dt);else if(e.remySummon)this.updateRemySummon(e,dt);else this.updateEnemyAction(e, dt); } finally { e.speed = speed; }
   }
 
   updateEnemyAction(e, dt) {
     if (e.joPallet) { this.updateJoPallet(e, dt); return; }
     if (this.updateNeighborhoodEnemy(e, dt)) return;
     if (this.updateThrown(e, dt)) return;
+    if(e.miniBoss){this.updateMiniBoss(e,dt);return;}
     this.tickActor(e, dt);
     if (this.updateTactics(e, dt)) return;
     if (e.elite) { this.updateElite(e, dt); return; }
@@ -582,6 +613,7 @@ export class Simulation {
       if (target) this.updateStreetEnemy(e, target, dt);
       return;
     }
+    if (e.hp > 0 && e.miniBoss) { this.updateMiniBoss(e, dt); return; }
     if (e.hp > 0 && e.boss) { this.updateBoss(e, dt); return; }
     if (e.hp <= 0 || e.attack || e.stun > 0 || !['fight', 'surprise'].includes(this.state.phase)) return;
     if (e.boss && e.hp < e.maxHp * .4 && !e.enraged) { e.enraged = true; e.speed *= 1.25; this.event('rage', { actor: e.id, label: `${fighter(e.kind).name} s’énerve !` }); }

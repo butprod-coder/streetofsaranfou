@@ -21,7 +21,7 @@ export const GUSTAVAX_BRANCHES=[
     ['Projectile humain','Esquive : frappe violemment le sol et fait tomber les ennemis alentours.'],
     ['Main Event','Durée 7 s. Les projections produisent une onde de choc.'],
     ['Prises aériennes','Saut : bondit sur un ennemi au sol pour une attaque de catch aérienne.'],
-    ['WRESTLEMANIA SARANFOU','Durée 9 s. Champion de catch. Les cordes du ring permettent de rebondir en accélérant. La dernière projection déclenche une énorme onde de choc.'],
+    ['WRESTLEMANIA SARANFOU','Durée 9 s. Champion de catch. Saut puis Rond (Spécial) en l’air : plaquage ventral et onde de choc sur toute l’arène. Les cordes du ring permettent de rebondir en accélérant. La dernière projection déclenche une énorme onde de choc.'],
   ]],
 ].map(([branch,entries],branchIndex)=>({branch,nodes:entries.map(([name,description],tier)=>({id:`gustavax_v3_${branchIndex}_${tier}`,name,description,tier,branch,branchIndex,ultimate:tier===5,effects:{}}))}));
 export function gustavaxSelection(p){const ids=p.progression?.talents||[],branch=GUSTAVAX_BRANCHES.findIndex(b=>b.nodes.some(n=>ids.includes(n.id)));return{branch,rank:branch<0?0:GUSTAVAX_BRANCHES[branch].nodes.filter(n=>ids.includes(n.id)).length};}

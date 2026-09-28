@@ -1,0 +1,5 @@
+{
+  "tool": "Imagegen intégré",
+  "character": "Planche de 16 poses en grille 4x4 du mini-boss Mazzuka : vieil instituteur au crâne chauve, lunettes rondes, cheveux gris sur les côtés, cardigan sombre. Poses de garde, marche, coups de pied hauts et tournoyants, lancer de brosse de tableau, lancer de chaise, blessure, garde, puis variantes renforcées. Pixel art arcade 16 bits, fond transparent demandé.",
+  "effects": "Atlas VFX 4x4 de pixel art : brosse volante, impact poudre de craie, éclats de craie, arc de balayage, chaise volante, éclats de bois, arc de coup de pied, étincelle d'impact, anneaux au sol, étoiles d'étourdissement, indicateur rouge de coup de pied et onde de choc. Fond transparent demandé ; le dégradé produit par Imagegen est retiré au chargement du jeu."
+}

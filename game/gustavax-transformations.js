@@ -65,10 +65,21 @@ export const gustavaxTransformations={
   updateGustavaxTransformation(p,input,dt){
     const a=p.specialState;a.elapsed+=dt;p.action='special';p.vx=p.vy=p.vz=0;
     if(p.hp<=0||a.elapsed>=a.duration){if(p.hp>0&&a.grip)this.finishGustavaxGrip(p);this.endSpecial(p);return;}
-    const fresh={};for(const key of ['punch','kick','jump','dodge']){fresh[key]=!!input[key]&&!a.held[key]||(input.taps?.[key]||0)>(a.taps[key]||0);a.held[key]=!!input[key];a.taps[key]=input.taps?.[key]||0;}
+    const fresh={};for(const key of ['punch','kick','jump','dodge','special']){fresh[key]=!!input[key]&&!a.held[key]||(input.taps?.[key]||0)>(a.taps[key]||0);a.held[key]=!!input[key];a.taps[key]=input.taps?.[key]||0;}
     const norm=Math.max(1,Math.hypot(input.x||0,input.y||0)),x=(input.x||0)/norm,y=(input.y||0)/norm;if(x)p.facing=Math.sign(x);
     if(a.elapsed>=a.poseUntil)a.pose=x||y?1+Math.floor(a.elapsed*8)%2:0;
     if(a.grip){a.grip.age+=dt;if(input.kick&&a.rank>=2&&a.grip.age>.22)a.grip.slam=true;const e=this.state.enemies.find(e=>e.id===a.grip.id);if(e){e.x=p.x+p.facing*30;e.y=p.y;e.z=110;}if(a.grip.age>=.6)this.finishGustavaxGrip(p);return;}
+    if(a.bellyJump){
+      const jump=a.bellyJump;jump.age+=dt;
+      if(jump.ultimateAuto&&jump.age>=.3&&!jump.slam){jump.slam=true;jump.fallZ=Math.max(35,p.z);jump.fallAge=0;}
+      p.x=clamp(p.x+x*220*dt,FLOOR.left,FLOOR.right);p.y=clamp(p.y+y*150*dt,FLOOR.top,FLOOR.bottom);
+      p.z=jump.slam?Math.max(0,jump.fallZ*(1-(jump.fallAge+=dt)/.2)):Math.sin(Math.min(1,jump.age/.85)*Math.PI)*180;
+      pose(a,jump.slam?6:3,.1);
+      if(jump.slam?p.z<=0:jump.age>=.85){
+        if(jump.slam){this.gustavaxPlayerStrike(p,p.x,p.y,1600,3.2,true,true);this.gustavaxFX(p.x,p.y,14);this.event('gustavaxCrash',{x:p.x,y:p.y});pose(a,5,.3);}
+        a.bellyJump=null;p.z=0;
+      }return;
+    }
     if(a.air){const t=Math.min(1,(a.air.age+=dt)/.6);p.x=a.air.x+(a.air.toX-a.air.x)*t;p.y=a.air.y+(a.air.toY-a.air.y)*t;p.z=Math.sin(t*Math.PI)*150;pose(a,6,.05);if(t===1){this.gustavaxPlayerStrike(p,p.x,p.y,210,2.6,true,true);this.gustavaxFX(p.x,p.y,13);a.air=null;p.z=0;}return;}
     let speed=p.speed;if(a.branch===0&&a.rank>=4)speed*=1.1;
     if(a.branch===2&&a.rank===6){a.speed=x||y?Math.min(650,a.speed+450*dt):0;speed+=a.speed;if(a.elapsed<(a.bounceUntil||0)){p.x=clamp(p.x+a.bounceX*750*dt,FLOOR.left,FLOOR.right);pose(a,1,.1);this.gustavaxPlayerStrike(p,p.x,p.y,100,.25,false,true);} }
@@ -89,7 +100,8 @@ export const gustavaxTransformations={
       if(input.punch&&a.elapsed>=a.nextAttack){this.gustavaxPlayerStrike(p,p.x,p.y,135,1,false);a.nextAttack=a.elapsed+.35;pose(a,2);}
       if(fresh.kick&&a.elapsed>=a.nextHeavy){this.startGustavaxGrip(p);a.nextHeavy=a.elapsed+.85;}
       if(fresh.dodge&&a.rank>=3&&a.elapsed>=a.nextDodge){this.gustavaxPlayerStrike(p,p.x,p.y,220,1.2,true,true);this.gustavaxFX(p.x,p.y,13);pose(a,7);a.nextDodge=a.elapsed+1;}
-      if(fresh.jump&&a.rank>=5&&a.elapsed>=a.nextJump){const e=this.state.enemies.filter(e=>grabbable(e)&&dist(p,e)<500&&(e.gustavaxDownUntil>this.state.time||e.stun>0)).sort((e,f)=>dist(p,e)-dist(p,f))[0];if(e){a.air={age:0,x:p.x,y:p.y,toX:e.x,toY:e.y};a.nextJump=a.elapsed+1.2;}}
+      if(fresh.jump&&a.rank===6&&a.elapsed>=a.nextJump){a.bellyJump={age:0,slam:false};a.nextJump=a.elapsed+1.3;pose(a,3);}
+      else if(fresh.jump&&a.rank>=5&&a.elapsed>=a.nextJump){const e=this.state.enemies.filter(e=>grabbable(e)&&dist(p,e)<500&&(e.gustavaxDownUntil>this.state.time||e.stun>0)).sort((e,f)=>dist(p,e)-dist(p,f))[0];if(e){a.air={age:0,x:p.x,y:p.y,toX:e.x,toY:e.y};a.nextJump=a.elapsed+1.2;}}
       if(a.rank===6&&a.elapsed>=a.duration-.8&&!a.finalAttempt){a.finalAttempt=true;this.startGustavaxGrip(p);}
     }
   },

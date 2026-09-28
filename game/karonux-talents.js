@@ -14,7 +14,7 @@ export const KARONUX_BRANCHES = [
     ['Patinoire', 'Esquive : laisse une traînée de glace qui fait glisser les ennemis.'],
     ['Blizzard', 'Durée 7 s. La tempête autour de Karonux accumule du gel sur les ennemis proches.'],
     ['Contagion glaciale', 'Les explosions transmettent une forte quantité de gel et peuvent provoquer des réactions en chaîne.'],
-    ['REINE DE SARANFOU', 'Durée 9 s. Vague de froid initiale sur tout l’écran. Toutes les cibles congelées explosent à la fin.'],
+    ['REINE DE SARANFOU', 'Durée 9 s. Vague de froid initiale sur tout l’écran. Pendant la transformation, appuie à nouveau sur Spécial (Rond) pour faire exploser les ennemis congelés. Les cibles encore congelées explosent aussi à la fin.'],
   ]],
   ['Handikaron', [
     ['Handikaron', 'Spécial : deux béquilles et un pied plâtré pendant 5 s. Main : béquille. Pied : coup de plâtre.'],

@@ -13,6 +13,36 @@ export class Assets {
         clearTimeout(timer);
         let bitmap = img;
         // This generated atlas uses a chroma key; keep the source PNG untouched.
+        if (['/assets/boss/chateau_etang/jalatrix_fx.png', '/assets/boss/stade_colette/mazzuka_fx.png', '/assets/boss/bourg_saran/effects.png', '/assets/boss/cap_saran/effects.png', '/assets/boss/college_montjoie/effects.png'].includes(url)) {
+          bitmap = document.createElement('canvas'); bitmap.width = img.width; bitmap.height = img.height;
+          const context = bitmap.getContext('2d', { willReadFrequently: true }); context.drawImage(img, 0, 0);
+          const pixels = context.getImageData(0, 0, img.width, img.height), { data } = pixels, cols = 4, rows = 4;
+          // Imagegen sometimes paints a soft gradient behind sprite atlases. Flood the
+          // smooth, edge-connected backdrop within each cell while retaining outlined FX.
+          for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
+            const x0 = Math.floor(col * img.width / cols), x1 = Math.floor((col + 1) * img.width / cols);
+            const y0 = Math.floor(row * img.height / rows), y1 = Math.floor((row + 1) * img.height / rows);
+            const w = x1 - x0, h = y1 - y0, seen = new Uint8Array(w * h), queue = new Int32Array(w * h);
+            let head = 0, tail = 0;
+            const add = n => { if (!seen[n]) { seen[n] = 1; queue[tail++] = n; } };
+            for (let x = 0; x < w; x++) { add(x); add((h - 1) * w + x); }
+            for (let y = 1; y < h - 1; y++) { add(y * w); add(y * w + w - 1); }
+            const smooth = (a, b) => {
+              const i = ((y0 + Math.floor(a / w)) * img.width + x0 + a % w) * 4;
+              const j = ((y0 + Math.floor(b / w)) * img.width + x0 + b % w) * 4;
+              return Math.abs(data[i] - data[j]) + Math.abs(data[i + 1] - data[j + 1]) + Math.abs(data[i + 2] - data[j + 2]) < 44;
+            };
+            while (head < tail) {
+              const n = queue[head++], x = n % w, y = Math.floor(n / w), i = ((y0 + y) * img.width + x0 + x) * 4;
+              data[i + 3] = 0;
+              if (x > 0 && !seen[n - 1] && smooth(n, n - 1)) add(n - 1);
+              if (x + 1 < w && !seen[n + 1] && smooth(n, n + 1)) add(n + 1);
+              if (y > 0 && !seen[n - w] && smooth(n, n - w)) add(n - w);
+              if (y + 1 < h && !seen[n + w] && smooth(n, n + w)) add(n + w);
+            }
+          }
+          context.putImageData(pixels, 0, 0);
+        }
         if (['/assets/shared/scenery/estate-events.png', '/assets/shared/scenery/night-bus.png'].includes(url)) {
           bitmap = document.createElement('canvas'); bitmap.width = img.width; bitmap.height = img.height;
           const context = bitmap.getContext('2d'); context.drawImage(img, 0, 0);
@@ -64,7 +94,7 @@ export class Assets {
       const canvas = document.createElement('canvas'); canvas.width = image.width; canvas.height = image.height;
       const ctx = canvas.getContext('2d', { willReadFrequently: true }); ctx.drawImage(image, 0, 0);
       const pixels = ctx.getImageData(0, 0, image.width, image.height).data;
-      rects = Array.from({ length: config.cols * config.rows }, (_, i) => {
+      rects = Array.from({ length: (config.frameCount || config.cols * config.rows) }, (_, i) => {
         const col = i % config.cols;
         const row = Math.floor(i / config.cols);
         const columns = config.rowColumns?.[row] || config.columnCuts;
@@ -112,7 +142,7 @@ export class Assets {
       this.frames.set(cacheKey, rects);
     }
     const rect=rects[Math.min(rects.length-1,frame)];
-    return { image:rect.image||image, rect:rect.image?[0,0,rect[2],rect[3]]:rect, base:rects[0], height:config.height };
+    return { image:rect.image||image, rect:rect.image?[0,0,rect[2],rect[3]]:rect, base:rects[config.baseFrame||0], height:config.height };
   }
   frame(id, action, progress, enemy = false) {
     const key = `${id}/${action}/${enemy}`;

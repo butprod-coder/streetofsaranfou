@@ -24,7 +24,7 @@ test('two distinct seeded encounters replace waves only in the first neighborhoo
   for(let seed=1;seed<100;seed++){
     const plan=neighborhoodPlan(seed);assert.deepEqual(plan,neighborhoodPlan(seed));assert.equal(new Set(plan.plan.map(p=>p.kind)).size,2);seen.add(plan.plan.map(p=>p.kind).join(','));
     const g=new Simulation(['jo'],0,seed);
-    for(let stage=0;stage<6;stage++){g.state.stage=stage;g.enterStreet();assert.equal(g.state.waves.filter(w=>w.neighborhood).length,[1,3].includes(stage)?1:0);assert.equal(g.state.waves.length,stage===5?4:3);}
+    for(let stage=0;stage<6;stage++){g.state.stage=stage;g.enterStreet();assert.equal(g.state.waves.filter(w=>w.neighborhood).length,[1,3].includes(stage)?1:0);assert.equal(g.state.waves.length,stage===5||stage===2?4:3);}
     g.state.chapter=4;g.state.stage=0;g.enterStreet();assert.equal(g.state.waves.some(w=>w.neighborhood),false);assert.equal(g.state.surpriseDone,false);
   }
   assert.ok(seen.size>=10);

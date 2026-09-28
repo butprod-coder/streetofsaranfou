@@ -1,3 +1,4 @@
+import { ULTIMATE_SPECIALS } from './ultimate-specials.js';
 import { drawGustavaxTransformation, drawGustavaxMinion, drawGustavaxWorld } from './gustavax-transform-renderer.js';
 import { drawLorenzoTransformation, drawLorenzoWorld } from './lorenzo-transform-renderer.js';
 import { drawJualosTransformation, drawJualosWorld } from './jualos-transform-renderer.js';
@@ -27,6 +28,8 @@ import { CHAPTER_INTROS, hasChapterIntro, INTRO_DURATION, INTRO_REVEAL } from '.
 const $ = s => document.querySelector(s);
 const TAU = Math.PI * 2;
 const BOSS_PRESENTATIONS = {
+  damps:['DAMPS','IL EN RESTE TOUJOURS UNE.'],
+  cainri:['CAINRI','JUSTE UN DERNIER VERRE.'],
   karonux: ['KARONUX', 'Meme pas du chêne Batard'],
   kikor: ['KIKOR', 'Benjamin présent dit le Rennais'],
   yanu: ['YANU', 'La bête qui sommeil BOW !'],
@@ -176,17 +179,17 @@ export class Renderer {
     const fade = Math.min(1, shot.elapsed * 3, (shot.duration - shot.elapsed) * 3);
     c.save(); c.globalAlpha = fade; c.fillStyle = '#04080ff2'; c.fillRect(0, 0, W, 94); c.fillRect(0, H - 105, W, 105);
     c.fillStyle = '#e9b96b'; c.fillRect(60, H - 106, W - 120, 2);
-    c.textAlign = 'left'; c.font = 'bold 16px monospace'; c.fillText(shot.kind === 'exit' ? 'ACTE II / LA PORTIÈRE CLAQUE' : 'FIN DE QUARTIER / LE PATRON', 64, 55);
+    c.textAlign = 'left'; c.font = 'bold 16px monospace'; c.fillText(shot.kind === 'exit' ? 'ACTE II / LA PORTIÈRE CLAQUE' : boss.miniBoss ? `${CHAPTERS[state.chapter].short.toUpperCase()} / RENCONTRE INTERMÉDIAIRE` : 'FIN DE QUARTIER / LE PATRON', 64, 55);
     if (shot.kind === 'arrival') {
-      c.restore(); this.bossPresentation(boss, shot); return;
+      c.restore(); this.bossPresentation(boss, shot, state); return;
     }
-    c.font = 'italic bold 48px Impact, sans-serif'; c.fillStyle = '#fff0d3'; c.fillText(boss.kind === 'jo' ? 'JO LA MOUK' : fighter(boss.kind).name.toUpperCase(), 64, H - 48);
+    c.font = 'italic bold 48px Impact, sans-serif'; c.fillStyle = '#fff0d3'; c.fillText(boss.miniBoss ? boss.kind==='maire'?'LE MAIRE':boss.kind==='remyGeek'?'RÉMY LE NO LIFE':boss.kind==='harmelin'?'MME HARMELIN':boss.kind.toUpperCase() : boss.kind === 'jo' ? 'JO LA MOUK' : fighter(boss.kind).name.toUpperCase(), 64, H - 48);
     c.font = '14px monospace'; c.fillStyle = '#e7bc80'; c.textAlign = 'right';
     c.fillText(boss.kind === 'karonux' ? shot.kind === 'exit' ? 'GRAND. NERVEUX. PAS RÉVEILLÉ.' : 'UNE GOLF. UN DERNIER AVERTISSEMENT.' : this.bossSubtitle(boss), W - 64, H - 43);
     c.restore();
   }
-  bossPresentation(boss, shot) {
-    const c = this.ctx, [name, description] = BOSS_PRESENTATIONS[boss.kind] || [fighter(boss.kind).name.toUpperCase(), this.bossSubtitle(boss)];
+  bossPresentation(boss, shot, state) {
+    const c = this.ctx, [name, description] = boss.miniBoss ? [shot.miniBossPair?'DAMPS & CAINRI':boss.kind==='jalatrix'?'JALATRIX LE PÉCHEUR':boss.kind==='mazzuka'?'MAZZUKA':boss.kind==='maire'?'LE MAIRE':boss.kind==='remyGeek'?'RÉMY LE NO LIFE':boss.kind==='harmelin'?'MME HARMELIN':boss.kind.toUpperCase(),shot.miniBossPair?'UNE CLOPE. UNE BOUTEILLE. DEUX PROBLÈMES.':boss.kind==='damps'?'IL EN RESTE TOUJOURS UNE.':boss.kind==='jalatrix'?'AU BORD DE LA RIVIÈRE, IL RAMÈNE TOUJOURS QUELQU’UN.':boss.kind==='mazzuka'?'LE CONSEIL DE CLASSE VA ÊTRE SPORTIF.':boss.kind==='maire'?'IL A FAIT APPELER LES RENFORTS.':boss.kind==='remyGeek'?'IL A PING TOUT LE RAID. IL A OUBLIÉ DE PRÉVOIR LE WIFI.':boss.kind==='harmelin'?'SON CONSEIL DE CLASSE ARRIVE À QUATRE CENTS À L’HEURE.':'JUSTE UN DERNIER VERRE.'] : BOSS_PRESENTATIONS[boss.kind] || [fighter(boss.kind).name.toUpperCase(), this.bossSubtitle(boss)];
     const entrance = clamp(shot.elapsed / .65, 0, 1), departure = clamp((shot.elapsed - (shot.duration - .65)) / .65, 0, 1);
     const offset = this.reducedMotion ? 0 : -(W + 100) * (1 - entrance) ** 3 + (W + 100) * departure ** 3;
     c.save(); c.globalAlpha = this.reducedMotion ? Math.min(entrance, 1 - departure) : 1;
@@ -198,13 +201,13 @@ export class Renderer {
     c.fillStyle = '#e9b96b'; c.fillRect(-555, -124, 1095, 4); c.fillRect(-540, 120, 1095, 4);
     c.fillStyle = '#e9b96b22';
     for (let i = 0; i < 5; i++) { c.save(); c.translate(-525 + i * 24, 0); c.transform(1, 0, -.2, 1, 0, 0); c.fillRect(0, -99, 9, 198); c.restore(); }
-    c.textAlign = 'center'; c.fillStyle = '#e9b96b'; c.font = 'bold 13px monospace'; c.fillText('FIN DE QUARTIER  /  LE PATRON', 0, -85);
+    c.textAlign = 'center'; c.fillStyle = '#e9b96b'; c.font = 'bold 13px monospace'; c.fillText(boss.miniBoss?`${CHAPTERS[state.chapter].short.toUpperCase()}  /  MINI-BOSS`:'FIN DE QUARTIER  /  LE PATRON', 0, -85);
     c.font = 'italic bold 88px Impact, sans-serif'; c.lineWidth = 7; c.strokeStyle = '#03070d'; c.strokeText(name, 0, 12, 870); c.fillStyle = '#fff0d3'; c.fillText(name, 0, 12, 870);
     c.fillStyle = '#e9b96b'; c.fillRect(-40, 35, 80, 3);
     c.font = 'bold 25px monospace'; c.fillStyle = '#e7bc80'; c.fillText(description, 0, 80, 940);
     c.restore();
   }
-  bossSubtitle(boss) { return boss.kind === 'jualos' ? 'LE DERNIER PATRON. LE VENTRE DES AFFAIRES.' : boss.kind === 'jo' ? 'LE BRAS LONG. LES POINGS VIFS. LIVRAISON BRUTALE.' : boss.kind === 'lorenzo' ? 'UNE BRAISE. UN TRÔNE. PLUS AUCUNE PATIENCE.' : boss.kind === 'yanu' ? 'LA MARÉE MONTE. LA BÊTE SE RÉVEILLE.' : boss.kind === 'kikor' ? 'LA TOILE PREND VIE. LE PEINTRE PERD LA TÊTE.' : `QUARTIER VERROUILLÉ · ${fighter(boss.kind).title || 'LE COMBAT COMMENCE'}`; }
+  bossSubtitle(boss) { return boss.kind === 'harmelin' ? 'LA SONNERIE RETENTIT. COUREZ.' : boss.kind === 'jualos' ? 'LE DERNIER PATRON. LE VENTRE DES AFFAIRES.' : boss.kind === 'jo' ? 'LE BRAS LONG. LES POINGS VIFS. LIVRAISON BRUTALE.' : boss.kind === 'lorenzo' ? 'UNE BRAISE. UN TRÔNE. PLUS AUCUNE PATIENCE.' : boss.kind === 'yanu' ? 'LA MARÉE MONTE. LA BÊTE SE RÉVEILLE.' : boss.kind === 'kikor' ? 'LA TOILE PREND VIE. LE PEINTRE PERD LA TÊTE.' : `QUARTIER VERROUILLÉ · ${fighter(boss.kind).title || 'LE COMBAT COMMENCE'}`; }
   drawJualos(a, state) {
     const c = this.ctx, p = a.pattern, changing = p?.kind === 'jualosSuit', commercial = a.commercial && !(changing && !p.hit);
     const intro = state.bossCinema?.actor === a.id ? state.bossCinema.elapsed : null;
@@ -492,7 +495,11 @@ export class Renderer {
   ellipse(x, y, rx, ry, color) { const c = this.ctx; c.fillStyle = color; c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, TAU); c.fill(); }
   arcadeSprite(key, x, y, frame = 0, height, facing = 1) {
     const asset = this.assets.arcadeFrame(key, frame); if (!asset) return;
-    const c = this.ctx, [sx, sy, sw, sh] = asset.rect, scale = (height || asset.height) / asset.base[3];
+    const c = this.ctx, [sx, sy, sw, sh] = asset.rect;
+    const talentFX=/^(karonux|lorenzo|jualos|yanu|jo|kikor|gustavax)FX$/.test(key);
+    // Effects use their own bounds: a small first atlas cell must not enlarge every other effect.
+    const size=(height||asset.height)*(talentFX?.72:1);
+    const scale=talentFX?Math.min(size/sh,Math.min(240,size*2)/sw):size/asset.base[3];
     c.save(); c.translate(x, y); c.scale(facing, 1); c.imageSmoothingEnabled = false;
     c.drawImage(asset.image, sx, sy, sw, sh, -sw * scale / 2, -sh * scale, sw * scale, sh * scale); c.restore();
   }
@@ -556,6 +563,35 @@ export class Renderer {
     if (h.kind === 'joArm') return; // The matching arm is rendered from the boss's attack clock.
     const c = this.ctx, warning = h.delay > 0, color = h.enemy || h.both ? '#ff696b' : '#83e6ca';
     c.save();
+    if(['harmelinPaper','harmelinPen'].includes(h.kind)){
+      c.globalAlpha=.95;c.translate(h.x,h.y-18);c.rotate(Math.atan2(h.vy||0,h.vx||1));
+      this.harmelinEffect(h.kind==='harmelinPen'?4:0,0,0,h.kind==='harmelinPen'?68:82,46);c.restore();return;
+    }
+    if(h.kind==='dampsSmoke'){
+      c.globalAlpha=.55;this.miniBossEffect(3,h.x,h.y-24,h.radius*2,h.radius);c.restore();return;
+    }
+    if(h.kind==='remyScreenPulse'&&h.electric){
+      c.strokeStyle='#cf91ff';c.lineWidth=3;c.beginPath();c.ellipse(h.x,h.y,h.radius,h.radius/1.45,0,0,TAU);c.stroke();
+      for(let i=0;i<12;i++){const angle=i*TAU/12;c.beginPath();c.moveTo(h.x,h.y-75);for(let j=1;j<=5;j++)c.lineTo(h.x+Math.cos(angle)*h.radius*j/5+(j%2?9:-9),h.y-75+Math.sin(angle)*h.radius*j/7);c.stroke();}c.restore();return;
+    }
+    if(['remyPixelBolt','remySlash','remyHolyNova','remyArrow','remyStomp','remyScreenPulse'].includes(h.kind)){
+      const cell={remyPixelBolt:12,remySlash:4,remyHolyNova:5,remyArrow:6,remyStomp:7,remyScreenPulse:14}[h.kind],line=h.shape==='line';
+      this.remyEffect(cell,line?h.x+h.facing*h.width/2:h.x,h.y-(line?16:h.kind==='remyArrow'?30:42),line?h.width:Math.max(60,h.radius*1.65),line?76:Math.max(58,h.radius*1.35),h.facing||1);c.restore();return;
+    }
+    if(['dampsCigarette','dampsCough','cainriBottle','whisky','whiskyFire','jalatrixHook','jalatrixSweep','jalatrixSlam','mazzukaEraser','mazzukaChair','mazzukaKick'].includes(h.kind)){
+      const jalatrix=h.kind.startsWith('jalatrix'),mazzuka=h.kind.startsWith('mazzuka'),cell=jalatrix?({jalatrixHook:0,jalatrixSweep:2,jalatrixSlam:6}[h.kind]):mazzuka?({mazzukaEraser:0,mazzukaChair:4,mazzukaKick:6}[h.kind]):({dampsCigarette:0,dampsCough:4,cainriBottle:8,whisky:10,whiskyFire:15}[h.kind]);
+      const line=h.shape==='line',height=h.kind==='dampsCough'?90:h.kind==='whiskyFire'?54:jalatrix?70:mazzuka?64:28;
+      c.globalAlpha=.8;
+      if(jalatrix)this.jalatrixEffect(cell,line?h.x+h.facing*h.width/2:h.x,h.y-(line?5:h.kind==='jalatrixSlam'?25:65),line?h.width:70,line?height:70,h.facing);
+      else if(mazzuka)this.mazzukaEffect(cell,line?h.x+h.facing*h.width/2:h.x,h.y-(line?10:52),line?h.width:70,line?height:60,h.facing);
+      else this.miniBossEffect(cell,line?h.x+h.facing*h.width/2:h.x,h.y-(line?(h.kind==='dampsCough'?40:5):65),line?h.width:32,line?height:28,h.facing);
+      c.restore();return;
+    }
+    if(['maireKick','maireWhistle'].includes(h.kind)){
+      const line=h.shape==='line',cell=h.kind==='maireWhistle'?0:9;
+      this.maireEffect(cell,line?h.x+h.facing*h.width/2:h.x,h.y-(h.kind==='maireWhistle'?95:48),line?h.width:100,h.kind==='maireWhistle'?100:70,h.facing);
+      c.restore();return;
+    }
     if (h.kind === 'jualosCash') {
       if (warning) {
         const t = clamp(1 - h.delay / h.flight, 0, 1);
@@ -684,12 +720,14 @@ export class Renderer {
     if(a.kikorSummon){drawKikorMinion(this,a,state);return;}
     if (a.joPallet) { this.drawJoPallet(a, state); return; }
     const c = this.ctx, dead = a.hp <= 0, t = a.actionTime + (state.paused ? 0 : age);
+    if(a.electrifiedUntil>state.time){c.save();c.strokeStyle='#e1b6ff';c.lineWidth=3;c.beginPath();for(let i=0;i<9;i++){const x=a.x+(i%2?24:-24),y=a.y-145+i*17;i?c.lineTo(x,y):c.moveTo(x,y);}c.stroke();c.restore();}
     const color = a.enemy ? '#ec6569' : a.id === 1 ? '#ffbf66' : '#91c6ff';
-    if (a.boss && a.pattern && !(a.pattern.kind === 'yanuHowl' && a.pattern.hit)) {
+    if (a.boss && !a.miniBoss && a.pattern && !(a.pattern.kind === 'yanuHowl' && a.pattern.hit)) {
       const p = a.pattern;
-      c.fillStyle = p.healing ? '#a3ecc6' : '#ffab95'; c.font = 'bold 12px monospace'; c.textAlign = 'center'; c.fillText((p.kind === 'sleep' && p.hit ? 'IL DORT · +25 % DE DÉGÂTS' : PATTERN_LABELS[p.kind] || '').toUpperCase(), clamp(a.x, 180, 1100), a.y - 264 - (a.z || 0));
+      const miniLabel={cigarette:'MÉGOT EN APPROCHE',smoke:'NUAGE PERSISTANT',cough:'COUP DE TOUX',charge:'CHARGE TITUBANTE',bottle:'BOUTEILLE VOLANTE',whisky:'JET DE WHISKY'}[p.kind];
+      c.fillStyle = p.healing ? '#a3ecc6' : '#ffab95'; c.font = 'bold 12px monospace'; c.textAlign = 'center'; c.fillText((p.kind === 'sleep' && p.hit ? 'IL DORT · +25 % DE DÉGÂTS' : miniLabel || PATTERN_LABELS[p.kind] || '').toUpperCase(), clamp(a.x, 180, 1100), a.y - 264 - (a.z || 0));
     }
-    if (a.recovering > 0 && !dead && !a.shielded && !(a.sofa && !a.sofaBroken)) { c.fillStyle = '#b9f2ce'; c.font = 'bold 13px monospace'; c.textAlign = 'center'; c.fillText('VULNÉRABLE', a.x, a.y - (ELITES[a.kind]?.height || 176) - 52 - (a.z || 0)); }
+    if (a.recovering > 0 && !dead && (a.miniBoss || !a.shielded && !(a.sofa && !a.sofaBroken))) { c.fillStyle = '#b9f2ce'; c.font = 'bold 13px monospace'; c.textAlign = 'center'; c.fillText('VULNÉRABLE', a.x, a.y - (a.miniBoss?195:ELITES[a.kind]?.height || 176) - 52 - (a.z || 0)); }
     this.ellipse(a.x + 5, a.y + 3, dead ? 49 : a.boss ? 39 : 28, dead ? 11 : 9, '#02060aa6');
     if (!a.enemy && !dead) {
       c.strokeStyle = color; c.globalAlpha = .65; c.lineWidth = 1.6; c.beginPath(); c.ellipse(a.x, a.y + 2, 29, 9, 0, 0, TAU); c.stroke(); c.globalAlpha = 1;
@@ -715,6 +753,10 @@ export class Renderer {
       if (form.charge > 0) c.fillText(`CHARGE ${Math.round(form.charge / 1.2 * 100)} %`, a.x, a.y - 200);
       return;
     }
+    if(a.miniBoss){this.drawMiniBoss(a,state);return;}
+    if(a.kind==='harmelinProviseur'){const c=this.ctx;c.save();if(a.hp<=0)c.globalAlpha=clamp((1.2-a.deadTime)/.4,0,1);this.arcadeSprite('miniBossProviseur',a.x,a.y-(a.z||0),a.hp<=0||a.stun>0?3:a.attack?2:a.moving?1:0,180,a.facing);c.restore();return;}
+    if(a.harmelinRush){this.drawHarmelinStudent(a);return;}
+    if(a.remySummon){this.drawRemySummon(a,state);return;}
     if(a.boss&&a.kind==='gustavax'){drawGustavax(this,a,state);return;}
     if (a.boss && a.kind === 'karonux') { this.drawKaronux(a, state); return; }
     if (a.boss && a.kind === 'kikor') { this.drawKikor(a, state); return; }
@@ -847,6 +889,120 @@ export class Renderer {
     c.fillStyle = '#293345'; c.fillRect(x - width / 2, y, width, 20);
     c.fillStyle = config?.color || '#ed968b'; c.fillRect(x - width / 2, y + 15, width * clamp(a.hp / a.maxHp, 0, 1), 5);
     c.fillStyle = '#ffffff'; c.fillText(name, x, y + 12); c.restore();
+  }
+  miniBossEffect(cell,x,y,width=90,height=65,facing=1){
+    const asset=this.assets.arcadeFrame('miniBossFX',cell);if(!asset)return;
+    const c=this.ctx,[sx,sy,sw,sh]=asset.rect,scale=Math.min(width/sw,height/sh);
+    c.save();c.translate(x,y);c.scale(facing,1);c.imageSmoothingEnabled=false;
+    c.drawImage(asset.image,sx,sy,sw,sh,-sw*scale/2,-sh*scale/2,sw*scale,sh*scale);c.restore();
+  }
+  jalatrixEffect(cell,x,y,width=90,height=65,facing=1){
+    const asset=this.assets.arcadeFrame('miniBossJalatrixFX',cell);if(!asset)return;
+    const c=this.ctx,[sx,sy,sw,sh]=asset.rect,scale=Math.min(width/sw,height/sh);
+    c.save();c.translate(x,y);c.scale(facing,1);c.imageSmoothingEnabled=false;
+    c.drawImage(asset.image,sx,sy,sw,sh,-sw*scale/2,-sh*scale/2,sw*scale,sh*scale);c.restore();
+  }
+  mazzukaEffect(cell,x,y,width=90,height=65,facing=1){
+    const asset=this.assets.arcadeFrame('miniBossMazzukaFX',cell);if(!asset)return;
+    const c=this.ctx,[sx,sy,sw,sh]=asset.rect,scale=Math.min(width/sw,height/sh);
+    c.save();c.translate(x,y);c.scale(facing,1);c.imageSmoothingEnabled=false;
+    c.drawImage(asset.image,sx,sy,sw,sh,-sw*scale/2,-sh*scale/2,sw*scale,sh*scale);c.restore();
+  }
+  maireEffect(cell,x,y,width=95,height=75,facing=1){
+    const asset=this.assets.arcadeFrame('miniBossMaireFX',cell);if(!asset)return;
+    const c=this.ctx,[sx,sy,sw,sh]=asset.rect,scale=Math.min(width/sw,height/sh);
+    c.save();c.translate(x,y);c.scale(facing,1);c.imageSmoothingEnabled=false;
+    c.drawImage(asset.image,sx,sy,sw,sh,-sw*scale/2,-sh*scale/2,sw*scale,sh*scale);c.restore();
+  }
+  remyEffect(cell,x,y,width=105,height=85,facing=1){
+    const asset=this.assets.arcadeFrame('miniBossRemyFX',cell);if(!asset)return;
+    const c=this.ctx,[sx,sy,sw,sh]=asset.rect,scale=Math.min(width/sw,height/sh);
+    c.save();c.translate(x,y);c.scale(facing,1);c.imageSmoothingEnabled=false;
+    c.drawImage(asset.image,sx,sy,sw,sh,-sw*scale/2,-sh*scale/2,sw*scale,sh*scale);c.restore();
+  }
+  harmelinEffect(cell,x,y,width=100,height=76,facing=1){
+    const asset=this.assets.arcadeFrame('miniBossHarmelinFX',cell);if(!asset)return;
+    const c=this.ctx,[sx,sy,sw,sh]=asset.rect,scale=Math.min(width/sw,height/sh);
+    c.save();c.translate(x,y);c.scale(facing,1);c.imageSmoothingEnabled=false;
+    c.drawImage(asset.image,sx,sy,sw,sh,-sw*scale/2,-sh*scale/2,sw*scale,sh*scale);c.restore();
+  }
+  drawHarmelin(a,state){
+    const p=a.pattern,cell=p?.kind==='harmelinClass'?7:p?.kind==='harmelinPaper'?(p.elapsed<p.windup?8:9):p?.kind==='harmelinPens'?(p.elapsed<p.windup?11:10):a.moving?4+Math.floor(state.time*8)%3:0;
+    const c=this.ctx;c.save();if(a.hp<=0)c.globalAlpha=clamp((1.2-a.deadTime)/.4,0,1);else if(a.flash>0)c.filter='brightness(1.6)';
+    this.arcadeSprite('miniBossHarmelin',a.x,a.y-(a.z||0),a.hp<=0?15:a.stun>0?12:cell,170,a.facing);c.restore();if(a.hp<=0)return;
+    c.textAlign='center';c.font='bold 11px monospace';c.fillStyle='#ffe8ca';c.fillText('MME HARMELIN',a.x,a.y-192);
+  }
+  drawHarmelinStudent(a){
+    const number=Number(a.kind.slice(-1)),column=number-1,key=`miniBossHarmelinStudent${number}`,row=a.hp<=0?3:a.stun>0?2:a.moving?1:0,cell=row*4+column,c=this.ctx;
+    c.save();if(a.hp<=0)c.globalAlpha=clamp((.8-a.deadTime)/.3,0,1);else if(a.flash>0)c.filter='brightness(1.7)';
+    if(a.enraged)c.filter='saturate(1.7) contrast(1.1)';this.arcadeSprite(key,a.x,a.y-(a.z||0),cell,125,a.facing);c.restore();
+  }
+  drawRemyGeek(a,state){
+    const p=a.pattern;let cell=a.remyShielded?0:1;
+    if(p?.kind==='summonParty')cell=p.elapsed<p.windup?4:5;
+    else if(p?.kind==='keyboardBurst')cell=p.elapsed<p.windup?6:10;
+    else if(p?.kind==='screenPulse')cell=p.elapsed<p.windup?7:(p.late?12:5);
+    if(a.stun>0)cell=8;if(a.hp<=0)cell=15;
+    const c=this.ctx;c.save();if(a.hp<=0)c.globalAlpha=clamp((1.2-a.deadTime)/.4,0,1);else if(a.flash>0)c.filter='brightness(1.6)';
+    this.arcadeSprite('miniBossRemy',a.x,a.y-(a.z||0),cell,185,a.facing);c.restore();if(a.hp<=0)return;
+    if(a.remyShielded){c.save();c.globalCompositeOperation='lighter';c.globalAlpha=.54+Math.sin(state.time*5)*.12;c.strokeStyle='#b788ff';c.lineWidth=4;c.beginPath();c.ellipse(a.x,a.y-95,90,110,0,0,TAU);c.stroke();c.strokeStyle='#effaff';c.lineWidth=1.5;c.beginPath();c.ellipse(a.x,a.y-95,94,114,0,0,TAU);c.stroke();c.restore();c.textAlign='center';c.font='bold 12px monospace';c.fillStyle='#ead9ff';c.fillText(a.remyOnyxiaSpawned?'ÉLIMINE ONYXIA !':'ÉLIMINE LES 4 INVOCATIONS !',a.x,a.y-220);}
+  }
+  drawRemySummon(a,state){
+    if(a.kind==='remyOnyxia'){const c=this.ctx;c.save();if(a.hp<=0)c.globalAlpha=clamp((1.2-a.deadTime)/.4,0,1);this.arcadeSprite('miniBossOnyxia',a.x,a.y-(a.z||0),a.hp<=0||a.stun>0?3:a.attack?2:a.moving?1:0,235,a.facing);c.restore();return;}
+
+    const row={remyOrc:0,remyPaladin:4,remyElf:8,remyTauren:12}[a.kind],height={remyOrc:155,remyPaladin:165,remyElf:150,remyTauren:175}[a.kind],cell=row+(a.hp<=0||a.stun>0?3:a.attack?2:a.action==='walk'?1:0),c=this.ctx;
+    c.save();if(a.hp<=0)c.globalAlpha=clamp((1.2-a.deadTime)/.4,0,1);else if(a.flash>0)c.filter='brightness(1.7)';this.arcadeSprite('miniBoss'+a.kind[0].toUpperCase()+a.kind.slice(1),a.x,a.y-(a.z||0),cell,height,a.facing);c.restore();if(a.hp<=0)return;
+    c.textAlign='center';c.font='bold 11px monospace';c.fillStyle='#e9dcff';c.fillText(({remyOrc:'ORC',remyPaladin:'PALADIN',remyElf:'ELFE',remyTauren:'TAUREN'})[a.kind],a.x,a.y-height-18);
+  }
+  drawMiniBoss(a,state){
+    if(a.kind==='remyGeek'){this.drawRemyGeek(a,state);return;}
+    if(a.kind==='harmelin'){this.drawHarmelin(a,state);return;}
+    const key=({damps:'miniBossDamps',cainri:'miniBossCainri',jalatrix:'miniBossJalatrix',mazzuka:'miniBossMazzuka',maire:'miniBossMaire'})[a.kind],p=a.pattern;let cell=a.moving?1+Math.floor(state.time*7)%2:0;
+    const active=!!p&&p.elapsed>=p.windup;
+    const poses={damps:{cigarette:active?6:3,cough:4,smoke:5},cainri:{charge:4,bottle:active?3:2,whisky:7},jalatrix:{cast:active?6:3,sweep:active?4:3,slam:active?10:3},mazzuka:{kick:active?4:3,eraser:8,chair:9},maire:{callPolice:active?5:4,whistle:6,maireKick:active?10:1}};
+    if(p)cell=poses[a.kind][p.kind]??cell;
+    if(a.enraged){
+      const rage={damps:{idle:12,walk:13,cigarette:15,cough:14,smoke:14},cainri:{idle:0,walk:12,charge:12,bottle:13,whisky:14},jalatrix:{idle:12,walk:12,cast:active?14:12,sweep:active?13:12,slam:active?15:12},mazzuka:{idle:12,walk:13,kick:active?14:13,eraser:8,chair:16},maire:{idle:7,walk:13,callPolice:active?5:4,whistle:6,maireKick:active?10:1}};
+      cell=rage[a.kind][p?.kind||(a.moving?'walk':'idle')]??cell;
+    }
+    if(a.hp<=0)cell={damps:7,cainri:6,jalatrix:9,mazzuka:7,maire:15}[a.kind];
+    else if(a.stun>0)cell={damps:7,cainri:5,jalatrix:8,mazzuka:10,maire:9}[a.kind];
+    const asset=this.assets.arcadeFrame(key,cell);
+    if(asset){
+      const c=this.ctx,[sx,sy,sw,sh]=asset.rect,scale=165/asset.base[3];
+      // Anchor the body over its ground position, excluding forward smoke and weapons.
+      const anchors=({damps:[.4,.5,.5,.32,.23,.25,.26,.5,.5,.2,.24,.45,.45,.58,.3,.34],cainri:[.45,.5,.5,.45,.55,.5,.5,.4,.25,.5,.5,.5,.55,.5,.4,.5],jalatrix:[.33,.4,.4,.62,.32,.28,.4,.5,.5,.5,.5,.5,.42,.45,.4,.5],mazzuka:[.5,.5,.5,.5,.3,.35,.35,.5,.32,.35,.5,.5,.5,.5,.5,.4,.35],maire:[.5,.5,.5,.5,.5,.34,.5,.5,.5,.5,.65,.5,.5,.5,.5,.5]})[a.kind];
+      c.save();c.translate(a.x,a.y-(a.z||0));c.scale(a.facing,1);c.imageSmoothingEnabled=false;
+      if(a.hp<=0)c.globalAlpha=clamp((1.2-a.deadTime)/.4,0,1);if(a.flash>0)c.filter='brightness(1.6)';
+      c.drawImage(asset.image,sx,sy,sw,sh,-sw*scale*(anchors[cell]??.5),-sh*scale,sw*scale,sh*scale);c.restore();
+    }
+    if(a.hp<=0)return;
+    const label={cigarette:'MÉGOT EN APPROCHE',smoke:'NUAGE PERSISTANT',cough:'COUP DE TOUX',charge:'CHARGE TITUBANTE',bottle:'BOUTEILLE VOLANTE',whisky:'JET DE WHISKY',cast:'LIGNE ET HAMEÇON',sweep:'BALAYAGE DE CANNE',slam:'FRAPPE LOURDE',kick:'COUP DE PIED AU VISAGE',eraser:'BROSSE DE TABLEAU',chair:'CHAISE VOLANTE',callPolice:'APPEL AUX RENFORTS',whistle:'COUP DE SIFFLET',maireKick:'COUP DE PIED DU MAIRE'}[p?.kind];
+    if(p&&label){
+      const c=this.ctx,warning=p.elapsed<p.windup,progress=clamp(p.elapsed/p.windup,0,1),top=a.y-200-(a.z||0);
+      c.save();c.textAlign='center';c.font='bold 13px monospace';c.fillStyle=warning?'#ffe7a4':'#ffb1a1';c.fillText(`${label}${p.late?' · RENFORCÉ':''}`,clamp(a.x,160,W-160),top);
+      c.globalAlpha=warning?.42:.82;c.strokeStyle=warning?'#ffd783':'#ff795f';c.lineWidth=warning?2:4;
+      if(p.kind==='charge'){
+        c.beginPath();c.moveTo(a.x,a.y);c.lineTo(clamp(a.x+p.dx*350,FLOOR.left,FLOOR.right),clamp(a.y+p.dy*270,FLOOR.top,FLOOR.bottom));c.stroke();
+      }else if(p.kind==='cast'){
+        const w=p.late?520:420;c.beginPath();c.moveTo(a.x,a.y);c.lineTo(clamp(a.x+a.facing*w,FLOOR.left,FLOOR.right),clamp(a.y+p.dy*130,FLOOR.top,FLOOR.bottom));c.stroke();
+      }else if(p.kind==='eraser'||p.kind==='chair'){
+        c.beginPath();c.moveTo(a.x+a.facing*35,a.y);c.lineTo(clamp(a.x+p.dx*(p.kind==='chair'?440:530),FLOOR.left,FLOOR.right),clamp(a.y+p.dy*(p.kind==='chair'?360:420),FLOOR.top,FLOOR.bottom));c.stroke();
+      }else if(p.kind==='kick'){
+        c.beginPath();c.moveTo(a.x+a.facing*32,a.y);c.lineTo(clamp(a.x+a.facing*(p.late?262:207),FLOOR.left,FLOOR.right),a.y);c.stroke();
+      }else if(p.kind==='maireKick'||p.kind==='whistle'){
+        const w=p.kind==='whistle'?(p.late?500:390):(p.late?285:225);c.beginPath();c.moveTo(a.x+a.facing*35,a.y-(p.kind==='whistle'?105:0));c.lineTo(clamp(a.x+a.facing*(w+35),FLOOR.left,FLOOR.right),a.y-(p.kind==='whistle'?105:0));c.stroke();
+      }else if(p.kind==='callPolice'){
+        c.beginPath();c.arc(a.x,a.y,38+progress*34,0,TAU);c.stroke();
+      }else if(p.kind==='cough'||p.kind==='whisky'||p.kind==='sweep'){
+        const w=p.kind==='cough'?(p.late?420:325):p.kind==='sweep'?(p.late?290:220):(p.late?370:290);c.beginPath();c.moveTo(a.x+a.facing*40,a.y-18);c.lineTo(a.x+a.facing*(w+40),a.y-18);c.stroke();
+      }else if(p.kind==='slam'){
+        c.beginPath();c.arc(a.x+a.facing*110,a.y+4,p.late?145:112,0,TAU);c.stroke();
+      }else if(p.kind==='smoke'){
+        c.beginPath();c.ellipse(a.x+a.facing*115,a.y,p.late?152:120,(p.late?152:120)/1.5,0,0,TAU);c.stroke();
+      }else if(warning){c.beginPath();c.arc(a.x+a.facing*40,a.y-20,20+progress*13,0,TAU);c.stroke();}
+      c.restore();
+    }
   }
   drawClassic(a, state) {
     const c = this.ctx, config = CLASSIC_SPRITES[a.kind], dead = a.hp <= 0;
@@ -1036,7 +1192,13 @@ export class Renderer {
         }
       }
       if (e.type === 'karonuxWave') { c.fillStyle = `rgba(140,220,255,${e.ttl / e.life * .22})`; c.fillRect(0, 0, W, H); }
-      if (e.type === 'atlasFX') this.arcadeSprite(e.atlas, e.x, e.y, e.atlas === 'karonuxFX' && e.cell < 4 ? Math.min(3, Math.floor((1-e.ttl/e.life)*4)) : e.cell, 110 + (1 - e.ttl / e.life) * 30);
+      if(e.type==='atlasFX'&&e.atlas==='miniBossFX')this.miniBossEffect(e.cell,e.x,e.y,100,65);
+      if(e.type==='atlasFX'&&e.atlas==='miniBossJalatrixFX')this.jalatrixEffect(e.cell,e.x,e.y,90,70);
+      if(e.type==='atlasFX'&&e.atlas==='miniBossMazzukaFX')this.mazzukaEffect(e.cell,e.x,e.y,90,65);
+      if(e.type==='atlasFX'&&e.atlas==='miniBossMaireFX')this.maireEffect(e.cell,e.x,e.y,125,95);
+      if(e.type==='atlasFX'&&e.atlas==='miniBossRemyFX')this.remyEffect(e.cell,e.x,e.y,125,95);
+      if(e.type==='atlasFX'&&e.atlas==='miniBossHarmelinFX')this.harmelinEffect(e.cell,e.x,e.y,115,88);
+      if (e.type === 'atlasFX'&&e.atlas!=='miniBossFX'&&e.atlas!=='miniBossJalatrixFX'&&e.atlas!=='miniBossMazzukaFX'&&e.atlas!=='miniBossMaireFX'&&e.atlas!=='miniBossRemyFX'&&e.atlas!=='miniBossHarmelinFX') this.arcadeSprite(e.atlas, e.x, e.y, e.atlas === 'karonuxFX' && e.cell < 4 ? Math.min(3, Math.floor((1-e.ttl/e.life)*4)) : e.cell, 110 + (1 - e.ttl / e.life) * 30);
       if (e.type === 'rogueFX' && e.visual === 'arms') { c.save();c.strokeStyle=e.color;c.lineWidth=12*e.ttl/e.life;c.beginPath();c.moveTo(e.x,e.y-65);c.lineTo(e.x+(e.facing||1)*e.radius*.75,e.y-70);c.moveTo(e.x,e.y-60);c.lineTo(e.x-(e.facing||1)*e.radius*.5,e.y-55);c.stroke();c.restore(); }
       if (e.type === 'rogueFX') { const progress=1-e.ttl/e.life;c.strokeStyle=e.color;c.lineWidth=5*(1-progress);c.beginPath();c.ellipse(e.x,e.y-15,Math.max(1,e.radius*(.3+progress*.7)),Math.max(1,e.radius*.3),0,0,TAU);c.stroke();if(e.label){c.font='bold 14px monospace';c.textAlign='center';c.fillStyle=e.color;c.fillText(e.label,clamp(e.x,180,W-180),e.y-180-progress*15);} }
       if (e.type === 'dash' && !this.reducedMotion) this.arcadeSprite('dash', e.x, e.y, Math.min(2, Math.floor((1 - e.ttl / e.life) * 3)), 34, e.facing);
@@ -1079,7 +1241,7 @@ export class Renderer {
       const cost = BALANCE.specials[p.kind].cost;
       el.querySelector('.dodge-caption').textContent = p.dodgeCd > 0 ? `ESQUIVE ${p.dodgeCd.toFixed(1)}s` : 'ESQUIVE ✓';
       el.querySelector('.credits').textContent = `${'◆'.repeat(p.lives) || '◇'} VIE${p.lives > 1 ? 'S' : ''}`;
-      const specialState = usesTransformationTree(p.kind) && !p.progression?.talents.length ? 'CHOISIS UNE BRANCHE · PAUSE → TALENTS' : p.specialState ? 'SPÉCIAL EN COURS' : p.energy >= cost ? 'SPÉCIAL PRÊT' : `FRAPPE POUR CHARGER · ${Math.floor(p.energy)} %`;
+      const specialState = usesTransformationTree(p.kind) && !p.progression?.talents.length ? 'CHOISIS UNE BRANCHE · PAUSE → TALENTS' : p.specialState?.transformation&&p.specialState.rank===6 ? `SPÉCIAL · ${ULTIMATE_SPECIALS[p.kind][p.specialState.branch][0]} · ${Math.max(0,(p.specialState.ultimateInput?.next||0)-p.specialState.elapsed)>0?Math.max(0,p.specialState.ultimateInput.next-p.specialState.elapsed).toFixed(1)+' s':'PRÊT'}` : p.specialState ? 'SPÉCIAL EN COURS' : p.energy >= cost ? 'SPÉCIAL PRÊT' : `FRAPPE POUR CHARGER · ${Math.floor(p.energy)} %`;
       el.querySelector('.energy-bar').classList.toggle('ready', !p.specialState && p.energy >= cost);
       const r = p.progression;
       if (!el.querySelector('.special-caption')) el.querySelector('.player-bars').insertAdjacentHTML('beforeend', '<span class="special-caption"></span>');
@@ -1114,13 +1276,15 @@ export class Renderer {
     if(s.sandbox?.mode==='enemy')$('#objective').textContent='TEST ENNEMI · '+ENEMIES[s.sandbox.enemy].name+(s.sandbox.invulnerable?' · INVULNÉRABLE':'')+' · PAUSE : MENU SECRET';
     if (s.practice) $('#objective').textContent = `TEST BOSS${s.practice.invulnerable ? ' · INVULNÉRABLE' : ''} · PAUSE : RELANCER / CHANGER DE BOSS`;
     $('#ping').textContent = online ? `${Math.round(ping)} ms · EN LIGNE` : 'SOLO';
-    const boss = s.enemies.find(e => e.boss && e.hp > 0);
+    const boss = s.enemies.find(e => e.miniBoss && e.hp > 0) || s.enemies.find(e => e.boss && e.hp > 0);
     $('#boss-hud').classList.toggle('hidden', !boss || !!s.bossCinema);
     if (boss) {
       const sleeping = boss.pattern?.kind === 'sleep' && boss.pattern.hit;
-      const status = boss.sofa && !boss.sofaBroken ? 'CANAPÉ · FRAPPE FORT POUR LE DÉLOGER !' : boss.kikorGrip ? 'PRISE · LIBÈRE-TOI !' : boss.shielded ? 'INVINCIBLE · DÉTRUIS LE BONHOMME VERT' : sleeping ? 'IL DORT · ENCHAÎNE !' : boss.pattern ? PATTERN_LABELS[boss.pattern.kind] || '' : boss.recovering > 0 ? 'CONTRE-ATTAQUE · +25 % DÉGÂTS' : boss.kind==='gustavax'?'PRESSION CONSTANTE':'ENCHAÎNE POUR BRISER SA GARDE';
-      $('#boss-name').textContent = `${boss.kind === 'jo' ? 'Jo la Mouk' : fighter(boss.kind).name} / ${boss.vehicle ? 'ACTE I · LA GOLF BLANCHE' : `ACTE ${boss.kind === 'karonux' ? boss.bossPhase + 1 : boss.bossPhase} · ${status}`}`;
-      $('#boss-health').style.transform = `scaleX(${boss.hp / boss.maxHp})`;
+      const status = boss.miniBoss ? (boss.kind==='harmelin'?({harmelinClass:'CHANGEMENT DE CLASSE · ÉLÈVES EN CHARGE',harmelinPaper:'AVALANCHE DE PAPIERS',harmelinPens:'STYLOS EN VOL'}[boss.pattern?.kind]||(boss.bossPhase>1?'PHASE 2 · PROVISEUR ET ÉLÈVES EN FURIE':'SURVEILLE LA PROF')):boss.kind==='remyGeek'?(boss.remyShielded?(boss.remyOnyxiaSpawned?'BOUCLIER ACTIF · ÉLIMINE ONYXIA':'BOUCLIER ACTIF · ÉLIMINE ORC, PALADIN, ELFE ET TAUREN'):({summonParty:'INVOCATIONS',keyboardBurst:'CLAVIER MITRAILLETTE',screenPulse:'DÉCHARGE ÉLECTRIQUE'}[boss.pattern?.kind]||'SANS INVOCATION, IL EST VULNÉRABLE')):({cigarette:'MÉGOT INCANDESCENT',smoke:'NUAGE DE FUMÉE',cough:'TOUX SÈCHE',charge:'CHARGE TITUBANTE',bottle:'COUP DE BOUTEILLE',whisky:'JET DE WHISKY',cast:'LIGNE ET HAMEÇON',sweep:'BALAYAGE DE CANNE',slam:'FRAPPE LOURDE',kick:'COUP DE PIED AU VISAGE',eraser:'BROSSE DE TABLEAU',chair:'CHAISE VOLANTE',callPolice:'APPEL AUX RENFORTS',whistle:'COUP DE SIFFLET',maireKick:'COUP DE PIED'}[boss.pattern?.kind]||'CHOISIS TON MOMENT')) : boss.sofa && !boss.sofaBroken ? 'CANAPÉ · FRAPPE FORT POUR LE DÉLOGER !' : boss.kikorGrip ? 'PRISE · LIBÈRE-TOI !' : boss.shielded ? 'INVINCIBLE · DÉTRUIS LE BONHOMME VERT' : sleeping ? 'IL DORT · ENCHAÎNE !' : boss.pattern ? PATTERN_LABELS[boss.pattern.kind] || '' : boss.recovering > 0 ? 'CONTRE-ATTAQUE · +25 % DÉGÂTS' : boss.kind==='gustavax'?'PRESSION CONSTANTE':'ENCHAÎNE POUR BRISER SA GARDE';
+      $('#boss-name').textContent = boss.miniBoss ? `${boss.kind==='damps'?'DAMPS':boss.kind==='cainri'?'CAINRI':boss.kind==='jalatrix'?'JALATRIX LE PÉCHEUR':boss.kind==='maire'?'LE MAIRE':boss.kind==='remyGeek'?'RÉMY LE NO LIFE':boss.kind==='harmelin'?'MME HARMELIN':'MAZZUKA'} / ${CHAPTERS[s.chapter].short.toUpperCase()} · MINI-BOSS · ${status}` : `${boss.kind === 'jo' ? 'Jo la Mouk' : fighter(boss.kind).name} / ${boss.vehicle ? 'ACTE I · LA GOLF BLANCHE' : `ACTE ${boss.kind === 'karonux' ? boss.bossPhase + 1 : boss.bossPhase} · ${status}`}`;
+      const pair=boss.miniBoss?s.enemies.filter(e=>e.miniBoss&&e.hp>0):[];
+      if(pair.length>1){$('#boss-name').textContent=pair.map(e=>`${e.kind.toUpperCase()} · ${Math.ceil(e.hp)} PV`).join('   /   ');}
+      $('#boss-health').style.transform = `scaleX(${pair.length?pair.reduce((n,e)=>n+e.hp,0)/pair.reduce((n,e)=>n+e.maxHp,0):boss.hp/boss.maxHp})`;
       $('#boss-hud').classList.toggle('boss-opening', !boss.shielded && (sleeping || boss.recovering > 0));
     }
   }
