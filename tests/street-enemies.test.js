@@ -4,6 +4,7 @@ import { access } from 'node:fs/promises';
 import { Simulation } from '../game/simulation.js';
 import { STREET_ENEMIES } from '../game/street-enemies-data.js';
 import { blankInput, FLOOR } from '../game/data.js';
+import { ENCOUNTER_ROSTER } from '../game/encounters.js';
 
 function arena(kind) {
   const sim = new Simulation(['karonux'], 0, 771);
@@ -31,6 +32,40 @@ test('street rivals expose their signature hazards', () => {
     sim.executeStreetPattern(enemy, { kind: kindForTest, targetX: 520, targetY: 540, dx: -1, dy: 0, active: .65 });
     assert.ok(sim.state.hazards.some(h => h.kind === expected), `${kind} should create ${expected}`);
   }
+});
+
+test('Lorenzo, the supporter trio, Michelle and Hervé use their signature attacks', () => {
+  const cases = [
+    ['lorenzo_raclette', 'raclettePan', 'streetFX'], ['lorenzo_raclette', 'cheeseSplash', 'cheesePuddle'],
+    ['karonux_om', 'barrierThrow', 'streetBarrier'], ['orelsan_om', 'megaphoneCharge', 'impact'],
+    ['gustavax_om', 'barrierThrow', 'streetBarrier'], ['michelle_police', 'pistolShot', 'streetProjectile'],
+    ['herve_mbk', 'mbkCharge', 'mbkCharge'],
+  ];
+  for (const [kind, pattern, hazard] of cases) {
+    const { sim, enemy, player } = arena(kind);
+    sim.executeStreetPattern(enemy, { kind: pattern, targetX: player.x, targetY: player.y, dx: -1, dy: 0, active: .7 });
+    assert.ok(sim.state.hazards.some(h => h.kind === hazard), `${kind}/${pattern}`);
+  }
+  const cheese = arena('lorenzo_raclette');
+  cheese.player.invincible = 0;
+  cheese.sim.executeStreetPattern(cheese.enemy, { kind: 'cheeseSplash', targetX: cheese.player.x, targetY: cheese.player.y });
+  cheese.sim.updateWorld(.02);
+  assert.ok(cheese.player.sticky, 'cheese contact should slow the player');
+  const speed = cheese.player.speed;
+  const x = cheese.player.x;
+  cheese.sim.updatePlayer(cheese.player, { ...blankInput(), x: 1 }, .1);
+  assert.equal(cheese.player.speed, speed, 'slow effect must not permanently change base movement speed');
+  assert.ok(cheese.player.x - x < speed * .1);
+});
+
+test('OM supporters enter normal waves as a single three-enemy group', () => {
+  assert.ok(ENCOUNTER_ROSTER.includes('om_supporters'));
+  for (const kind of ['karonux_om', 'orelsan_om', 'gustavax_om']) assert.ok(!ENCOUNTER_ROSTER.includes(kind));
+  const sim = new Simulation(['karonux'], 0, 91);
+  Object.assign(sim.state, { phase: 'fight', enemies: [], props: [], hazards: [], spawnQueue: [], waves: [{ kinds: [] }], wave: 0 });
+  const group = sim.spawnEncounterEnemy('om_supporters');
+  assert.deepEqual(group.map(enemy => enemy.kind), ['karonux_om', 'orelsan_om', 'gustavax_om']);
+  assert.ok(group.every(enemy => enemy.supporterTrio));
 });
 
 test('street rivals cannot attack after KO or outside combat; heavy hits interrupt tells', () => {

@@ -71,7 +71,15 @@ export function sanitizeInput(value = {}) {
 }
 export function animation(id, action = 'idle', enemy = false) {
   if (enemy && STREET_ENEMIES[id]) {
-    const cells = { idle: [0], walk: [1, 2], punch: [3, 4], special: [7, 8], hurt: [5], dead: [6] }[action] || [0];
+    const recent = {
+      lorenzo_raclette: {walk:[0,1],punch:[2,3],special:[4,5],hurt:[6],dead:[7]},
+      karonux_om: {punch:[4,5],special:[3,9],hurt:[6],dead:[7]},
+      orelsan_om: {punch:[4,5],special:[3,9],hurt:[6],dead:[7]},
+      gustavax_om: {punch:[4,5],special:[3,8],hurt:[6],dead:[7]},
+      michelle_police: {punch:[3,4],special:[3,4],hurt:[5],dead:[7]},
+      herve_mbk: {punch:[4,6],special:[4,6],hurt:[8],dead:[8]},
+    }[id];
+    const cells = recent?.[action] || { idle: [0], walk: [1, 2], punch: [3, 4], special: [7, 8], hurt: [5], dead: [6] }[action] || [0];
     return cells.map(cell => ({ url: `/assets/enemies/street/${id}.png`, atlas: `street_${id}`, cell }));
   }
   if(enemy&&ENEMIES[id]?.miniBoss){const prefix={damps:'miniBossDamps',cainri:'miniBossCainri',jalatrix:'miniBossJalatrix',mazzuka:'miniBossMazzuka',maire:'miniBossMaire',remyGeek:'miniBossRemy',harmelin:'miniBossHarmelin'}[id],folder=({jalatrix:'chateau_etang',mazzuka:'stade_colette',maire:'bourg_saran',remyGeek:'cap_saran',harmelin:'college_montjoie'})[id]||'mini_chene',file=id==='remyGeek'?'remy':id==='harmelin'?'harmelin':id,cells={idle:0,walk:id==='remyGeek'?2:1,punch:id==='maire'?10:id==='remyGeek'?9:id==='harmelin'?3:3,kick:id==='mazzuka'?4:id==='maire'?10:id==='remyGeek'?7:id==='harmelin'?15:7,special:id==='maire'?4:id==='remyGeek'?4:id==='harmelin'?6:6,hurt:id==='remyGeek'?8:id==='harmelin'?12:14,dead:15};return[{url:`/assets/boss/${folder}/${file}.png`,atlas:prefix,cell:cells[action]??0}];}

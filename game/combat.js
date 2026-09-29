@@ -95,8 +95,9 @@ export const combat = {
         const hit = h.shape === 'ring' ? distance >= h.previousRadius - h.thickness && distance <= h.radius + h.thickness : h.shape === 'line' ? dx * h.facing >= -25 && dx * h.facing <= h.width && Math.abs(dy) < h.band : distance < h.radius;
         if (hit) {
           this.damage(target, Math.round(ignition ? h.ignitionDamage || h.damage : h.damage), source, true);
+          if (h.knockback && target.hp > 0) { target.vx = (Math.sign(dx) || h.facing || 1) * h.knockback; target.stun = Math.max(target.stun || 0, .18); }
           if (h.electric && target.hp > 0) target.electrifiedUntil = s.time + .85;
-          if (h.sticky && target.hp > 0 && !target.sticky) target.sticky = { owner: h.owner, remaining: 1.25 };
+          if (h.sticky && target.hp > 0 && !target.sticky) target.sticky = { owner: h.kind === 'cheesePuddle' ? null : h.owner, remaining: 1.25, rooted: h.kind !== 'cheesePuddle' };
           if (h.stunDuration && target.hp > 0) target.stun = Math.max(target.stun, h.stunDuration);
           h.hits[target.id] = s.time + h.pulse;
         }

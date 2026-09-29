@@ -649,6 +649,12 @@ export class Renderer {
         if (h.kind === 'fire') { c.save(); c.translate(x, y); c.rotate(progress * 5 * h.facing); if (h.atlas) this.arcadeSprite(h.atlas, 0, 8, h.cell, 40); else this.fireSprite(Math.floor(time * 12) % 4, 0, 8, 40); c.restore(); }
         else { const image = this.assets.get(VISUALS.spit[2]); if (image) c.drawImage(image, 511, 17, 105, 110, x - 18, y - 22, 36, 38); }
       }
+    } else if (h.kind === 'streetBarrier') {
+      c.globalAlpha = clamp(h.ttl / .25, .35, 1); this.classicFX(`street_${h.atlas}`, 12, h.x, h.y - 10, 76, h.vx < 0 ? -1 : 1);
+    } else if (h.kind === 'cheesePuddle') {
+      c.globalAlpha = clamp(h.ttl / .8, .4, .9); this.classicFX(`street_${h.atlas}`, 13, h.x, h.y, 92);
+    } else if (h.kind === 'mbkCharge') {
+      c.globalAlpha = .75; this.classicFX('street_herve_mbk', 13, h.x - Math.sign(h.vx || 1) * 35, h.y + 4, 118);
     } else if (h.kind === 'streetProjectile') {
       this.classicFX(`street_${h.atlas}`, h.cell ?? 9, h.x, h.y - 18, 54, h.vx < 0 ? -1 : 1);
     } else if (h.kind === 'huntingDog') {
@@ -1027,10 +1033,18 @@ export class Renderer {
   }
   drawStreetEnemy(a, state) {
     const c = this.ctx, config = STREET_ENEMIES[a.kind], p = a.pattern, dead = a.hp <= 0;
-    let cell = a.action === 'walk' ? 1 + Math.floor(state.time * 8) % 2 : 0;
-    if (p) cell = (['megaphone', 'tacoVolley', 'huntingDog', 'puddle', 'fastTalk'].includes(p.kind) ? 7 : 3) + Number(p.hit);
-    if (a.stun > 0) cell = 5;
-    if (dead) cell = 6;
+    const poses={
+      lorenzo_raclette:{walk:[0,1],hurt:6,dead:7,raclettePan:[2,3],cheeseSplash:[4,5]},
+      karonux_om:{hurt:6,dead:7,barrierThrow:[4,5],megaphoneCharge:[3,9]},
+      orelsan_om:{hurt:6,dead:7,barrierThrow:[4,5],megaphoneCharge:[3,9]},
+      gustavax_om:{hurt:6,dead:7,barrierThrow:[4,5],megaphoneCharge:[3,8]},
+      michelle_police:{hurt:5,dead:7,pistolShot:[3,4]},
+      herve_mbk:{hurt:8,dead:8,mbkCharge:[4,6]},
+    }[a.kind];
+    let cell = a.action === 'walk' ? (poses?.walk || [1,2])[Math.floor(state.time * 8) % 2] : 0;
+    if (p) cell = poses?.[p.kind] ? poses[p.kind][Number(p.hit)] : (['megaphone', 'tacoVolley', 'huntingDog', 'puddle', 'fastTalk'].includes(p.kind) ? 7 : 3) + Number(p.hit);
+    if (a.stun > 0) cell = poses?.hurt ?? 5;
+    if (dead) cell = poses?.dead ?? 6;
     c.save();
     if (dead) c.globalAlpha = clamp((1.2 - a.deadTime) / .4, 0, 1);
     else if (a.invincible > .2 && Math.floor(state.time * 14) % 2 === 0) c.globalAlpha = .63;

@@ -5,9 +5,47 @@ import { ENCORE_ELITES } from './elite-encore-data.js';
 import { SCENERY_SPRITES } from './scenery.js';
 import { HERO_ACTION_SPRITES } from './weapons.js';
 import { STREET_ENEMIES } from './street-enemies-data.js';
+// Explicit pixel bounds for irregular generated sheets; normalize once for the atlas loader.
+const atlasCells = (width, height, cells) => cells.map(rect => rect.map((v, i) => v / (i % 2 ? height : width)));
 // Keep extended hands, prone bodies and detached FX inside their atlas region.
 const STREET_GUTTERS = {
   lorenzo_pigeons: { rowCuts: [0, .455, .745, 1], rowColumns: { 2: [0, .275, .5, .75, 1] } },
+  lorenzo_raclette: { exclude: { 4: atlasCells(1240, 1268, [[275,585,320,665]]), 5: atlasCells(1240, 1268, [[278,510,316,590]]) }, cells: atlasCells(1240, 1268, [
+    [0,0,310,345], [315,0,638,345], [640,0,927,345], [930,0,1240,345],
+    [0,350,307,665], [278,350,673,665], [676,350,927,665], [932,340,1240,665],
+    [0,670,324,997], [325,685,645,997], [650,670,925,997], [938,660,1240,997],
+    [0,1010,320,1268], [335,1010,632,1268], [650,1010,916,1268], [940,1010,1240,1268],
+  ]) },
+  karonux_om: { exclude: { 4: atlasCells(1224, 1285, [[262,570,280,690]]), 5: atlasCells(1224, 1285, [[260,375,305,560],[674,575,713,690]]), 6: atlasCells(1224, 1285, [[674,430,713,590]]) }, cells: atlasCells(1224, 1285, [
+    [0,0,305,365], [305,0,605,365], [606,0,885,365], [888,0,1224,365],
+    [0,376,274,690], [260,375,713,690], [674,376,894,690], [896,500,1224,690],
+    [0,697,280,1006], [282,700,608,1006], [609,710,921,1006], [942,710,1224,1006],
+    [0,1014,334,1285], [339,1008,690,1285], [699,1014,925,1285], [929,1014,1224,1285],
+  ]) },
+  orelsan_om: { cells: atlasCells(1448, 1086, [
+    [0,0,352,324], [359,0,729,324], [735,0,1098,324], [1101,0,1448,324],
+    [0,340,345,617], [362,340,829,617], [836,340,1098,617], [1105,460,1448,617],
+    [0,617,348,900], [365,635,737,900], [773,635,1098,900], [1118,680,1448,900],
+    [0,909,349,1086], [407,908,735,1086], [787,902,1050,1086], [1105,924,1448,1086],
+  ]) },
+  gustavax_om: { exclude: { 5: atlasCells(1324, 1188, [[530,629,625,643]]), 9: atlasCells(1324, 1188, [[359,633,540,646]]) }, cells: atlasCells(1324, 1188, [
+    [0,0,300,345], [345,0,647,345], [671,0,955,345], [977,0,1324,345],
+    [0,353,283,643], [289,347,785,643], [786,352,995,643], [1000,465,1324,643],
+    [0,690,333,996], [359,633,649,996], [681,644,972,1004], [1015,742,1300,996],
+    [40,1007,355,1188], [401,1007,665,1188], [740,1007,961,1188], [1001,1007,1300,1188],
+  ]) },
+  michelle_police: { cells: atlasCells(1426, 1103, [
+    [0,0,288,405], [289,0,560,405], [565,0,870,405], [884,0,1160,405],
+    [1162,0,1426,405], [0,411,284,780], [288,505,526,780], [530,577,924,780],
+    [927,511,1201,780], [1203,411,1426,780], [0,780,291,1103], [310,820,585,1103],
+    [600,900,795,1020], [832,868,1008,1030], [1030,920,1150,1008], [1216,890,1390,1030],
+  ]) },
+  herve_mbk: { exclude: { 11: atlasCells(1536, 1024, [[1204,548,1280,575]]) }, cells: atlasCells(1536, 1024, [
+    [0,0,370,276], [384,0,766,276], [777,0,1163,276], [1205,0,1536,276],
+    [0,279,369,548], [389,279,765,548], [776,279,1164,548], [1205,279,1536,548],
+    [0,548,367,837], [385,548,768,837], [821,548,1162,837], [1204,548,1536,837],
+    [0,843,358,1024], [389,852,769,1024], [811,843,1163,1024], [1240,842,1536,1024],
+  ]) },
   titou_bowling: { rowCuts: [0, .38, .675, 1], rowColumns: { 1: [0, .315, .5, .79, 1], 2: [0, .35, .5, .75, 1] } },
   yann_fluo: { rowCuts: [0, .35, .675, 1], rowColumns: { 1: [0, .275, .5, .77, 1], 2: [0, .31, .5, .75, 1] } },
   kikor_velo: { rowCuts: [0, .35, .665, 1] },
@@ -129,7 +167,7 @@ export const ARCADE_SPRITES = {
   ...Object.fromEntries(Object.entries(CLASSIC_SPRITES).map(([key, data]) => [key, { file: key, folder: 'enemies/classics', cols: 4, rows: 3, ...data }])),
   ...Object.fromEntries(Object.entries(ELITES).map(([key, data]) => [key, { file: key, folder: ENCORE_ELITES[key] ? 'enemies/encore' : 'enemies/elites', cols: 4, rows: 3, height: data.height, ...ELITE_GUTTERS[key] }])),
   ...Object.fromEntries(Object.entries(STREET_ENEMIES).map(([key, data]) => [
-    `street_${key}`, { file: key, folder: 'enemies/street', cols: 4, rows: 3, height: data.height, ...STREET_GUTTERS[key] },
+    `street_${key}`, { file: key, folder: 'enemies/street', cols: 4, rows: ['lorenzo_raclette','karonux_om','orelsan_om','gustavax_om','michelle_police','herve_mbk'].includes(key) ? 4 : 3, height: data.height, ...STREET_GUTTERS[key] },
   ])),
   fireFX: { file: 'fire-effects', cols: 4, rows: 3, height: 80 },
   gustavax: { file: 'gustavax-user', folder: 'gustavax', cols: 4, rows: 4, rowCuts: [0, .2823, .5263, .762, 1], columnCuts: [0, .25, .53, .75, 1], height: 144 },

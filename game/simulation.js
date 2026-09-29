@@ -116,7 +116,7 @@ export class Simulation {
     s.neighborhoodEncounter = null;
     if (wave.neighborhood && !s.practice) { this.beginNeighborhood(wave.neighborhood); return; }
     s.spawnQueue = [...wave.kinds]; s.spawnTimer = 1.6;
-    if (s.spawnQueue.length) this.spawnEnemy(s.spawnQueue.shift());
+    if (s.spawnQueue.length) this.spawnEncounterEnemy(s.spawnQueue.shift());
     if (wave.boss) {
       if(wave.miniBoss){
         const bosses=(wave.bossKinds||[wave.bossKind]).map((kind,i)=>{
@@ -136,6 +136,16 @@ export class Simulation {
     }
     s.phase = 'fight'; this.event('wave', { label: `VAGUE ${s.wave + 1}/${s.waves.length} · ${wave.label}` });
     this.neighborAssist();
+  }
+
+  spawnEncounterEnemy(kind) {
+    if (kind !== 'om_supporters') return this.spawnEnemy(kind);
+    const s=this.state, leftDistance=Math.min(...s.players.map(p=>Math.abs(p.x-85))), rightDistance=Math.min(...s.players.map(p=>Math.abs(p.x-1195)));
+    const side=leftDistance>rightDistance?1:-1, baseX=side>0?FLOOR.left+30:FLOOR.right-30, centerY=FLOOR.top+60+this.random()*85;
+    return ['karonux_om','orelsan_om','gustavax_om'].map((supporter,i)=>this.spawnEnemy(supporter,{
+      x:clamp(baseX+side*i*72,FLOOR.left+25,FLOOR.right-25),y:clamp(centerY+(i-1)*43,FLOOR.top,FLOOR.bottom),
+      facing:side,supporterTrio:true,supporterOrder:i,cooldown:1.7+i*.12,
+    }));
   }
 
   spawnEnemy(kind, overrides = {}) {
@@ -258,8 +268,9 @@ export class Simulation {
 
     if (s.phase === 'fight' || s.phase === 'surprise' && s.surprise?.warning <= 0) {
       s.spawnTimer -= dt;
-      if (s.spawnQueue.length && s.spawnTimer <= 0 && s.enemies.filter(alive).length < activeEnemyLimit(this.routeDepth(), s.players.length)) {
-        this.spawnEnemy(s.spawnQueue.shift()); s.spawnTimer = 1.2 + this.random() * .7;
+      const queued=s.spawnQueue[0],needed=queued==='om_supporters'?3:1;
+      if (s.spawnQueue.length && s.spawnTimer <= 0 && s.enemies.filter(alive).length+needed <= activeEnemyLimit(this.routeDepth(), s.players.length)) {
+        this.spawnEncounterEnemy(s.spawnQueue.shift()); s.spawnTimer = 1.2 + this.random() * .7;
       }
     }
     if (s.phase === 'rest') { s.phaseTime -= dt; if (s.phaseTime <= 0) this.spawnWave(); }
@@ -303,10 +314,10 @@ export class Simulation {
     if (p.jualosSlip && this.updateJualosSlip(p, input, dt)) return;
     this.tickActor(p, dt);
     if (p.sticky) {
-      const owner = this.state.enemies.find(e => e.id === p.sticky.owner && e.hp > 0);
+      const owner = p.sticky.rooted ? this.state.enemies.find(e => e.id === p.sticky.owner && e.hp > 0) : true;
       p.sticky.remaining -= dt;
       if (!owner || p.hp <= 0 || p.sticky.remaining <= 0) p.sticky = null;
-      else { p.x = clamp(owner.x - owner.facing * 32, FLOOR.left, FLOOR.right); p.y = owner.y; p.vx = p.vy = 0; p.action = 'hurt'; return; }
+      else if (p.sticky.rooted) { p.x = clamp(owner.x - owner.facing * 32, FLOOR.left, FLOOR.right); p.y = owner.y; p.vx = p.vy = 0; p.action = 'hurt'; return; }
     }
     p.seq = input.seq || 0;
     if (p.hp <= 0) {
@@ -367,7 +378,7 @@ export class Simulation {
       }
     }
     const norm = Math.max(1, Math.hypot(input.x || 0, input.y || 0));
-    const speed = p.speed * this.stadiumSpeedMultiplier() * (p.buff > 0 ? 1.28 : 1);
+    const speed = p.speed * this.stadiumSpeedMultiplier() * (p.buff > 0 ? 1.28 : 1) * (p.sticky && !p.sticky.rooted ? .48 : 1);
     p.x += (input.x || 0) / norm * speed * move * dt;
     p.y += (input.y || 0) / norm * speed * .68 * move * dt;
     p.moving = !!(input.x || input.y) && move > 0;

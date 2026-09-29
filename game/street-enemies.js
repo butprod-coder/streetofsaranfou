@@ -12,11 +12,11 @@ export const streetEnemies = {
       const p = e.pattern;
       p.elapsed += dt; e.action = 'special';
       // The bluff moves only during its tell; the jab keeps its original direction.
-      if (p.kind === 'bluff' && p.elapsed < p.windup * .45) {
+    if (p.kind === 'bluff' && p.elapsed < p.windup * .45) {
         e.y = clamp(e.y + p.sidestep * 105 * dt, FLOOR.top, FLOOR.bottom);
       }
       if (!p.hit && p.elapsed >= p.windup) { p.hit = true; this.executeStreetPattern(e, p); }
-      if (p.hit && p.kind === 'supporterCharge' && p.elapsed < p.windup + p.active) {
+      if (p.hit && ['supporterCharge', 'megaphoneCharge', 'mbkCharge'].includes(p.kind) && p.elapsed < p.windup + p.active) {
         e.x = clamp(e.x + p.dx * 395 * mode.speed * dt, FLOOR.left, FLOOR.right);
         e.y = clamp(e.y + p.dy * 395 * mode.speed * dt, FLOOR.top, FLOOR.bottom);
         // One travelling hitbox keeps a separate hit ledger for each player.
@@ -35,7 +35,10 @@ export const streetEnemies = {
     if (e.cooldown <= 0 && distance < b.range && occupied < limit) {
       const sequence = e.eliteState.sequence || 0; e.eliteState.sequence = sequence + 1;
       const close = distance < 130;
-      const kind = ['oliver', 'titou'].includes(e.kind) ? close ? b.alternate : b.pattern
+      const kind = e.kind === 'lorenzo_raclette' ? close ? 'cheeseSplash' : 'raclettePan'
+        : ['karonux_om', 'orelsan_om', 'gustavax_om'].includes(e.kind) ? close ? 'megaphoneCharge' : 'barrierThrow'
+        : ['michelle_police', 'herve_mbk'].includes(e.kind) ? b.pattern
+        : ['oliver', 'titou'].includes(e.kind) ? close ? b.alternate : b.pattern
         : sequence % 2 && (e.kind !== 'albero' || distance < 220) ? b.alternate : b.pattern;
       const d = Math.max(1, Math.hypot(dx, dy));
       e.pattern = { kind, elapsed: 0, windup: b.windup * mode.telegraph, active: b.active, hit: false,
@@ -58,6 +61,28 @@ export const streetEnemies = {
     const s = this.state;
     if (p.kind === 'supporterCharge') {
       p.hitbox = this.hazard(e, { kind: 'impact', radius: 68, delay: 0, ttl: p.active, pulse: 2, damage: e.power }).id;
+    } else if (p.kind === 'barrierThrow') {
+      const count = Math.max(0, Math.min(2, R.barrierLimit - s.hazards.filter(h => h.kind === 'streetBarrier').length));
+      for (let i = 0; i < count; i++) {
+        const angle = Math.atan2(p.targetY - e.y, p.targetX - e.x) + (i - (count - 1) / 2) * .14;
+      this.hazard(e, { kind: 'streetBarrier', atlas: e.kind, cell: 12, radius: 44, delay: i * .18, ttl: 2.1, pulse: 2,
+          vx: Math.cos(angle) * 300, vy: Math.sin(angle) * 300, damage: e.power, knockback: 300 });
+      }
+    } else if (p.kind === 'megaphoneCharge' || p.kind === 'mbkCharge') {
+      p.hitbox = this.hazard(e, { kind: p.kind === 'mbkCharge' ? 'mbkCharge' : 'impact', radius: p.kind === 'mbkCharge' ? 76 : 66,
+        delay: 0, ttl: p.active, pulse: 2, damage: e.power }).id;
+    } else if (p.kind === 'pistolShot') {
+      const dx = p.targetX - e.x, dy = p.targetY - e.y, length = Math.max(1, Math.hypot(dx, dy));
+      this.hazard(e, { kind: 'streetProjectile', atlas: e.kind, cell: 12, shape: 'line', width: 620, band: 13,
+        x: e.x + e.facing * 18, y: p.targetY, facing: e.facing, delay: 0, ttl: .16, pulse: 1, damage: e.power,
+        vx: dx / length * 750, vy: dy / length * 750 });
+    } else if (p.kind === 'raclettePan') {
+      this.hazard(e, { kind: 'streetFX', atlas: e.kind, cell: 15, shape: 'line', width: 150, band: 46,
+        delay: 0, ttl: .24, pulse: 1, damage: e.power * 1.15 });
+    } else if (p.kind === 'cheeseSplash') {
+      const puddleLimit = 4, count = Math.max(0, Math.min(2, puddleLimit - s.hazards.filter(h => h.kind === 'cheesePuddle').length));
+      for (let i = 0; i < count; i++) this.hazard(e, { kind: 'cheesePuddle', atlas: e.kind, cell: 13,
+        x: p.targetX + (i ? 35 : -35), y: p.targetY + (i ? 20 : -20), radius: 48, delay: 0, ttl: 4.2, pulse: .8, damage: 3, sticky: true });
     } else if (p.kind === 'tacoVolley' || p.kind === 'fastTalk') {
       const count = Math.max(0, Math.min(2, R.projectileLimit - s.hazards.filter(h => h.kind === 'streetProjectile').length));
       for (let i = 0; i < count; i++) {

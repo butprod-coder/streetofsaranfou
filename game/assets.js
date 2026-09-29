@@ -43,6 +43,25 @@ export class Assets {
           }
           context.putImageData(pixels, 0, 0);
         }
+        if (url === '/assets/enemies/street/gustavax_om.png') {
+          bitmap = document.createElement('canvas'); bitmap.width = img.width; bitmap.height = img.height;
+          const context = bitmap.getContext('2d', { willReadFrequently: true }); context.drawImage(img, 0, 0);
+          const pixels = context.getImageData(0, 0, img.width, img.height), { data } = pixels, cols = 4, rows = 4;
+          // This sheet arrived with an opaque light-gray checkerboard. Remove only
+          // neutral gray pixels connected to each cell's edge so white clothing stays intact.
+          const background = i => {
+            const r=data[i],g=data[i+1],b=data[i+2];
+            return Math.max(r,g,b)-Math.min(r,g,b)<18 && (r+g+b)/3>180;
+          };
+          for(let row=0;row<rows;row++)for(let col=0;col<cols;col++){
+            const x0=Math.floor(col*img.width/cols),x1=Math.floor((col+1)*img.width/cols),y0=Math.floor(row*img.height/rows),y1=Math.floor((row+1)*img.height/rows),w=x1-x0,h=y1-y0;
+            const seen=new Uint8Array(w*h),queue=new Int32Array(w*h);let head=0,tail=0;
+            const add=n=>{if(!seen[n]&&background(((y0+Math.floor(n/w))*img.width+x0+n%w)*4)){seen[n]=1;queue[tail++]=n;}};
+            for(let x=0;x<w;x++){add(x);add((h-1)*w+x);}for(let y=1;y<h-1;y++){add(y*w);add(y*w+w-1);}
+            while(head<tail){const n=queue[head++],x=n%w,y=Math.floor(n/w),i=((y0+y)*img.width+x0+x)*4;data[i+3]=0;if(x)add(n-1);if(x+1<w)add(n+1);if(y)add(n-w);if(y+1<h)add(n+w);}
+          }
+          context.putImageData(pixels,0,0);
+        }
         if (['/assets/shared/scenery/estate-events.png', '/assets/shared/scenery/night-bus.png'].includes(url)) {
           bitmap = document.createElement('canvas'); bitmap.width = img.width; bitmap.height = img.height;
           const context = bitmap.getContext('2d'); context.drawImage(img, 0, 0);
@@ -93,8 +112,17 @@ export class Assets {
       // Read alpha once to find each cell's anchor. Originals keep their generated alpha untouched.
       const canvas = document.createElement('canvas'); canvas.width = image.width; canvas.height = image.height;
       const ctx = canvas.getContext('2d', { willReadFrequently: true }); ctx.drawImage(image, 0, 0);
-      const pixels = ctx.getImageData(0, 0, image.width, image.height).data;
+      const sourcePixels = ctx.getImageData(0, 0, image.width, image.height).data;
       rects = Array.from({ length: (config.frameCount || config.cols * config.rows) }, (_, i) => {
+        // A few poses interleave at the row boundary. Mask only the neighbouring
+        // fragments, retaining detached projectiles, smoke and stars in this pose.
+        let frameImage = image, pixels = sourcePixels;
+        if (config.exclude?.[i]) {
+          frameImage = document.createElement('canvas'); frameImage.width = image.width; frameImage.height = image.height;
+          const masked = frameImage.getContext('2d'); masked.drawImage(image, 0, 0);
+          for (const [l,t,r,b] of config.exclude[i]) masked.clearRect(Math.round(l*image.width), Math.round(t*image.height), Math.round((r-l)*image.width), Math.round((b-t)*image.height));
+          pixels = masked.getImageData(0, 0, image.width, image.height).data;
+        }
         const col = i % config.cols;
         const row = Math.floor(i / config.cols);
         const columns = config.rowColumns?.[row] || config.columnCuts;
@@ -137,7 +165,12 @@ export class Assets {
         for (let y = top; y < bottom; y++) for (let x = left; x < right; x++) if (pixels[(y * image.width + x) * 4 + 3] > 32) {
           x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
         }
-        return x1 >= x0 ? [x0, y0, x1 - x0 + 1, y1 - y0 + 1] : [left, top, right - left, bottom - top];
+        const rect = x1 >= x0 ? [x0, y0, x1 - x0 + 1, y1 - y0 + 1] : [left, top, right - left, bottom - top];
+        if (frameImage !== image) {
+          const cropped = document.createElement('canvas'); cropped.width = rect[2]; cropped.height = rect[3];
+          cropped.getContext('2d').drawImage(frameImage, ...rect, 0, 0, rect[2], rect[3]); rect.image = cropped;
+        }
+        return rect;
       });
       this.frames.set(cacheKey, rects);
     }

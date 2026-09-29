@@ -21,7 +21,7 @@ test('all 36 streets have varied multi-wave plans, delayed reinforcement and loc
     assert.equal(waves.at(-1).boss, street === 5 || street === 2 && c <= 5);
     const g = new Simulation(['jo'], c, 1); g.state.stage = street; g.enterStreet(); g.state.surpriseDone = true; g.spawnWave();
     g.state.players[0].x = 1200; g.state.players[0].invincible = 999;
-    assert.ok(g.state.spawnQueue.length > 0); assert.equal(g.state.enemies.length, 1);
+    assert.ok(g.state.spawnQueue.length > 0); assert.equal(g.state.enemies.length, g.state.waves[0].kinds[0] === 'om_supporters' ? 3 : 1);
     for (let wave = 0; wave < waves.length; wave++) {
       if (g.state.phase === 'encounter') {
         if (['merchant','petanque','picnic','shells','gym','vending'].includes(g.state.neighborhoodEncounter.kind)) g.finishNeighborhood('skipped');
