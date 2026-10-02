@@ -1,0 +1,75 @@
+import { chromium } from 'playwright';
+import assert from 'node:assert/strict';
+import { createGameServer } from '../server/index.js';
+
+const server = createGameServer();
+await new Promise(resolve => server.server.listen(0, '127.0.0.1', resolve));
+const browser = await chromium.launch({ headless: true, ...(process.env.BROWSER_PATH ? { executablePath: process.env.BROWSER_PATH } : {}) });
+const page = await browser.newPage();
+const errors = []; page.on('pageerror', e => errors.push(e.message));
+await page.addInitScript(() => {
+  window.pads = [0, 3].map(index => ({ index, id: 'Identical Xbox Controller', connected: true, mapping: 'standard', axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) }));
+  Object.defineProperty(navigator, 'getGamepads', { value: () => [window.pads[0], null, null, window.pads[1]] });
+});
+const inspect = () => page.evaluate(() => window.saranfou.inspect());
+async function button(slot, index, duration = 100) {
+  await page.evaluate(({ slot, index }) => { window.pads[slot].buttons[index] = { pressed: true, value: 1 }; }, { slot, index });
+  await page.waitForTimeout(duration);
+  await page.evaluate(({ slot, index }) => { window.pads[slot].buttons[index] = { pressed: false, value: 0 }; }, { slot, index });
+  await page.waitForTimeout(100);
+}
+try {
+  await page.goto(`http://127.0.0.1:${server.server.address().port}`);
+  await page.waitForFunction(() => window.saranfou?.inspect().screen === 'home');
+  await page.locator('[data-action=solo]').click();
+  await button(1, 9);
+  assert.equal((await inspect()).screen, 'select', 'J2 Start joins without launching');
+  assert.equal(await page.locator('#local-player2').getAttribute('class'), 'joined');
+  const p1 = await page.locator('#roster .selected').getAttribute('data-fighter');
+  const p2 = await page.locator('#roster .selected-p2').getAttribute('data-fighter');
+  await button(1, 15);
+  assert.equal(await page.locator('#roster .selected').getAttribute('data-fighter'), p1);
+  assert.notEqual(await page.locator('#roster .selected-p2').getAttribute('data-fighter'), p2);
+  await button(0, 9); assert.equal((await inspect()).screen, 'select', 'Unconfirmed J2 prevents launch');
+  await button(1, 0);
+  await button(0, 9, 800);
+  await page.waitForFunction(() => window.saranfou.inspect().screen === null);
+  assert.equal((await inspect()).state.players.length, 2);
+  assert.equal((await inspect()).state.paused, false);
+  await page.waitForFunction(() => window.saranfou.inspect().state.phase === 'fight');
+  let before = (await inspect()).state.players.map(p => p.x);
+  await page.evaluate(() => { window.pads[1].axes[0] = .8; }); await page.waitForTimeout(350);
+  await page.evaluate(() => { window.pads[1].axes[0] = 0; });
+  let after = (await inspect()).state.players.map(p => p.x);
+  assert.ok(after[1] > before[1] + 25); assert.ok(Math.abs(after[0] - before[0]) < 2);
+  before = after;
+  await page.keyboard.down('ArrowRight'); await page.waitForTimeout(200); await page.keyboard.up('ArrowRight');
+  after = (await inspect()).state.players.map(p => p.x); assert.ok(Math.abs(after[0] - before[0]) < 2, 'Keyboard cannot control local coop');
+  await button(1, 9);
+  assert.match(await page.locator('#pause-kicker').textContent(), /JOUEUR 2/);
+  await button(1, 13); assert.equal(await page.evaluate(() => document.activeElement.id), 'pause-talents');
+  await button(1, 0);
+  await page.waitForFunction(() => window.saranfou.inspect().screen === 'evolution');
+  const players = (await inspect()).state.players;
+  assert.ok((await page.locator('#evolution-portrait').getAttribute('src')).includes(`/${players[1].kind}/`));
+  const talentsBefore = players.map(p => p.progression.talents.length);
+  await button(0, 15); assert.equal(await page.evaluate(() => document.activeElement.dataset.talent), await page.locator('[data-talent]').first().getAttribute('data-talent'), 'Other pad cannot steer the personal tree');
+  await button(1, 0);
+  const talentsAfter = (await inspect()).state.players.map(p => p.progression.talents.length);
+  assert.equal(talentsAfter[0], talentsBefore[0]); assert.equal(talentsAfter[1], talentsBefore[1] + 1, 'Purchase belongs to the player who paused');
+  await button(1, 1); await button(1, 9);
+  await page.waitForFunction(() => window.saranfou.inspect().screen === null);
+  await button(0, 9); assert.match(await page.locator('#pause-kicker').textContent(), /JOUEUR 1/);
+  await page.locator('#pause-talents').click();
+  assert.ok((await page.locator('#evolution-portrait').getAttribute('src')).includes(`/${players[0].kind}/`));
+  await button(0, 1); await button(0, 9);
+  await page.evaluate(() => { window.pads[0].connected = false; });
+  await page.waitForFunction(() => window.saranfou.inspect().screen === 'pause');
+  await page.evaluate(() => { window.pads[0].connected = true; }); await button(1, 9);
+  await page.waitForFunction(() => window.saranfou.inspect().screen === null);
+  before = (await inspect()).state.players.map(p => p.x);
+  await button(0, 15, 300); after = (await inspect()).state.players.map(p => p.x);
+  assert.ok(after[0] > before[0] + 25); assert.ok(Math.abs(after[1] - before[1]) < 2);
+  assert.deepEqual(errors, []);
+  console.log('PASS local coop: Start join, independent selection, identical sparse-index pads, independent movement, controllers only, disconnect and resume.');
+} finally { await browser.close(); await server.close(); }

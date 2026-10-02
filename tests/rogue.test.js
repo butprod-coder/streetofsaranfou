@@ -26,7 +26,7 @@ test('126 unique nodes, three branches, character-specific ranks, legal investme
     for(const n of nodes.filter(n=>n.branchIndex===0&&nodes.find(q=>q.branch===n.branch&&q.tier===n.tier)===n))p=spendPoint(p,n.id);
     assert.equal(spendPoint(p,nodes[11].id),null);assert.equal(spendPoint(p,nodes[0].id),null);
     assert.equal(normalizeProfile({xp:Infinity,points:999},f.id).points,1);
-    for(let i=0;i<10;i++)p=spendAttribute(p,'vitality');assert.equal(spendAttribute(p,'vitality'),null);
+    for(let i=0;i<20;i++)p=spendAttribute(p,'endurance');assert.equal(p.attributes.endurance,20);
   }assert.equal(ids.size,126);
 });
 test('enemy bags have exactly equal frequencies and arrivals obey active cap',()=>{
@@ -36,10 +36,10 @@ test('enemy bags have exactly equal frequencies and arrivals obey active cap',()
   for(let i=0;i<60;i++)sim.step();assert.equal(sim.state.enemies.length,1);
   for(let i=0;i<500;i++)sim.step();assert.ok(sim.state.enemies.filter(e=>e.hp>0).length<=activeEnemyLimit(0));
 });
-test('XP is shared, deduplicated; summons grant none; streets have no reward menu',()=>{
+test('XP is shared, deduplicated; summons grant reduced XP; streets have no reward menu',()=>{
   const sim=new Simulation(['jo','yanu'],0,8);sim.awardXP(1000,'wave:test');sim.awardXP(1000,'wave:test');
   assert.deepEqual(sim.state.players.map(p=>p.progression.xp),[500,500]);
-  const e=sim.spawnEnemy('creation',{owner:999});sim.damage(e,999,sim.state.players[0],true);assert.equal(sim.state.players[0].progression.xp,500);
+  const e=sim.spawnEnemy('creation',{owner:999});sim.damage(e,999,sim.state.players[0],true);assert.equal(sim.state.players[0].progression.xp,505);
   sim.clearStreet();assert.equal(sim.state.players.every(p=>!p.rewardOptions?.length),true);
   sim.clearStreet();assert.equal(sim.state.players[0].rogueRewards,undefined);
 });
@@ -56,7 +56,7 @@ test('paint, fire and recruitment trigger the new combat mechanics',()=>{
   const tank=arena('jualos');learn(tank.p,'Responsable commercial');tank.p.energy=100;tank.sim.activateSpecial(tank.p);tank.sim.recruitJualos(tank.p,tank.e);assert.ok(tank.e.permanent);
 });
 test('rest checkpoints round trip without replaying wave XP, restoring consumed props or carrying buffs',()=>{
-  const sim=new Simulation(['gustavax','kikor'],2,442);sim.spawnWave();sim.state.enemies=[];sim.state.spawnQueue=[];sim.step();assert.equal(sim.state.phase,'rest');
+  const sim=new Simulation(['gustavax','kikor'],2,442);sim.state.stage=1;sim.enterStreet();sim.spawnWave();sim.state.enemies=[];sim.state.spawnQueue=[];sim.step();assert.equal(sim.state.phase,'rest');
   sim.awardXP(1000,'test');sim.state.players[0].weapon={kind:'shotgun',uses:4};sim.state.props[0].hp=0;
   const save=checkpoint(sim.snapshot()),restored=restoreCheckpoint(JSON.parse(JSON.stringify(save)));
   assert.equal(restored.state.phase,'rest');assert.equal(restored.state.wave,sim.state.wave);assert.deepEqual(restored.state.waves,sim.state.waves);

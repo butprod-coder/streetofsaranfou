@@ -34,4 +34,4 @@ export function karonuxSelection(p) {
   return { branch, rank: branch < 0 ? 0 : KARONUX_BRANCHES[branch].nodes.filter(n => ids.includes(n.id)).length };
 }
 
-export const KARONUX_MILESTONES = ['start', 'boss:1', 'boss:2', 'boss:3', 'boss:4', 'boss:5'];
+export const KARONUX_MILESTONES = ['start', 'boss:0', 'boss:1', 'boss:2', 'boss:3', 'boss:4'];

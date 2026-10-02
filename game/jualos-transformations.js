@@ -19,6 +19,7 @@ export const jualosTransformations={
     if(!a||!ordinary(e)||!takeover&&HEAVY_ENEMIES.has(e.kind))return false;
     if(!takeover&&s.allies.filter(r=>r.recruit&&r.owner===p.id&&r.hp>0).length>=(a.rank>=3?2:1))return false;
     this.releaseGrab(e);e.attack=null;e.pattern=null;e.lorenzoConfused=null;
+    const charge=s.hazards.find(h=>h.id===e.newPattern?.hazard);if(charge)charge.ttl=0;e.newPattern=null;
     s.enemies=s.enemies.filter(other=>other!==e);
     Object.assign(e,{enemy:false,ally:true,recruit:true,owner:p.id,permanent:a.rank>=5,contractUntil:s.time+(a.duration-a.elapsed)+(a.rank>=4?4:0),ttl:1,cooldown:.15,stun:0,invincible:0,action:'idle',aggressive:a.rank>=2,vx:0,vy:0,vz:0,z:0});
     s.allies.push(e);this.jualosFX(e.x,e.y-120,10);return true;

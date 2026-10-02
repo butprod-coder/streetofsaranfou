@@ -17,7 +17,7 @@ export const BALANCE = {
   thunder: { strikeAt: .32, sleepAt: .65, lifetime: .24 },
   tornado: { speedX: 350, speedY: 225 },
   embers: { count: 5, flight: .5, stagger: .09, ignition: 1.05, duration: 3.6, pulse: .8 },
-  triso: { range: 410, distance: 240, windup: 1.05, recovery: 2.8, flight: .6, duration: 4.5, radius: 76, pulse: 1, maxPuddles: 3 },
+  triso: { range: 410, distance: 240, windup: 1.05, recovery: 2.8, flight: .6, duration: 8, radius: 76, pulse: 1, maxPuddles: 3 },
   specials: {
     karonux: { cost: 100, cooldown: 0, duration: 3.6, damage: 1.9, radius: 100, golfAt: .25, exitDuration: .2, speedX: 510, speedY: 240, reverseSpeed: 700, reverseDuration: .24, reverseCooldown: .8, driftSpeed: 420, maxHits: 2, hitCooldown: .65 },
     jualos: { cost: 100, cooldown: 0, duration: 1.45, damage: 1.6, radius: 115 },

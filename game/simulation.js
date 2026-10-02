@@ -24,6 +24,7 @@ import { rogueRun } from './rogue-run.js';
 import { rogueCombat } from './rogue-combat.js';
 import { streetEnemies } from './street-enemies.js';
 import { STREET_ENEMIES } from './street-enemies-data.js';
+import { DYNAMIC_ENEMIES } from './dynamic-enemies-data.js';
 import { hasTalent } from './rogue-talents.js';
 import { CHAPTER_INTROS, hasChapterIntro, INTRO_DURATION, INTRO_REVEAL } from './chapter-intro.js';
 
@@ -84,6 +85,8 @@ export class Simulation {
     s.decor = null;
     for (const p of s.players) { this.releaseGrab(p); p.interaction = null; this.clearRogueTransient(p); }
     s.enemies = []; s.pickups = this.streetWeapons(); s.combo = 0; s.comboTime = 0;
+    s.weaponProjectiles = [];
+    for (const p of s.players) { p.groundGlueUntil = p.glueImmuneUntil = p.corruptedUntil = p.corruptImmuneUntil = 0; }
     s.gymProjectiles = []; s.hazards = []; s.allies = s.allies.filter(a => (a.recruit || a.gustavaxMinion) && a.permanent && a.hp > 0); s.wave = -1; s.spawnQueue = []; s.spawnTimer = 0;
     s.jualosWaves = []; s.lorenzoClouds = []; s.lorenzoShots = []; s.lorenzoBirds = [];
     s.yanuPlants = []; s.yanuTiles = [];
@@ -94,6 +97,8 @@ export class Simulation {
     s.streetSeed = this.seed; s.streetBag = [...(s.enemyBag || [])];
     s.waves = wavePlan(this.routeDepth(), s.stage, s.players.length, s.difficulty, () => this.random(), s.enemyBag ||= [], s.enemyOrder, s.chapter);
     s.props = this.streetProps(); s.surprise = null; s.surpriseDone = false;
+    for (const p of s.players) this.resetMeleeCombo(p);
+    this.resetStreetAction();
     this.prepareNeighborhood();
     for (const [i, p] of s.players.entries()) {
       p.x = 200 + i * 95; p.y = 535 + i * 55; p.z = 0; p.vz = 0; p.vx = 0; p.vy = 0;
@@ -250,6 +255,8 @@ export class Simulation {
     for (const e of s.enemies) this.updateEnemy(e, dt);
     this.updateWorld(dt);
     this.updateScenery(dt);
+    this.updateStreetAction(dt);
+    this.updateWeaponProjectiles(dt);
     if(s.chapter===6)this.updateFinalArena(dt);
     this.separateEnemies(dt);
     for (const actor of [...s.players, ...s.enemies]) this.physics(actor, dt);
@@ -278,7 +285,7 @@ export class Simulation {
       if (s.practice || s.sandbox?.mode === 'enemy') { s.phase = 'won'; s.hazards = []; return; }
       this.finishNeighborhoodWave();
       this.awardXP(120 + this.routeDepth() * 30, 'wave:' + s.chapter + ':' + s.stage + ':' + s.wave);
-      s.hazards = s.hazards.filter(h => !h.enemy);
+      s.hazards = s.hazards.filter(h => !h.enemy || h.groundResidue && h.delay <= 0);
       if (s.wave < s.waves.length - 1) {
         s.phase = 'rest'; s.phaseTime = s.waves[s.wave + 1].rest;
         this.event('breather', { label: 'UNE SECONDE POUR SOUFFLER…' });
@@ -309,6 +316,11 @@ export class Simulation {
   }
 
   updatePlayer(p, input, dt) {
+    if (p.corruptedUntil > this.state.time) input = { ...input, x: -input.x, y: -input.y };
+    if (p.groundGlueUntil > this.state.time) {
+      if (input.jump || input.dodge || p.z > 0 || p.hp <= 0) p.groundGlueUntil = 0;
+      else { input = { ...input, x: 0, y: 0 }; p.vx = p.vy = 0; }
+    }
     if (p.caughtBy && this.updateKikorCaught(p, input, dt)) return;
     if (p.yanuFrozen && this.updateYanuFrozen(p, input, dt)) return;
     if (p.jualosSlip && this.updateJualosSlip(p, input, dt)) return;
@@ -325,6 +337,7 @@ export class Simulation {
       if (p.downTime > 14 && p.lives > 0) { p.lives--; this.revivePlayer(p, .75); }
       return;
     }
+    this.captureComboInput(p, input);
     const pressed = {};
     const fresh = {};
     for (const action of ['grab', 'interact']) {
@@ -363,9 +376,11 @@ export class Simulation {
       this.rogueOnDodge(p);
       this.event('dodge', { actor: p.id, x: p.x, y: p.y, facing: Math.sign(p.dodgeX) || p.facing }); return;
     }
-    if (pressed.jump && p.z === 0 && !p.attack) { p.vz = 490; p.z = .1; p.action = 'jump'; p.actionTime = 0; this.event('jump', { actor: p.id }); }
+    const queued = p.comboQueued && !p.attack && p.cooldown <= 0 ? p.comboQueued : null;
+    if ((queued?.action === 'jump' || pressed.jump) && p.z === 0 && !p.attack) { p.vz = 490; p.z = .1; p.action = 'jump'; p.actionTime = 0; this.comboJump(p); if (queued?.action === 'jump') p.comboQueued = null; this.event('jump', { actor: p.id }); }
     if (!p.attack && p.cooldown <= 0) {
       if (pressed.special && !p.specialState && p.energy >= BALANCE.specials[p.kind].cost && p.specialCd <= 0) { this.activateSpecial(p); return; }
+      else if (queued && ['punch', 'kick'].includes(queued.action)) { p.comboIntent = queued; p.comboQueued = null; this.startAttack(p, queued.action); }
       else if (pressed.kick) this.startAttack(p, 'kick');
       else if (pressed.punch) this.startAttack(p, 'punch');
     }
@@ -405,6 +420,8 @@ export class Simulation {
     const duration = a.enemy ? windup + .38 : type === 'special' ? .7 : type === 'kick' ? .43 : a.comboStep === 3 ? .38 : .27;
     a.attack = { type, elapsed: 0, windup, duration, hit: false, heavy, air: a.z > 0 };
     a.cooldown = duration + (a.enemy ? .85 * difficulty(s.difficulty).recovery * (1 - this.routeDepth() * BALANCE.enemy.chapterRecovery) : .015);
+    if (!a.enemy) { const speed = a.bonuses.attackSpeed || 1; a.attack.windup /= speed; a.attack.duration /= speed; a.cooldown /= speed; }
+    if (!a.enemy) this.prepareComboAttack(a, a.attack);
     if (a.enemy && a.kind === 'triso' && type === 'special') {
       a.attack.windup = BALANCE.triso.windup * difficulty(s.difficulty).telegraph;
       a.attack.duration = a.attack.windup + .45; a.cooldown = a.attack.duration + BALANCE.triso.recovery * difficulty(s.difficulty).recovery;
@@ -420,7 +437,7 @@ export class Simulation {
       const b = BALANCE.triso;
       if (s.hazards.filter(h => h.kind === 'slime').length < b.maxPuddles) {
         this.hazard(a, { kind: 'slime', x: a.spitTarget?.x ?? a.x + a.facing * 180, y: a.spitTarget?.y ?? a.y,
-          radius: b.radius, verticalScale: 2.5, delay: b.flight, ttl: b.duration, pulse: b.pulse, damage: a.power * .65 });
+          radius: b.radius, verticalScale: 2.5, delay: b.flight, ttl: b.duration, pulse: b.pulse, damage: a.power * .65, groundGlue: true, groundResidue: true });
         this.event('spit', { x: a.x, y: a.y - 95 });
       }
       return;
@@ -477,15 +494,19 @@ export class Simulation {
     if (wrestling) range = type === 'kick' ? BALANCE.wrestler.radius * a.bonuses.radius : 145;
     if (!a.enemy && type === 'punch' && hasTalent(a, 'Main baladeuse')) range += 40;
     if (attack.rogueRange) range = attack.rogueRange;
+    // Follow-ups reach through ordinary recoil, so a successful opening stays usable.
+    if (attack.chain?.steps.length > 1) range = Math.max(range, type === 'punch' ? 165 : 230);
     const band = attack.rogueBand || (wrestling && type === 'kick' ? 95 : a.enemy ? (special ? 115 : 48) : (special ? 95 : attack.air ? 68 : 54));
-    const damage = Math.round((wrestling ? a.specialPower : a.power) * (special ? (a.enemy ? 1.35 : 2.5) : type === 'kick' ? 1.5 : a.comboStep === 3 ? 1.4 : 1) * (a.buff > 0 ? 1.2 : 1) * (attack.air ? 1.2 : 1));
+    const damage = Math.round((wrestling ? a.specialPower : a.power) * (special ? (a.enemy ? 1.35 : 2.5) : type === 'kick' ? 1.5 : a.comboStep === 3 ? 1.4 : 1) * (a.buff > 0 ? 1.2 : 1) * (attack.air ? 1.2 : 1) * (attack.chain?.multiplier || 1));
     let hits = 0;
+    const comboTargets = [];
     for (const target of a.enemy ? s.players : s.enemies) {
       if (target.hp <= 0 || target.invincible > 0 || (a.enemy && target.z > 28)) continue;
       const dx = target.x - a.x, dy = target.y - a.y;
       if (Math.abs(dx) > range || Math.abs(dy) > band || (!radial && dx * a.facing < -28)) continue;
       if (radial && Math.hypot(dx, dy * 1.35) > range) continue;
-      this.damage(target, damage, a, attack.heavy, true); hits++;
+      const beforeHP = target.hp; this.damage(target, damage, a, attack.heavy, true); hits++;
+      if (target.hp < beforeHP) comboTargets.push(target);
     }
     if (a.enemy) for (const prop of s.props) {
       if (prop.bourgTable && prop.hp > 0 && Math.abs(prop.x-a.x) <= range && Math.abs(prop.y-a.y) <= band && (radial || (prop.x-a.x)*a.facing >= -28)) this.hitProp(prop, attack.heavy ? 2 : 1, a);
@@ -494,8 +515,10 @@ export class Simulation {
       for (const prop of s.props) {
         if (prop.kind === 'easel' && !prop.enemy) continue;
         if (prop.hp <= 0 || Math.abs(prop.x - a.x) > range + (prop.halfWidth || 0) || Math.abs(prop.y - a.y) > band || (!radial && (prop.x - a.x) * a.facing < -28 - (prop.halfWidth || 0))) continue;
-        this.hitProp(prop, attack.heavy ? 2 : 1, a);
+        if (prop.kind === 'bin' && type === 'kick') this.launchBin(prop, a);
+        else this.hitProp(prop, attack.heavy ? 2 : 1, a);
       }
+      this.confirmComboHit(a, attack, comboTargets);
       if (special && ['charge', 'roll'].includes(technique)) a.vx = a.facing * 600;
       if (hits) { s.combo += hits; s.comboTime = 2.2; s.bestCombo = Math.max(s.bestCombo, s.combo); }
     }
@@ -505,6 +528,7 @@ export class Simulation {
   damage(target, amount, source, heavy, chargeEnergy = false) {
     const s = this.state;
     if (target.hp <= 0) return;
+    if (this.shieldBlocks(target, source)) return;
     if(target.kind==='remyGeek'&&target.remyShielded){if(s.time>=(target.remyShieldHintAt||0)){target.remyShieldHintAt=s.time+1.1;this.event('opening',{x:target.x,y:target.y-205,label:'BOUCLIER ACTIF · ÉLIMINE LES 4 INVOCATIONS !'});}return;}
     if(target.gustavaxMinion){if(!source?.enemy||s.bossCinema)return;target.hp=Math.max(0,target.hp-amount);target.flash=.15;if(target.hp<=0)target.ttl=0;this.event('impact',{x:target.x,y:target.y-65});return;}
     if (amount > 0 && this.bourgCover(target, source, heavy)) return;
@@ -533,11 +557,12 @@ export class Simulation {
     if(target.boss&&target.kind==='gustavax'&&target.bossPhase<3)amount=Math.min(amount,Math.max(0,target.hp-target.maxHp*(target.bossPhase===1?.65:.3)));
     if (target.boss && target.kind === 'lorenzo' && !target.sofa && !target.sofaBroken) amount = Math.min(amount, Math.max(0, target.hp - target.maxHp * BALANCE.bosses.lorenzo.phases[0]));
     if (target.boss && target.kind === 'jualos' && !target.commercial) amount = Math.min(amount, Math.max(0, target.hp - target.maxHp * BALANCE.bosses.jualos.phases[0]));
-    if (amount > 0 && chargeEnergy && source?.progression && !source.enemy && !source.ally && !source.specialState && !this.rogueDepth) source.energy = Math.min(100, source.energy + BALANCE.energy.perHit);
+    if (amount > 0 && chargeEnergy && source?.progression && !source.enemy && !source.ally && !source.specialState && !this.rogueDepth) source.energy = Math.min(100, source.energy + BALANCE.energy.perHit + (source.bonuses.energyPerHitBonus || 0));
     if (!target.enemy) this.dropStadiumBaton(target);
     if (target.enemy && amount > 0 && source?.specialState && !source.enemy) this.schoolSpecialHit(source, target);
     amount=this.kikorProtect(target,amount);
     target.hp = Math.max(0, target.hp - amount); target.flash = .12;
+    if (DYNAMIC_ENEMIES[target.kind] && target.pattern) { target.pattern = null; target.cooldown = .9; target.recovering = .9; }
     if (target.boss && target.kind === 'lorenzo' && !target.sofa && !target.sofaBroken && target.hp <= target.maxHp * BALANCE.bosses.lorenzo.phases[0]) this.beginLorenzoSofa(target);
     if (target.boss && target.kind === 'jualos' && !target.commercial && target.hp <= target.maxHp * BALANCE.bosses.jualos.phases[0]) this.beginJualosCommercial(target);
     if (!target.enemy) { this.releaseGrab(target); target.interaction = null; }
@@ -554,10 +579,16 @@ export class Simulation {
     target.stun = (target.miniBoss ? .18 : target.boss ? .09 : heavy ? .34 : .23) * (target.enemy ? 1 : target.bonuses.stagger);
     // Boss wind-ups remain readable and cannot be stun-locked indefinitely.
     if (!target.boss || !target.attack) { target.attack = null; target.action = 'hurt'; target.actionTime = 0; }
-    target.vx = (Math.sign(target.x - source.x) || source.facing) * (target.boss ? 65 : heavy ? 340 : 110);
-    if (!target.enemy) { target.sitting = null; target.seatHold = 0; target.invincible = .65; target.comboStep = 0; s.combo = 0; }
+    const meleeImpact = !source.specialState && ['punch', 'kick'].includes(source.attack?.type);
+    target.vx = (Math.sign(target.x - source.x) || source.facing) * (target.boss ? 65 : heavy ? (meleeImpact ? 390 : 340) : (meleeImpact ? 135 : 110));
+    if (!target.enemy) { this.resetMeleeCombo(target); target.sitting = null; target.seatHold = 0; target.invincible = .65; target.comboStep = 0; s.combo = 0; }
     if (preservedAttack) { Object.assign(target, preservedAttack); target.stun = 0; target.vx = 0; }
-    this.event('hit', { x: target.x, y: target.y - 72 - target.z, amount, heavy, enemy: target.enemy, actor: target.id });
+    this.event('hit', { x: target.x, y: target.y - 72 - target.z, amount, heavy, enemy: target.enemy, actor: target.id, facing: Math.sign(target.x - source.x) || source.facing, finishing: target.hp <= 0 });
+    if (target.newPattern) {
+      const hazard = s.hazards.find(h => h.id === target.newPattern.hazard);
+      if (hazard) hazard.ttl = 0;
+      target.newPattern = null; target.cooldown = Math.max(target.cooldown, 1.2);
+    }
     if (target.hp <= 0) {
       if (target.vehicle) {
         target.vehicle = false; target.maxHp = Math.round(BALANCE.bosses.karonux.hp * (target.routeBossScale || 1) * (s.players.length > 1 ? BALANCE.bossCombat.duoHp : 1)); target.hp = target.maxHp;
@@ -581,7 +612,7 @@ export class Simulation {
         this.rogueOnKill(source, target);
         this.yanuTransformationKill(source);
         this.kikorParticipationKill(source,target);
-        if (!target.owner && !source?.ally) this.awardXP(target.boss ? 600 : 20 + this.routeDepth() * 3, 'enemy:' + target.id);
+        this.awardXP(target.boss ? 600 : target.owner ? 10 : 20 + this.routeDepth() * 3, 'enemy:' + target.id);
         s.kills++; s.score += target.value + Math.min(10, Math.floor(s.combo / 3)) * 20;
         if (target.boss) { s.hazards = s.hazards.filter(h => h.owner !== target.id); for (const e of s.enemies) if (e.owner === target.id) { e.hp = 0; e.deadTime = 0; } }
         const lootRoll = this.random();
@@ -616,6 +647,8 @@ export class Simulation {
     if (this.updateThrown(e, dt)) return;
     if(e.miniBoss){this.updateMiniBoss(e,dt);return;}
     this.tickActor(e, dt);
+    if (this.updateNewEnemy(e, dt)) return;
+    if (this.updateDynamicEnemy(e, dt)) return;
     if (this.updateTactics(e, dt)) return;
     if (e.elite) { this.updateElite(e, dt); return; }
     if (STREET_ENEMIES[e.kind]) {

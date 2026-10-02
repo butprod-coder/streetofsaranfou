@@ -13,7 +13,7 @@ function arena(branch=0,rank=6){
 }
 function run(sim,p,seconds,input={}){for(let t=0;t<seconds;t+=1/60){sim.state.time+=1/60;if(p.specialState)sim.updateSpecial(p,{...blankInput(),...input},1/60);for(const e of sim.state.enemies)if(e.joCargo)sim.updateJoCargo(e,1/60);sim.updateWorld(1/60);}}
 test('Jo receives one initial point and locks chosen branch across save',()=>{
-  let p=normalizeProfile({},'jo');assert.equal(p.points,1);p=spendPoint(p,JO_BRANCHES[2].nodes[0].id);assert.equal(awardTalent(p,'street:0:0').points,0);assert.equal(awardTalent(p,'boss:0').points,0);p=awardTalent(p,'boss:1');assert.equal(spendPoint(p,JO_BRANCHES[0].nodes[0].id),null);
+  let p=normalizeProfile({},'jo');assert.equal(p.points,1);p=spendPoint(p,JO_BRANCHES[2].nodes[0].id);assert.equal(awardTalent(p,'street:0:0').points,0);assert.equal(awardTalent(p,'boss:0').points,1);p=awardTalent(p,'boss:1');assert.equal(spendPoint(p,JO_BRANCHES[0].nodes[0].id),null);
   const {sim}=arena(2);sim.state.phase='clear';assert.deepEqual(restoreCheckpoint(checkpoint(sim.snapshot())).state.players[0].progression,sim.state.players[0].progression);
 });
 test('all 18 Jo ranks respect energy, fixed durations, bounds and friendly fire',()=>{

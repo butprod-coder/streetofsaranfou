@@ -74,12 +74,11 @@ test('gun lanes, facing, range and friendlies are respected', () => {
   for (const [x, y] of [[p.x - 90, p.y], [p.x + 90, p.y + 80], [p.x + 750, p.y]]) { e.x = x; e.y = y; g.startWeaponAttack(p); g.resolveWeaponAttack(p); assert.equal(e.hp, hp); }
   e.x = 950; e.y = p.y; g.startWeaponAttack(p); g.resolveWeaponAttack(p); assert.ok(e.hp < hp); assert.equal(other.hp, friendHp);
 });
-test('36 streets have only occasional food crates and explosive barrels, with no ambient decor', () => {
+test('36 streets use varied combat props while boss arenas stay clear', () => {
   const keys = THEME_DECOR.flat().map(d => d.key); assert.equal(new Set(keys).size, 72);
   for (let chapter = 0; chapter < 6; chapter++) {
-    const g = new Simulation(['karonux'], chapter, 42); let count = 0, drops = 0;
-    for (let stage = 0; stage < 6; stage++) { g.state.stage = stage; g.enterStreet(); count += g.state.props.length; drops += g.state.props.filter(p => p.drop).length; assert.deepEqual(streetDecor(chapter, stage), []); assert.ok(g.state.props.every(p => p.kind === 'crate' && p.drop === 'food' || p.kind === 'barrel' && p.drop === null)); }
-    assert.equal(count, 2); assert.equal(drops, 1);
+    const g = new Simulation(['karonux'], chapter, 42);
+    for (let stage = 0; stage < 6; stage++) { g.state.stage = stage; g.enterStreet(); assert.deepEqual(streetDecor(chapter, stage), []); assert.ok(g.state.props.every(p => ['crate', 'barrel', 'bin', 'fuelDrum', 'electricBox', 'hydrant'].includes(p.kind))); assert.ok(g.state.props.every(p => p.kind === 'crate' ? ['food', 'energy'].includes(p.drop) : !p.drop)); assert.ok(stage < 5 && [1,3].includes((stage+chapter)%5) ? g.state.props.length >= 1 && g.state.props.length <= 3 : g.state.props.length === 0); }
   }
 });
 test('edited layouts round trip, preserve deliberately empty streets and reject hostile data', () => {

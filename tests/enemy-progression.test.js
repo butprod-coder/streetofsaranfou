@@ -4,9 +4,9 @@ import { Simulation } from '../game/simulation.js';
 import { ENCOUNTER_ROSTER, STARTING_ENEMIES, streetEnemyRoster } from '../game/encounters.js';
 import { checkpoint, restoreCheckpoint } from '../game/run-save.js';
 
-test('each street adds one persistent random rival, including across chapters', () => {
+test('every street draws from the complete enemy pool, including the first street', () => {
   const sim = new Simulation(['jo'], 0, 123);
-  assert.deepEqual(new Set(sim.state.waves.flatMap(w => w.kinds)), new Set(sim.state.enemyOrder.slice(0, 3)));
+  assert.ok(sim.state.waves.flatMap(w => w.kinds).some(k => !sim.state.enemyOrder.slice(0, 3).includes(k)));
   const order = [...sim.state.enemyOrder];
   assert.notDeepEqual(order, new Simulation(['jo'], 0, 456).state.enemyOrder);
   for (let street = 1; street < 36; street++) {
@@ -14,9 +14,8 @@ test('each street adds one persistent random rival, including across chapters', 
     s.chapter = Math.floor(street / 6); s.stage = street % 6;
     sim.enterStreet();
     const roster = streetEnemyRoster(s.chapter, s.stage, order);
-    assert.equal(roster.length, Math.min(3 + street, ENCOUNTER_ROSTER.length));
+    assert.deepEqual(roster, ENCOUNTER_ROSTER);
     assert.ok(s.waves.flatMap(w => w.kinds).every(k => roster.includes(k)));
-    if (street + 2 < order.length) assert.equal(s.waves[0].kinds[0], order[street + 2]);
     if (s.stage === 3) {
       sim.beginSurprise();
       assert.ok(s.spawnQueue.every(k => roster.includes(k)));

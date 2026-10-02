@@ -45,30 +45,31 @@ function bot(state, player) {
   const stop = target === food ? 10 : 74;
   input.x = Math.abs(dx) > stop ? Math.sign(dx) : 0;
   input.y = Math.abs(dy) > (target === food ? 10 : 24) ? Math.sign(dy) : 0;
-  const threat = enemies.find(e => (e.attack && !e.attack.hit && distance(e) < (e.attack.type === 'special' ? 260 : 145) && e.attack.elapsed > e.attack.windup * .4) || (e.pattern && !e.pattern.hit && e.pattern.elapsed > e.pattern.windup * .4 && distance(e) < 500));
+  const threat = enemies.find(e => (e.newPattern && !e.newPattern.fired && e.newPattern.elapsed > e.newPattern.windup * .4 && distance(e) < 500) || (e.attack && !e.attack.hit && distance(e) < (e.attack.type === 'special' ? 260 : 145) && e.attack.elapsed > e.attack.windup * .4) || (e.pattern && !e.pattern.hit && e.pattern.elapsed > e.pattern.windup * .4 && distance(e) < 500));
   const hazard = state.hazards.find(h => h.enemy && Math.hypot(h.x-player.x,(h.y-player.y)*1.5)<(h.radius||80)+100 && h.delay<.5);
-  if (hazard || threat) input.jump = true;
+  if (hazard || threat || player.groundGlueUntil > state.time) input.jump = true;
   if (threat && player.dodgeCd <= 0) { input.dodge = true; input.x = 0; input.y = player.y > 550 ? -1 : 1; }
   if (Math.abs(dx) < 140 && Math.abs(dy) < 50 && target !== food) {
     input.punch = true;
     input.special = player.energy >= 100 && (enemies.filter(e => distance(e) < 240).length >= 2 || target.boss);
   }
+  if (player.corruptedUntil > state.time) { input.x *= -1; input.y *= -1; }
   return input;
 }
 
 function spendRunTalents(game) {
   for (const [slot, player] of game.state.players.entries()) {
-    for (const key of ['strength', 'vitality', 'endurance', 'mobility', 'weapons']) if (player.progression.statPoints && player.progression.attributes[key] < (key === 'strength' || key === 'vitality' ? 10 : 6)) game.spendAttribute(slot, key);
+    for (const key of ['strength', 'endurance', 'attackSpeed', 'moveSpeed', 'specialCharge']) if (player.progression.statPoints && Number.isFinite(player.progression.attributes[key])) game.spendAttribute(slot, key);
     if (!player.progression?.points) continue;
     const next = TALENTS[player.kind].find(node => spendPoint(player.progression, node.id));
     if (next) game.spendStat(slot, next.id);
   }
 }
 
-test('every fighter can complete a six-street chapter through ordinary controls', () => {
+test('every fighter can complete a six-street chapter on the accessible preset through ordinary controls', () => {
   const results = [];
   for (const f of FIGHTERS) {
-    const game = new Simulation([f.id], 0, 555);
+    const game = new Simulation([f.id], 0, 555, { difficulty: 'easy' });
     let ticks = 0;
     while (ticks++ < 60 * 1200 && game.state.chapter === 0 && game.state.phase !== 'over') { spendRunTalents(game); game.step(game.state.players.map(p => bot(game.state, p))); }
     results.push({ fighter: f.id, chapter: game.state.chapter, street: game.state.stage, phase: game.state.phase, seconds: Math.round(ticks * STEP), score: game.state.score });

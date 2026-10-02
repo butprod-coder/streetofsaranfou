@@ -1,5 +1,8 @@
 // Arcade values, shared by solo and the authoritative cooperative simulation.
 export const WEAPONS = {
+  bazooka: { name: 'Bazooka', atlas: 'heavyWeapons', cell: 0, uses: 3, power: 4.5, range: 850, band: 35, windup: .25, duration: 1.15, width: 110, gun: true, projectile: 'rocket' },
+  flamethrower: { name: 'Lance-flammes', atlas: 'heavyWeapons', cell: 1, uses: 12, power: .65, range: 285, band: 62, windup: .1, duration: .65, width: 90, gun: true, projectile: 'flame' },
+  grenade: { name: 'Grenades', atlas: 'heavyWeapons', cell: 2, uses: 4, power: 3.8, range: 360, band: 50, windup: .2, duration: 1.05, width: 28, projectile: 'grenade' },
   knife: { name: 'Couteau', cell: 0, uses: 10, power: 1.65, range: 140, band: 48, windup: .10, duration: .31, width: 42 },
   bat: { name: 'Batte', cell: 1, uses: 8, power: 2.2, range: 182, band: 68, windup: .22, duration: .56, width: 74 },
   pistol: { name: 'Pistolet', cell: 2, uses: 8, power: 1.9, range: 710, band: 29, windup: .13, duration: .4, width: 42, gun: true },

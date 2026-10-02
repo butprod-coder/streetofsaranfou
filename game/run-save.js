@@ -91,7 +91,7 @@ export function recordRun(state, slot, storage = localStorage) {
   if(p.progression.level>=10)unlocks.add('veteran');
   if(p.progression.completed.length>=5)unlocks.add('boss-slayer');
   if(wins>=3)unlocks.add('saran-legend');
-  records[p.kind]={xp:integer(old.xp,1e9)+delta,wins,bestScore:Math.max(integer(old.bestScore,1e7),state.score),bestLevel:Math.max(integer(old.bestLevel,20),p.progression.level),
+  records[p.kind]={xp:integer(old.xp,1e9)+delta,wins,bestScore:Math.max(integer(old.bestScore,1e7),state.score),bestLevel:Math.max(integer(old.bestLevel,Number.MAX_SAFE_INTEGER),p.progression.level),
     title:wins>=3?'Légende de Saran':wins?'Maître de la nuit':p.progression.level>=10?'Habitué de la rue':'Nouvelle tête',unlocks:[...unlocks].slice(0,24),runs:Object.fromEntries(Object.entries(runs).slice(-80))};
   storage.setItem(RECORDS_KEY,JSON.stringify(records));
 }

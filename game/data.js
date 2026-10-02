@@ -3,6 +3,8 @@ import { ENCORE_ELITES } from './elite-encore-data.js';
 import { CLASSIC_SPRITES, CLASSIC_POSES } from './classic-sprites.js';
 import { HERO_IDS, HERO_POSES } from './hero-sprites.js';
 import { STREET_ENEMIES } from './street-enemies-data.js';
+import { DYNAMIC_ENEMIES } from './dynamic-enemies-data.js';
+import { NEW_ENEMIES, NEW_SPRITE_IDS, NEW_ENEMY_POSES } from './new-enemies-data.js';
 export const W = 1280;
 export const H = 720;
 export const FLOOR = { top: 448, bottom: 646, left: 55, right: 1225 };
@@ -29,6 +31,8 @@ export const CHAPTERS = [
 ];
 CHAPTERS.push({name:'Le bureau de Gustavax',short:'Le dernier mot',quote:'« Vous avez fini de jouer ? »',boss:'gustavax',color:'#e8bf73',backgrounds:Array(7).fill('/assets/shared/levels/level7/gustavax-office.png')});
 export const ENEMIES = {
+  ...NEW_ENEMIES,
+  ...DYNAMIC_ENEMIES,
   ...Object.fromEntries(Object.entries(ELITES).map(([id, data]) => [id, { ...data, elite: true }])),
   ...STREET_ENEMIES,
   damps: { name:'Damps', hp:470, speed:132, power:16, reach:100, score:900, color:'#b8a7d0', miniBoss:true, walk:4, attack:4 },
@@ -41,7 +45,7 @@ export const ENEMIES = {
   remyOrc: { name:'Orc', hp:190, speed:166, power:16, reach:92, score:0, color:'#8dcc61', summonOnly:true, walk:4, attack:4 },
   remyPaladin: { name:'Paladin', hp:280, speed:112, power:17, reach:105, score:0, color:'#f5d971', summonOnly:true, walk:4, attack:4 },
   remyElf: { name:'Elfe', hp:145, speed:180, power:14, reach:440, score:0, color:'#81dd9b', summonOnly:true, walk:4, attack:4 },
-  remyOnyxia: { name:'Onyxia', hp:680, speed:105, power:24, reach:165, score:0, color:'#ae69cf', summonOnly:true, walk:2, attack:2 },
+  remyOnyxia: { name:'Onyxia', hp:680, speed:105, power:24, reach:165, score:0, color:'#ae69cf', height:235, summonOnly:true, walk:2, attack:2 },
   remyTauren: { name:'Tauren', hp:350, speed:96, power:20, reach:118, score:0, color:'#bd916c', summonOnly:true, walk:4, attack:4 },
   harmelin: { name:'Mme Harmelin', hp:1160, speed:72, power:18, reach:110, score:2100, color:'#b77b68', miniBoss:true, storyBossOnly:true, walk:4, attack:4 },
   harmelinProviseur:{name:'Le Proviseur',hp:420,speed:165,power:22,reach:105,score:0,color:'#ac566d',summonOnly:true,walk:2,attack:2},
@@ -56,7 +60,7 @@ export const ENEMIES = {
   papy_jala: { name: 'Papy Jala', hp: 100, speed: 108, power: 15, reach: 106, score: 220, color: '#a9d280', walk: 3, attack: 4, style: 'pepper' },
   makouille: { name: 'Makouille', hp: 105, speed: 128, power: 16, reach: 112, score: 230, color: '#e88362', walk: 3, attack: 3, style: 'motorcycle' },
   kikor_e: { name: 'Kikor · Ennemi', hp: 68, speed: 175, power: 12, reach: 88, score: 175, color: '#b9f56d', walk: 3, attack: 3, style: 'skateboard' },
-  triso: { name: 'Triso', hp: 76, speed: 116, power: 10, reach: 86, score: 190, color: '#b6d85a', walk: 3, attack: 3 },
+  triso: { name: 'Triolo', hp: 76, speed: 116, power: 10, reach: 86, score: 190, color: '#b6d85a', walk: 3, attack: 3 },
 };
 export const ACTIONS = ['punch', 'kick', 'special', 'jump', 'dodge', 'grab', 'interact'];
 export const blankInput = () => ({ x: 0, y: 0, punch: false, kick: false, special: false, jump: false, dodge: false, grab: false, interact: false, revive: false, seq: 0, taps: {} });
@@ -70,6 +74,8 @@ export function sanitizeInput(value = {}) {
   return result;
 }
 export function animation(id, action = 'idle', enemy = false) {
+  if (enemy && NEW_SPRITE_IDS.includes(id)) return (NEW_ENEMY_POSES[action] || [0]).map(cell => ({ url: `/assets/enemies/new/${id}.png`, atlas: `new_${id}`, cell }));
+  if (enemy && DYNAMIC_ENEMIES[id]) { const pose = { idle: 0, walk: 1, punch: 2, special: 2, hurt: 0, dead: 3 }[action] || 0; return [{ url: '/assets/shared/arcade/dynamic-enemies-v1.png', atlas: 'dynamicEnemies', cell: DYNAMIC_ENEMIES[id].row * 4 + pose }]; }
   if (enemy && STREET_ENEMIES[id]) {
     const recent = {
       lorenzo_raclette: {walk:[0,1],punch:[2,3],special:[4,5],hurt:[6],dead:[7]},

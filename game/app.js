@@ -18,6 +18,7 @@ import { installAudioUI, renderAudioUI } from './audio-settings.js';
 import { installInteractionUI } from './interaction-ui.js';
 import { installRogueUI, renderAttributes } from './rogue-ui.js';
 import { checkpoint, readCheckpoint, recordRun, RUN_SAVE_KEY, RECORDS_KEY } from './run-save.js';
+import { installComboUI } from './combo-ui.js';
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -30,10 +31,10 @@ class Game {
     this.renderer = new Renderer($('#game'), this.assets, this.audio);
     this.network = new Network(message => this.onNetwork(message), (status, message) => this.networkStatus(status, message));
     installInteractionUI();
-    this.input = new Input({ pause: () => this.togglePause(), blur: () => this.focusLost(), menu: action => this.gamepadMenu(action), wake: () => this.audio.wake() });
+    this.input = new Input({ pause: slot => this.togglePause(slot), blur: () => this.focusLost(), menu: (action, slot) => this.gamepadMenu(action, slot), wake: () => this.audio.wake() });
     const storyButton = document.createElement('button');
     storyButton.id = 'chapter-story-next'; storyButton.textContent = 'ESPACE / A / ✕ · Afficher / Continuer';
-    storyButton.addEventListener('click', () => { if (this.input.enabled) this.input.tap('jump'); });
+    storyButton.addEventListener('click', () => { if (this.input.enabled && !this.input.controllersOnly) this.input.tap('jump'); });
     $('#app').append(storyButton);
     this.state = null; this.simulation = null; this.mode = 'solo'; this.screen = 'home'; this.accumulator = 0;
     this.lastFrame = performance.now(); this.lastSnapshot = 0; this.lastInputSend = 0; this.loadingGeneration = 0; this.currentChapter = -1; this.resultShown = false;
@@ -44,6 +45,7 @@ class Game {
     installAudioUI(this);
     installRouteUI();
     installSecretMenu(this);
+    installComboUI();
     this.bind(); this.renderSelection(); this.updateRecord(); this.updateSound();
 
     const orientationHint = document.createElement('p'); orientationHint.className = 'orientation-hint'; orientationHint.textContent = '↻ Tourne ton téléphone : la rue se joue en paysage.'; $('#app').append(orientationHint);
@@ -86,7 +88,7 @@ class Game {
     });
     addEventListener('beforeunload', () => { if (this.mode === 'online' && this.state) this.network.send({ type: 'pause', value: true }); });
   }
-  focusables() { return this.screen ? [...$(`#${this.screen}`).querySelectorAll('button:not(:disabled), input:not(:disabled):not([type=hidden]):not([type=file]), select:not(:disabled), a[href]')].filter(el => el.offsetParent !== null && !el.closest('[inert]')) : []; }
+  focusables() { return this.screen ? [...$(`#${this.screen}`).querySelectorAll('button:not(:disabled), input:not(:disabled):not([type=hidden]):not([type=file]), select:not(:disabled), a[href]' + (this.screen === 'combos' ? ', [tabindex="0"]' : ''))].filter(el => el.offsetParent !== null && !el.closest('[inert]')) : []; }
   show(screen) {
     const previousScreen = this.screen;
     this.menuFocus ??= new Map();
@@ -98,10 +100,10 @@ class Game {
     document.body.classList.toggle('playing', playing);
     $('#game-ui').classList.toggle('hidden', !playing || screen === 'badges');
     this.input.enabled = playing && !screen && !this.state.paused;
-    $('#touch-controls').classList.toggle('hidden', !this.input.enabled || !matchMedia('(pointer: coarse)').matches);
+    $('#touch-controls').classList.toggle('hidden', this.input.controllersOnly || !this.input.enabled || !matchMedia('(pointer: coarse)').matches);
     this.input.clear();
     if (screen === 'select') this.select(this.selected);
-    if (screen === 'pause') renderPauseTalents(this.state?.players[this.mode === 'online' ? this.network.slot : 0]);
+    if (screen === 'pause') renderPauseTalents(this.state?.players[this.progressionSlot()]);
     if (screen) requestAnimationFrame(() => {
       if (this.screen !== screen) return;
       const items = this.focusables(), remembered = this.menuFocus.get(screen);
@@ -118,6 +120,14 @@ class Game {
     $$('[data-fighter]').forEach(el => el.addEventListener('click', () => { this.audio.confirm(); this.select(el.dataset.fighter); }));
     $('#online-fighter').innerHTML = FIGHTERS.map(c => `<option value="${c.id}">${c.name} — ${c.title}</option>`).join('');
     this.select(this.selected);
+    const panel = document.createElement('div'); panel.id = 'local-player2'; panel.setAttribute('aria-live', 'polite');
+    $('#roster').after(panel); this.renderLocalSelection();
+  }
+  renderLocalSelection() {
+    const panel = $('#local-player2'); if (!panel) return;
+    panel.textContent = this.localJoined ? `J1 : manette ${this.input.padSlots[0] + 1} · J2 : manette ${this.input.padSlots[1] + 1} · ${fighter(this.selected2).name} · ${this.localReady2 ? 'PRÊT ✓' : 'Stick / croix : choisir · A / ✕ : valider · B / ○ : quitter'}` : 'J2 · Appuie sur Start / Options sur une seconde manette pour rejoindre';
+    panel.classList.toggle('joined', !!this.localJoined);
+    $$('#roster [data-fighter]').forEach(el => { el.classList.toggle('selected-p2', !!this.localJoined && el.dataset.fighter === this.selected2); el.dataset.localPlayers = [el.dataset.fighter === this.selected ? 'J1' : '', this.localJoined && el.dataset.fighter === this.selected2 ? 'J2' : ''].filter(Boolean).join(' + '); });
   }
   select(id) {
     this.selected = fighter(id).id; const c = fighter(this.selected);
@@ -127,11 +137,14 @@ class Game {
     $('#fighter-special').textContent = `15 TALENTS · 3 BRANCHES   /   ${Math.round(c.hp * bonuses(profile).life)} PV   /   L · ${c.special.toUpperCase()} · ${special.cost} ÉNERGIE`;
     try { const record = JSON.parse(localStorage.getItem(RECORDS_KEY) || '{}')[c.id]; if (record) $('#fighter-special').textContent += ` · ${record.title} · ${record.wins} victoire(s)`; } catch {}
     $('#online-fighter').value = this.selected; this.preferences.character = this.selected; this.save();
+    this.renderLocalSelection();
   }
   updateRecord() { $('#record').textContent = number(this.preferences.record); }
   updateSound() { const b = $('#sound-button'); b.textContent = this.preferences.muted ? '♪̸' : '♪'; b.setAttribute('aria-label', this.preferences.muted ? 'Activer le son' : 'Couper le son'); b.setAttribute('aria-pressed', String(!this.preferences.muted)); }
   toast(message, duration = 4000) { $('#toast').textContent = message; $('#toast').classList.remove('hidden'); clearTimeout(this.toastTimer); this.toastTimer = setTimeout(() => $('#toast').classList.add('hidden'), duration); }
   async action(action) {
+    if (action === 'combos') { this.combosReturn = this.screen || 'pause'; if (this.state && !this.state.paused && !this.resultShown) this.setPause(true); this.menuFocus?.delete('combos'); this.show('combos'); }
+    if (action === 'close-combos') this.show(this.combosReturn || 'home');
     if(action.startsWith('secret-')){if(!this.secretUnlocked)return;if(action==='secret-menu'){this.quit();this.show('secret-menu');}else if(action==='secret-lock')this.secretLock();else if(action==='secret-play'||action==='secret-final'){const options=this.secretOptions();await this.startSecret(action==='secret-final'?{...options,mode:'level',chapter:6,stage:0}:options);}return;}
     if(action==='route-next'){if(this.mode==='online')this.network.send({type:'route-ready'});else this.simulation?.confirmRoute(0);return;}
     if (action === 'attributes') { this.rogueReturn = this.screen; if (this.state && !this.state.paused) this.setPause(true); this.show(action); this.renderRogue(); }
@@ -183,11 +196,14 @@ class Game {
     await this.load(this.state.chapter,()=>{this.simulation.pause(false);this.show(null);this.audio.wake();});
   }
   async startSolo(chapter = 0) {
+    if (this.localJoined && (!this.localReady2 || !this.input.padSlots?.every(index => [...navigator.getGamepads()].some(p => p?.connected && p.index === index)))) { this.toast('J2 doit valider son personnage et les deux manettes doivent être connectées.'); return; }
     const startingChoice = !this.state ? this.profiles[this.selected]?.talents.slice(0, 1) : [];
     this.network.close(true); this.mode = 'solo'; this.resultShown = false; this.state = null; this.simulation = null;
     this.resetProgression(); this.clearRunSave();
     if (startingChoice?.length) this.profiles[this.selected] = normalizeProfile({ talents: startingChoice }, this.selected);
-    this.simulation = new Simulation([this.selected], chapter, Date.now(), { randomRoute:true, difficulty: $('#difficulty-select').value, profiles: [this.profiles[this.selected]] }); this.state = this.simulation.state;
+    const characters = this.localJoined ? [this.selected, this.selected2] : [this.selected];
+    this.input.controllersOnly = !!this.localJoined;
+    this.simulation = new Simulation(characters, chapter, Date.now(), { randomRoute:true, difficulty: $('#difficulty-select').value, profiles: characters.map(id => this.profiles[id]) }); this.state = this.simulation.state;
     await this.load(this.state.chapter, () => {
       this.sceneryStreet = '';
       this.renderer.reset(); this.input.resetRun(); this.accumulator = 0; this.show(null); this.audio.wake();
@@ -285,7 +301,9 @@ class Game {
     if (this.mode === 'solo') this.setPause(true);
     else this.network.send({ type: 'input', input: this.input.neutral() });
   }
-  togglePause() {
+  progressionSlot() { return this.mode === 'online' ? this.network.slot : this.localJoined && this.state?.players[this.pauseSlot ?? 0] ? this.pauseSlot ?? 0 : 0; }
+  togglePause(slot = 0) {
+    if (this.screen === 'combos') { this.show(this.combosReturn || 'pause'); return; }
     if (this.screen === 'sound') { this.show(this.soundReturn || 'home'); return; }
     if (this.screen === 'evolution') { this.closeProgressionMenu(this.evolutionReturn, 'select'); return; }
     if (this.screen === 'attributes') { this.closeProgressionMenu(this.rogueReturn, 'pause'); return; }
@@ -293,7 +311,7 @@ class Game {
     if (!this.state || this.resultShown) { if (this.screen !== 'home') this.quit(); return; }
     if (this.screen === 'loading') return;
     if (this.screen === 'pause' && this.state.pauseReason && this.state.pauseReason !== 'manual') return;
-    this.setPause(!this.state.paused);
+    this.setPause(!this.state.paused, slot);
   }
   closeProgressionMenu(returnScreen, fallback) {
     if (returnScreen === null && this.state && !this.resultShown) {
@@ -304,8 +322,9 @@ class Game {
       this.setPause(false);
     } else this.show(returnScreen || fallback);
   }
-  setPause(value) {
+  setPause(value, slot) {
     if (!this.state || this.resultShown) return;
+    if (value && !this.state.paused && this.mode !== 'online') this.pauseSlot = slot ?? 0;
     this.input.clear();
     if (this.mode === 'online') { this.network.send({ type: 'pause', value }); if (value) { this.state.paused = true; this.pauseScreen('manual'); } }
     else { this.simulation.pause(value, 'manual'); if (value) this.pauseScreen('manual'); else this.show(null); }
@@ -313,7 +332,7 @@ class Game {
   pauseScreen(reason = 'manual', slot) {
     const manual = reason === 'manual';
     if (this.state) this.state.pauseReason = reason;
-    $('#pause-kicker').textContent = manual ? 'LA RUE PEUT ATTENDRE.' : 'ON GARDE TA PLACE.';
+    $('#pause-kicker').textContent = manual && this.localJoined ? `JOUEUR ${this.progressionSlot() + 1} · ${fighter(this.state.players[this.progressionSlot()].kind).name.toUpperCase()}` : manual ? 'LA RUE PEUT ATTENDRE.' : 'ON GARDE TA PLACE.';
     $('#pause-title').innerHTML = manual ? 'ON <em>SOUFFLE.</em>' : 'ON SE <em>RETROUVE.</em>';
     $('#pause-copy').textContent = manual ? (this.mode === 'online' ? 'Pause pour toute la bande. Chacun peut reprendre.' : 'Prends ton temps. On reprend quand tu veux.') : reason === 'reconnecting' ? 'Ta connexion a été coupée. Reconnexion automatique en cours…' : reason === 'left' || reason === 'expired' ? 'Ton pote a quitté la partie. Tu peux continuer seul avec ton combattant.' : `La connexion du joueur ${(slot ?? 1) + 1} a été coupée. La partie attend son retour pendant 45 secondes.`;
     $('#resume-button').classList.toggle('hidden', !manual); $('#continue-solo').classList.toggle('hidden', manual || !this.state);
@@ -358,6 +377,7 @@ class Game {
     this.show('result');
   }
   quit() {
+    this.localJoined = false; this.localReady2 = false; this.input.controllersOnly = false; this.renderLocalSelection();
     this.persistRun();
     this.syncProgression();
     ++this.loadingGeneration; this.network.close(true); this.state = null; this.simulation = null; this.resultShown = false; this.mode = 'solo';
@@ -366,8 +386,23 @@ class Game {
 
     if (location.search) history.replaceState(null, '', location.pathname);
   }
-  gamepadMenu(action) {
+  gamepadMenu(action, slot = 0) {
+    const personalMenu = this.localJoined && this.mode !== 'online' && ['pause', 'evolution', 'attributes', 'sound', 'controls', 'combos'].includes(this.screen);
+    if (personalMenu && slot !== this.progressionSlot()) { if (this.screen === 'pause' && action === 'start') this.togglePause(slot); return; }
+    if (slot === 1 && this.mode !== 'online' && !personalMenu) {
+      if (this.screen === 'select') {
+        if (!this.localJoined) { if (action === 'start') { this.localJoined = true; this.selected2 = FIGHTERS[1].id; this.localReady2 = false; this.renderLocalSelection(); } return; }
+        if (action === 'back') { this.localJoined = false; this.localReady2 = false; }
+        if (action === 'accept') this.localReady2 = true;
+        if (['left', 'right', 'up', 'down'].includes(action)) { const i = FIGHTERS.findIndex(c => c.id === this.selected2); this.selected2 = FIGHTERS[(i + (['left', 'up'].includes(action) ? -1 : 1) + FIGHTERS.length) % FIGHTERS.length].id; this.localReady2 = false; }
+        this.renderLocalSelection(); return;
+      }
+      if (this.localJoined && this.screen === 'pause' && ['start', 'back'].includes(action)) this.togglePause();
+      return;
+    }
+    if (slot === 1 && !personalMenu) return;
     if (action === 'start') {
+      if (this.screen === 'combos') { this.show(this.combosReturn || 'home'); return; }
       if (this.screen === 'select') {
         const highlighted = document.activeElement?.dataset.fighter;
         if (highlighted) this.select(highlighted);
@@ -375,6 +410,7 @@ class Game {
       } else if (this.screen === 'pause') this.togglePause();
       return;
     }
+    if (action === 'back' && this.screen === 'combos') { this.show(this.combosReturn || 'home'); return; }
     if (action === 'back' && this.screen === 'attributes') { this.closeProgressionMenu(this.rogueReturn, 'pause'); return; }
     if (this.screen === 'sound' && action === 'back') { this.show(this.soundReturn || 'home'); return; }
     if (this.screen === 'sound' && document.activeElement?.type === 'range' && ['left', 'right', 'accept'].includes(action)) {
@@ -408,7 +444,7 @@ class Game {
   }
   syncProgression() {
     if (this.state?.practice || this.state?.sandbox) return;
-    const p = this.state?.players[this.mode === 'online' ? this.network.slot : 0];
+    const p = this.state?.players[this.progressionSlot()];
     if (!p?.progression) return;
     const profile = normalizeProfile(p.progression);
     if (JSON.stringify(profile) === JSON.stringify(this.profiles[p.kind])) return;
@@ -422,16 +458,16 @@ class Game {
     try { localStorage.removeItem(TALENT_SAVE_KEY); } catch {}
   }
   renderEvolution() {
-    const p = this.state?.players[this.mode === 'online' ? this.network.slot : 0], kind = p?.kind || this.selected;
+    const slot = this.progressionSlot(), p = this.state?.players[slot], kind = p?.kind || this.selected;
     renderEvolution(kind, p?.progression || this.profiles[kind], stat => {
       if (this.state && this.mode === 'online') { this.network.send({ type: 'spend', stat }); return; }
-      if (this.simulation) { if (!this.simulation.spendStat(0, stat)) return; this.syncProgression(); }
+      if (this.simulation) { if (!this.simulation.spendStat(slot, stat)) return; this.syncProgression(); }
       else { const next = spendPoint(this.profiles[kind], stat); if (!next) return; this.profiles[kind] = next; }
       this.audio.confirm(); this.renderEvolution();
     });
   }
   renderRogue() {
-    const slot = this.mode === 'online' ? this.network.slot : 0, player = this.state?.players[slot];
+    const slot = this.progressionSlot(), player = this.state?.players[slot];
     renderAttributes(player, key => {
       if (this.mode === 'online') this.network.send({ type: 'attribute', key });
       else if (this.simulation?.spendAttribute(slot, key)) { this.syncProgression(); this.renderRogue(); }
@@ -455,11 +491,13 @@ class Game {
     requestAnimationFrame(time => this.frame(time));
     const dt = Math.min(.075, (now - this.lastFrame) / 1000); this.lastFrame = now;
     const input = this.input.sample();
+    const input2 = (this.screen === 'select' && this.mode !== 'online') || this.localJoined && this.mode !== 'online' ? this.input.sample(1) : blankInput();
+    if (this.localJoined && this.input.enabled && this.input.padSlots.some(index => ![...(navigator.getGamepads?.() || [])].some(p => p?.connected && p.index === index))) { this.setPause(true); this.toast('Manette déconnectée : reconnecte-la pour reprendre.'); }
     if (now - (this.lastCheckpoint || 0) > 1000) { this.lastCheckpoint = now; this.persistRun(); }
     if (now - (this.lastProgressSave || 0) > 200) { this.lastProgressSave = now; this.syncProgression(); }
     if (this.simulation && this.state && !this.state.paused) {
       this.accumulator = Math.min(.12, this.accumulator + dt);
-      while (this.accumulator >= STEP) { this.simulation.step([input]); this.accumulator -= STEP; }
+      while (this.accumulator >= STEP) { this.simulation.step([input, input2]); this.accumulator -= STEP; }
       this.state = this.simulation.state;
       if (this.state.chapter !== this.currentChapter && !['won', 'over'].includes(this.state.phase)) {
         this.simulation.pause(true, 'loading');

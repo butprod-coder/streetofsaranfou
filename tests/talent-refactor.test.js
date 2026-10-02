@@ -23,7 +23,7 @@ test('six campaign milestones, including KO partner, never stack on replays or X
     sim.state.chapter=chapter;sim.state.stage=stage;sim.state.players[1].hp=0;sim.clearStreet();sim.clearStreet();
     if(stage===2||stage===5)totals.push(sim.state.players[0].progression.points);
   }
-  assert.deepEqual(totals,[1,1,1,2,2,3,3,4,4,5,5,6]);
+  assert.deepEqual(totals,[1,2,2,3,3,4,4,5,5,6,6,6]);
   for(const p of sim.state.players){assert.equal(p.progression.points,6);assert.equal(addExperience(p.progression,10000).points,6);}
   sim.state.chapter=0;sim.state.stage=2;sim.clearStreet();assert.equal(sim.state.players[0].progression.points,6);
   assert.equal(new Simulation(['jo']).state.players[0].progression.points,1);

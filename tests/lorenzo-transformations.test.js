@@ -14,7 +14,7 @@ function arena(branch=0,rank=6){
 function run(sim,p,seconds,input={}){for(let t=0;t<seconds;t+=1/60){sim.state.time+=1/60;if(p.specialState)sim.updateSpecial(p,{...blankInput(),...input},1/60);sim.updateWorld(1/60);}}
 test('Lorenzo starts with one point and locks a six-rank branch across saves',()=>{
   let p=normalizeProfile({},'lorenzo');assert.equal(p.points,1);p=spendPoint(p,LORENZO_BRANCHES[1].nodes[0].id);assert.equal(p.points,0);
-  assert.equal(awardTalent(p,'street:0:0').points,0);assert.equal(awardTalent(p,'boss:0').points,0);
+  assert.equal(awardTalent(p,'street:0:0').points,0);assert.equal(awardTalent(p,'boss:0').points,1);
   for(const key of TRANSFORMATION_MILESTONES.slice(1))p=awardTalent(awardTalent(p,key),key);
   assert.equal(p.points,5);assert.equal(spendPoint(p,LORENZO_BRANCHES[0].nodes[0].id),null);
   for(const n of LORENZO_BRANCHES[1].nodes.slice(1))p=spendPoint(p,n.id);
@@ -30,7 +30,7 @@ test('all 18 Lorenzo ranks consume full energy and last 5/7/9 seconds without fr
   }
 });
 test('smoke persists, illusions attract enemies, bad trip damages another enemy',()=>{
-  const {sim,p,enemy}=arena(0,3),e=enemy(500),other=enemy(525);sim.activateSpecial(p);sim.updateLorenzoWorld(.01);
+  const {sim,p,enemy}=arena(0,3),e=enemy(500),other=enemy(525);e.id=200;other.id=201;sim.activateSpecial(p);sim.updateLorenzoWorld(.01);
   assert.ok(e.lorenzoConfused);const hp=other.hp;sim.updateLorenzoEnemy(e,.1);assert.ok(other.hp<hp);
   sim.updateLorenzoEnemy(other,.1);assert.match(String(other.lorenzoTarget),/illusion/);
   run(sim,p,.4,{punch:true});assert.ok(sim.state.lorenzoClouds.length>=2);

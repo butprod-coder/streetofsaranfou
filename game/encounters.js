@@ -13,7 +13,7 @@ export function createEnemyOrder(random = Math.random) {
   return order;
 }
 export function streetEnemyRoster(chapter, stage, order) {
-  return order.filter(id=>ENCOUNTER_ROSTER.includes(id)).slice(0, 3 + chapter * 6 + stage);
+  return [...ENCOUNTER_ROSTER];
 }
 export const activeEnemyLimit = (chapter, players = 1) => Math.min(5, 3 + Math.floor(chapter / 2)) + (players > 1 ? 2 : 0);
 // Serializable shuffle bag spans waves and streets. Each identity has equal frequency.
@@ -34,13 +34,6 @@ export function randomEnemyKinds(chapter, count, random = Math.random, bag = [],
 export function wavePlan(chapter, stage, players = 1, mode = 'normal', random = Math.random, bag = [], order = createEnemyOrder(random), district = chapter) {
   order=order.filter(id=>ENCOUNTER_ROSTER.includes(id));
   const roster = streetEnemyRoster(chapter, stage, order);
-  const newcomer = chapter * 6 + stage > 0 ? order[chapter * 6 + stage + 2] : null;
-  // Present the newly unlocked rival immediately, even if the previous bag is not empty.
-  if (newcomer) {
-    const index = bag.indexOf(newcomer);
-    if (index >= 0) bag.splice(index, 1);
-    bag.push(newcomer);
-  }
   const middleBosses=district===0&&stage===2;
   const fishingBoss=district===1&&stage===2;
   const stadiumBoss=district===2&&stage===2;

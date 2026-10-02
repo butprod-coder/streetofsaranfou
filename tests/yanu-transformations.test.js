@@ -14,7 +14,7 @@ function arena(branch=0,rank=6){
 }
 function run(sim,p,seconds,input={}){for(let t=0;t<seconds;t+=1/60){sim.state.time+=1/60;if(p.specialState)sim.updateSpecial(p,{...blankInput(),...input},1/60);sim.updateWorld(1/60);}}
 test('Yanu starts with one point, never doubles first reward and locks one branch across save',()=>{
-  let p=normalizeProfile({},'yanu');assert.equal(p.points,1);p=spendPoint(p,YANU_BRANCHES[1].nodes[0].id);assert.equal(awardTalent(p,'street:0:0').points,0);assert.equal(awardTalent(p,'boss:0').points,0);
+  let p=normalizeProfile({},'yanu');assert.equal(p.points,1);p=spendPoint(p,YANU_BRANCHES[1].nodes[0].id);assert.equal(awardTalent(p,'street:0:0').points,0);assert.equal(awardTalent(p,'boss:0').points,1);
   p=awardTalent(p,'boss:1');assert.equal(spendPoint(p,YANU_BRANCHES[0].nodes[0].id),null);
   const {sim}=arena(1);sim.state.phase='clear';assert.deepEqual(restoreCheckpoint(checkpoint(sim.snapshot())).state.players[0].progression,sim.state.players[0].progression);
 });

@@ -1,6 +1,8 @@
 import { BALANCE } from './balance.js';
 import { randomEnemyKinds, streetEnemyRoster } from './encounters.js';
 import { hasTalent } from './rogue-talents.js';
+import { streetAction } from './street-action.js';
+import { chainScenery } from './chain-scenery.js';
 
 export function surprisePlan(chapter, stage) {
   if (stage === 1) return chapter % 2 ? 'delivery' : 'car';
@@ -10,17 +12,32 @@ export function surprisePlan(chapter, stage) {
 
 // Like combat.js, these methods run on the authoritative, fixed-step simulation.
 export const streetEvents = {
+  ...chainScenery,
+  ...streetAction,
   makeProp(kind, x, y, extra = {}) {
     const hp = BALANCE.scenery[`${kind}Hp`] || 3;
-    return { id: this.nextId++, kind, x, y, hp, maxHp: hp, flash: 0, rubble: 0, ...extra };
+    return { id: extra.id ?? this.nextId++, kind, x, y, hp, maxHp: hp, flash: 0, rubble: 0, ...extra };
   },
   streetProps() {
-    const s = this.state, kind = ['crate', null, null, null, 'barrel', null][s.stage];
-    // Two occasional objects per chapter; other streets and boss arenas stay clear.
-    if (!kind) return [];
-    return [this.makeProp(kind, [790, 0, 875, 0, 735, 325][s.stage] + s.chapter % 2 * 35, s.stage === 2 ? 619 : 486, {
-      drop: kind === 'crate' ? 'food' : null,
-    })];
+    const s = this.state;
+    if (s.chapter >= 6 || s.stage >= 5 || s.practice || s.sandbox) return [];
+    // Two streets per district carry combat props; rotate them between districts.
+    if (![1, 3].includes((s.stage + s.chapter) % 5)) return [];
+    const pool = ['bin', 'bin', 'fuelDrum', 'fuelDrum', 'electricBox', 'hydrant', 'barrel', 'crate'];
+    const count = 1 + Math.floor(this.random() * 3), props = [];
+    for (let i = 0; i < count; i++) {
+      const kind = pool.splice(Math.floor(this.random() * pool.length), 1)[0];
+      let position;
+      for (let attempt = 0; attempt < 60; attempt++) {
+        const candidate = { x: Math.round(430 + this.random() * 670), y: Math.round(470 + this.random() * 150) };
+        if (props.every(p => Math.abs(p.x - candidate.x) >= 100 || Math.abs(p.y - candidate.y) >= 65)) { position = candidate; break; }
+      }
+      if (!position) continue;
+      props.push(this.makeProp(kind, position.x, position.y, { id: 920000 + s.chapter * 100 + s.stage * 10 + i,
+        ...(kind === 'bin' ? { hp: 4, maxHp: 4, vx: 0 } : kind === 'hydrant' ? { hp: 2, maxHp: 2 } : {}),
+        drop: kind === 'crate' ? this.random() < .65 ? 'food' : 'energy' : null }));
+    }
+    return props;
   },
   hitProp(prop, amount, source) {
     if (prop.hp <= 0 || (prop.kind === 'easel' && !prop.enemy)) return false;
@@ -38,10 +55,11 @@ export const streetEvents = {
     if (source?.specialState && hasTalent(source, 'Débris volants')) this.rogueBurst(source, prop.x, prop.y, 190, 1, 'DÉBRIS VOLANTS');
     if (prop.drop) this.state.pickups.push({ id: this.nextId++, x: prop.x, y: prop.y, kind: prop.drop });
     this.state.score += 50;
+    if (this.activateChainProp(prop, source)) return true;
     if (prop.kind === 'barrel') {
       const b = BALANCE.scenery;
       this.hazard(source, { x: prop.x, y: prop.y, kind: 'barrelBlast', enemy: false, both: true, bossOwner: false,
-        radius: b.explosionRadius, delay: b.explosionDelay, ttl: .18, damage: b.explosionDamage, propDamage: 3 });
+        radius: b.explosionRadius, delay: b.explosionDelay, ttl: .18, damage: b.explosionDamage, propDamage: 3, bypassShield: true });
       this.event('opening', { x: prop.x, y: prop.y - 115, label: 'RECULE !' });
     }
     return true;

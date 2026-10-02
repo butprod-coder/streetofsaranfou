@@ -62,7 +62,10 @@ export class Audio {
     if (['hit', 'explosion', 'thunder', 'special'].includes(event.type)) this.soundtrack?.duck();
     if (event.type === 'ultimate') { const root = [110,147,196][event.branch || 0]; this.tone(root,.5,.3,'sawtooth',0,root*2); this.hiss(.3,.12); }
     if (event.type === 'talent') { for (const [i, note] of [440, 554, 659, 880].entries()) this.tone(note, .32, .2, 'triangle', this.context?.currentTime + i * .09); }
-    if (event.type === 'hit') { this.tone(event.heavy ? 105 : 150, .12, .65, 'triangle', 0, 32); this.hiss(.07, event.heavy ? .22 : .12, 0, 650); }
+    if (event.type === 'hit') { this.tone(event.heavy ? 95 : 160, event.heavy ? .17 : .10, .55, 'triangle', 0, 30); this.hiss(event.heavy ? .10 : .055, event.heavy ? .25 : .15, 0, event.heavy ? 450 : 1100); if (event.finishing) this.tone(58, .22, .22, 'sine', 0, 24); }
+    else if (event.type === 'comboFinish') { this.tone(75, .25, .28, 'triangle', 0, 26); this.hiss(.14, .2, 0, 1800); }
+    else if (event.type === 'trafficWarning') { const now = this.context?.currentTime || 0; for (let i = 0; i < 2; i++) { this.tone(310, .22, .15, 'sawtooth', now + i * .4, 290); this.tone(390, .22, .10, 'triangle', now + i * .4, 370); } }
+    else if (event.type === 'binKick' || event.type === 'binCrash' || event.type === 'trafficImpact') { this.tone(event.type === 'binKick' ? 180 : 85, .18, .3, 'triangle', 0, 35); this.hiss(.17, .23, 0, 1450); }
     else if (event.type === 'swing' && !event.special) this.hiss(.07, .06, 0, 2200);
     else if(event.type==='gustavaxCharge'){this.tone(320,.13,.2,'sawtooth',0,650);this.tone(650,.18,.18,'triangle',(this.context?.currentTime||0)+.15,180);this.hiss(.3,.07,0,2400);}
     else if(event.type==='gustavaxCrash'){this.tone(85,.35,.4,'triangle',0,24);this.hiss(.25,.2,0,480);}
@@ -82,6 +85,10 @@ export class Audio {
     else if (event.type === 'clear') { this.tone(330, .3, .2); this.tone(440, .35, .15, 'triangle', this.context?.currentTime + .1); this.tone(660, .4, .15, 'triangle', this.context?.currentTime + .2); }
     else if (event.type === 'break') this.hiss(.15, .3, 0, 500);
     else if (event.type === 'gunshot') { this.hiss(.10, .3, 0, 2200); this.tone(105, .1, .32, 'triangle', 0, 35); }
+    else if (event.type === 'weaponExplosion') { this.tone(85, .45, .5, 'triangle', 0, 24); this.hiss(.45, .4, 0, 280); }
+    else if (event.type === 'heavyFire') { if (event.weapon === 'flamethrower') this.hiss(.5, .28, 0, 750); else if (event.weapon === 'bazooka') { this.hiss(.22, .3, 0, 1400); this.tone(120, .16, .25, 'triangle', 0, 45); } else this.tone(560, .07, .12, 'triangle'); }
+    else if (event.type === 'shieldBlock') this.tone(650, .09, .16, 'triangle', 0, 180);
+    else if (event.type === 'chainActivate') { this.hiss(event.kind === 'chainWater' ? .8 : .35, .24, 0, event.kind === 'chainWater' ? 1200 : 3000); if (event.kind === 'chainElectric') this.tone(95, .3, .18, 'sawtooth'); }
     else if (event.type === 'grab' || event.type === 'throw') this.hiss(.12, .18, 0, 1100);
     else if (event.type === 'equip') this.tone(610, .11, .16, 'triangle');
   }

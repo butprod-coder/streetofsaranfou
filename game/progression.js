@@ -4,7 +4,7 @@ import { BALANCE } from './balance.js';
 import { TALENTS, hasTalent } from './rogue-talents.js';
 export { TALENTS };
 export const TALENT_SAVE_KEY = 'saranfou-talents-v1';
-export const ATTRIBUTES = { vitality: 'Vitalité', strength: 'Force', mobility: 'Mobilité', endurance: 'Endurance', weapons: 'Maîtrise des armes' };
+export const ATTRIBUTES = { strength: 'Force', endurance: 'Endurance', attackSpeed: 'Vitesse de frappe', moveSpeed: 'Vitesse de déplacement', specialCharge: 'Recharge de spécial' };
 export const xpForLevel = level => Math.round(65 * (level - 1) ** 2 + 120 * (level - 1));
 const finite = (n, max) => Number.isFinite(n) ? clamp(Math.floor(n), 0, max) : 0;
 export const TALENT_MILESTONES = ['start', 'street:0:2', 'boss:0', 'street:1:2', 'boss:1', 'boss:2', 'boss:3', 'boss:4'];
@@ -22,15 +22,21 @@ export function canLearn(profile, node) {
 export function normalizeProfile(raw = {}, kind = raw?.kind || 'karonux') {
   kind = fighter(kind).id; raw ||= {};
   const completed = [...new Set(Array.isArray(raw.completed) ? raw.completed.filter(n => Number.isInteger(n) && n >= 0 && n < 6) : [])].sort();
-  const xp = finite(raw.xp, xpForLevel(20));
-  let level = 1; while (level < 20 && xp >= xpForLevel(level + 1)) level++;
-  const milestones = (usesTransformationTree(kind) ? TRANSFORMATION_MILESTONES : TALENT_MILESTONES).filter(key => key === 'start' || Array.isArray(raw.milestones) && raw.milestones.includes(key));
+  const xp = finite(raw.xp, Number.MAX_SAFE_INTEGER);
+  let level = Math.max(1, Math.floor((-120 + Math.sqrt(14400 + 260 * xp)) / 130) + 1);
+  while (xp >= xpForLevel(level + 1)) level++;
+  while (level > 1 && xp < xpForLevel(level)) level--;
+  const earned = new Set(Array.isArray(raw.milestones) ? raw.milestones : []);
+  // Preserve earned ranks when resuming a run made before the reward schedule changed.
+  if (raw.progressionVersion !== 2 && (earned.has('boss:5') || completed.includes(0))) earned.add('boss:0');
+  const milestones = (usesTransformationTree(kind) ? TRANSFORMATION_MILESTONES : TALENT_MILESTONES).filter(key => key === 'start' || earned.has(key));
   const total = milestones.length;
-  const p = { kind, xp, level, completed, milestones, talents: [], points: total, attributes: {}, statPoints: (level - 1) * 2 };
+  const p = { progressionVersion: 2, kind, xp, level, completed, milestones, talents: [], points: total, attributes: {}, statPoints: (level - 1) * 2 };
   const requested = new Set(Array.isArray(raw.talents) ? raw.talents : []);
   const firstBranch = usesTransformationTree(kind) ? TALENTS[kind].find(n => n.id === [...requested].find(id => TALENTS[kind].some(t => t.id === id)))?.branchIndex : undefined;
   for (const node of TALENTS[kind]) if ((firstBranch === undefined || node.branchIndex === firstBranch) && requested.has(node.id) && p.points > 0 && canLearn(p, node)) { p.talents.push(node.id); p.points--; }
-  for (const key of Object.keys(ATTRIBUTES)) { p.attributes[key] = Math.min(p.statPoints, finite(raw.attributes?.[key], 10)); p.statPoints -= p.attributes[key]; }
+  const attributes = { ...raw.attributes, endurance: (raw.attributes?.endurance || 0) + (raw.attributes?.vitality || 0), moveSpeed: raw.attributes?.moveSpeed ?? raw.attributes?.mobility };
+  for (const key of Object.keys(ATTRIBUTES)) { p.attributes[key] = Math.min(p.statPoints, finite(attributes[key], Number.MAX_SAFE_INTEGER)); p.statPoints -= p.attributes[key]; }
   return p;
 }
 export function addExperience(profile, amount) { const p = normalizeProfile(profile); return normalizeProfile({ ...p, xp: p.xp + finite(amount, 10000) }); }
@@ -42,18 +48,19 @@ export function spendPoint(profile, talent) {
 }
 export function spendAttribute(profile, key) {
   const p = normalizeProfile(profile);
-  if (!Object.hasOwn(ATTRIBUTES, key) || !p.statPoints || p.attributes[key] >= 10) return null;
+  if (!Object.hasOwn(ATTRIBUTES, key) || !p.statPoints) return null;
   return normalizeProfile({ ...p, attributes: { ...p.attributes, [key]: p.attributes[key] + 1 } });
 }
 export function bonuses(profile) {
   const p = normalizeProfile(profile), a = p.attributes;
-  const b = { life: 1 + a.vitality * .08, attack: 1 + a.strength * .07, defense: a.endurance * .015, special: 1, radius: 1, cooldown: 1, speed: 1 + a.mobility * .025, dodge: 1 - a.endurance * .025,
-    energyRegen: 1, duration: 0, sleepReduction: 0, blastHeal: 0, chargeSpeed: 1, fireDuration: 0, allyDuration: 0, allyRate: 1, food: 0, drink: 0, weaponPower: 1 + a.weapons * .08, stagger: 1 - a.endurance * .035 };
+  const b = { life: 1 + a.endurance * .08, attack: 1 + a.strength * .07, defense: 1 - 1 / (1 + a.endurance * .015), special: 1, radius: 1, cooldown: 1, speed: 1 + a.moveSpeed * .025, dodge: 1 / (1 + a.endurance * .025),
+    attackSpeed: 1 + a.attackSpeed * .05, energyPerHitBonus: a.specialCharge,
+    energyRegen: 1, duration: 0, sleepReduction: 0, blastHeal: 0, chargeSpeed: 1, fireDuration: 0, allyDuration: 0, allyRate: 1, food: 0, drink: 0, weaponPower: 1, stagger: 1 / (1 + a.endurance * .035) };
   for (const node of TALENTS[p.kind]) if (p.talents.includes(node.id)) for (const [key, value] of Object.entries(node.effects)) b[key] = (b[key] || 0) + value;
   const actor = { kind: p.kind, progression: p };
 
   if (hasTalent(actor, 'Pas de côté')) b.dodge *= .8;
-  b.defense = Math.min(.55, b.defense); b.speed = Math.min(1.55, b.speed); b.dodge = Math.max(.4, b.dodge); b.cooldown = Math.max(.45, b.cooldown);
+  b.defense = Math.min(.99, b.defense); b.dodge = Math.max(.01, b.dodge); b.cooldown = Math.max(.45, b.cooldown);
   return b;
 }
 export function refreshPlayerStats(player, proportionalHealth = false) {

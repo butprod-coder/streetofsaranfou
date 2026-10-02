@@ -6,6 +6,7 @@ export const rogueRun = {
     if (this.state.xpAwards.includes(key)) return;
     this.state.xpAwards.push(key);
     for (const p of this.state.players) {
+      if (!p.progression) continue;
       const level = p.progression.level, next = addExperience(p.progression, Math.round(amount * BALANCE.progression.xpMultiplier));
       applyProfile(p, next);
       if (next.level > level) this.event('talent', { actor: p.id, label: 'NIVEAU ' + next.level + ' · CARACTÉRISTIQUES · PAUSE' });

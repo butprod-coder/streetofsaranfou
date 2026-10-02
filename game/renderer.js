@@ -19,6 +19,9 @@ import { CLASSIC_SPRITES } from './classic-sprites.js';
 import { ENCORE_ELITES, ENCORE_RULES } from './elite-encore-data.js';
 import { streetDecor } from './scenery.js';
 import { WEAPONS, GRAPPLE } from './weapons.js';
+import { DYNAMIC_ENEMIES } from './dynamic-enemies-data.js';
+import { NEW_ENEMIES, NEW_SPRITE_IDS } from './new-enemies-data.js';
+import { CHAIN_PROPS } from './chain-scenery.js';
 import { xpForLevel } from './progression.js';
 import { drawNeighborhoodWorld, drawNeighborhoodChoices, drawNeighborhoodPanel, neighborhoodHint } from './neighborhood-renderer.js';
 import { drawCostumeEnemy, drawCostumeHazard } from './costume-renderer.js';
@@ -52,23 +55,33 @@ export class Renderer {
     const rect = this.canvas.getBoundingClientRect(); this.scale = Math.min(1.5, Math.max(1, rect.width / W * Math.min(devicePixelRatio, 1.5)));
     this.canvas.width = Math.round(W * this.scale); this.canvas.height = Math.round(H * this.scale);
   }
-  reset() { this.effects = []; this.seenEvent = 0; this.visual.clear(); this.street = ''; this.hudTime = 0; this.hudKey = ''; }
+  reset() { this.effects = []; this.seenEvent = 0; this.visual.clear(); this.street = ''; this.hudTime = 0; this.hudKey = ''; this.impactHold = 0; this.nextImpactHold = 0; }
   consume(state) {
     for (const e of state.events) {
       if (e.id <= this.seenEvent) continue;
       this.seenEvent = e.id; this.audio.effect(e);
       if (e.type === 'hit') {
-        this.shake = Math.max(this.shake, e.heavy ? 5 : 2.2);
+        this.shake = Math.max(this.shake, e.finishing ? 8 : e.heavy ? 6.5 : 2.8);
+        const now = performance.now();
+        if (!this.reducedMotion && now >= (this.nextImpactHold || 0)) { this.impactHold = now + (e.finishing ? 70 : e.heavy ? 55 : 30); this.nextImpactHold = now + 220; }
+        this.effects.push({ type: 'impactRing', x: e.x, y: e.y, heavy: e.heavy || e.finishing, ttl: .18, life: .18 });
         this.effects.push({ type: 'number', x: e.x, y: e.y - 20, text: String(e.amount), color: e.enemy ? '#ffe1a4' : '#ff8b8b', ttl: .7, life: .7 });
         for (let i = 0; i < (e.heavy ? 15 : 9); i++) {
           const angle = Math.random() * TAU, speed = 70 + Math.random() * 250;
           this.effects.push({ type: 'spark', x: e.x, y: e.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, ttl: .2 + Math.random() * .18, life: .4, color: i % 3 ? '#ffcd6e' : '#fff8df' });
         }
       }
+      if (e.type === 'comboFinish') {
+        this.shake = Math.max(this.shake, 7);
+        this.effects.push({ type: 'number', x: e.x, y: e.y - 15, text: `${e.label} · ×${e.multiplier.toFixed(2)}`, color: '#a4f0ea', ttl: 1, life: 1 });
+        this.effects.push({ ...e, type: 'comboBurst', y: e.y + 75, ttl: .3, life: .3 });
+      }
       if (e.type === 'special') { if (e.kind === 'thunder') this.effects.push({ type: 'announcement', text: e.label.toUpperCase(), color: '#bfeeff', ttl: .9, life: .9 }); else { this.shake = 7; this.effects.push({ ...e, type: 'special', ttl: .7, life: .7 }); } }
       if (e.type === 'thunder') this.shake = Math.max(this.shake, 5);
       if (e.type === 'ember') { this.shake = Math.max(this.shake, 2); this.effects.push({ ...e, type: 'ember', ttl: .48, life: .48 }); }
-      if (e.type === 'break') for (let i = 0; i < 10; i++) this.effects.push({ type: 'spark', x: e.x, y: e.y, vx: (Math.random() - .5) * 260, vy: -Math.random() * 200, ttl: .6, life: .6, color: '#d2a36c' });
+      if (e.type === 'break') { this.shake = Math.max(this.shake, e.broken ? 5 : 2); for (let i = 0; i < (e.broken ? 16 : 8); i++) this.effects.push({ type: 'spark', x: e.x, y: e.y, vx: (Math.random() - .5) * 300, vy: -Math.random() * 230, ttl: .6, life: .6, color: e.kind === 'bin' ? '#a4d2b0' : '#d2a36c' }); }
+      if (e.type === 'trafficWarning') this.effects.push({ type: 'announcement', text: e.label, color: '#ffb66e', y: 265, size: 22, ttl: 1.7, life: 1.7 });
+      if (['binKick', 'binCrash', 'trafficImpact', 'impact'].includes(e.type)) { this.shake = Math.max(this.shake, e.type === 'binKick' ? 3 : 7); this.effects.push({ type: 'impactRing', x: e.x, y: e.y, heavy: true, ttl: .24, life: .24 }); }
       if (e.type === 'dodge') this.effects.push({ ...e, type: 'dash', ttl: .32, life: .32 });
       if (e.type === 'skid') { this.shake = Math.max(this.shake, 3); this.effects.push({ ...e, type: 'dash', ttl: .45, life: .45 }); }
       if (e.type === 'golf') this.audio.effect({ ...e, type: 'skid' });
@@ -76,13 +89,15 @@ export class Renderer {
       if (e.type === 'explosion') { this.shake = 7; this.effects.push({ ...e, type: 'special', label: 'BOUM !', ttl: .5, life: .5 }); }
       if (e.type === 'pickup') this.effects.push({ type: 'number', x: e.x, y: e.y, text: e.kind === 'food' ? `+${e.amount ?? BALANCE.scenery.food} PV` : `+${e.amount ?? BALANCE.scenery.energy} ÉNERGIE`, color: '#98efc9', ttl: .9, life: .9 });
       if (e.type === 'equip') this.effects.push({ type: 'number', x: e.x, y: e.y, text: e.label.toUpperCase(), color: '#a5dbff', ttl: 1.1, life: 1.1 });
-      if (e.type === 'throw') this.shake = Math.max(this.shake, 3);
+      if (e.type === 'throw') { this.shake = Math.max(this.shake, 5); if (Number.isFinite(e.x) && Number.isFinite(e.y)) this.effects.push({ type: 'impactRing', x: e.x, y: e.y, heavy: true, ttl: .22, life: .22 }); }
       if (e.type === 'rogueFX') this.effects.push({ ...e, type: 'rogueFX', ttl: .45, life: .45 });
       if (e.type === 'gunshot') {
         this.effects.push({ ...e, type: 'shot', ttl: .22, life: .22 });
         this.effects.push({ type: 'spark', x: e.x - e.facing * 30, y: e.y, vx: -e.facing * 100, vy: -110, color: '#dcb56b', ttl: .35, life: .35 });
         if (e.weapon === 'shotgun') this.shake = Math.max(this.shake, 5);
       }
+      if (e.type === 'weaponExplosion') { this.shake = Math.max(this.shake, 10); this.effects.push({ ...e, type: 'weaponBlast', ttl: .65, life: .65 }); }
+      if (e.type === 'heavyFire' && e.weapon === 'bazooka') this.shake = Math.max(this.shake, 4);
       if (e.type === 'revive') this.effects.push({ type: 'number', x: e.x, y: e.y - 130, text: 'DEBOUT, POTO !', color: '#98efc9', ttl: 1.3, life: 1.3 });
       if (e.type === 'rage') this.effects.push({ type: 'announcement', text: e.label.toUpperCase(), color: '#ff8279', ttl: 2, life: 2 });
       if (e.type === 'ko' && e.boss) { this.shake = 8; this.effects.push({ type: 'announcement', text: 'LE PATRON EST À TERRE', color: '#ffe0a3', ttl: 2.6, life: 2.6 }); }
@@ -98,6 +113,8 @@ export class Renderer {
   }
   draw(state, dt, { online = false, slot = 0, input = {}, age = 0, ping = 0 } = {}) {
     const c = this.ctx;
+    // Presentation-only hit pause: shared simulation and network keep running.
+    if (state && !state.paused && !this.reducedMotion && performance.now() < (this.impactHold || 0)) return;
     document.body.classList.toggle('chapter-story', !!state && hasChapterIntro(state));
     c.setTransform(this.scale, 0, 0, this.scale, 0, 0); c.fillStyle = '#090d16'; c.fillRect(0, 0, W, H);
     if (!state) return;
@@ -106,6 +123,7 @@ export class Renderer {
     if (key !== this.street) { this.street = key; this.visual.clear(); this.effects = []; this.decor = streetDecor(state.chapter, state.stage); }
     this.consume(state);
     c.save();
+
     if (!this.reducedMotion && this.shake > .1 && !state.paused) c.translate((Math.random() - .5) * this.shake, (Math.random() - .5) * this.shake * .65);
     this.shake *= Math.exp(-dt * 16);
     const background = this.assets.get(CHAPTERS[state.chapter].backgrounds[state.stage]);
@@ -132,14 +150,16 @@ export class Renderer {
     drawNeighborhoodWorld(this, state); drawLorenzoWorld(this, state); drawJualosWorld(this, state); drawYanuWorld(this,state); drawKikorWorld(this,state); drawGustavaxWorld(this,state);
     for (const trail of state.karonuxTrails || []) this.arcadeSprite('karonuxFX', trail.x, trail.y, 8 + Math.floor(state.time * 6) % 4, 30);
     for (const p of state.props.filter(p => p.hp <= 0 && p.rubble > 0)) this.prop(p);
-    const entities = [...state.props.filter(p => p.hp > 0).map(p => ({ ...p, prop: true })), ...state.pickups.map(p => ({ ...p, pickup: true })), ...state.enemies, ...state.players, ...(state.allies || [])].sort((a, b) => a.y - b.y || Number(a.enemy) - Number(b.enemy));
+    this.drawStreetTrafficWarning(state);
+    const entities = [...state.props.filter(p => p.hp > 0).map(p => ({ ...p, prop: true })), ...(state.traffic?.warning <= 0 ? [{ ...state.traffic, trafficCar: true }] : []), ...state.pickups.map(p => ({ ...p, pickup: true })), ...state.enemies, ...state.players, ...(state.allies || [])].sort((a, b) => a.y - b.y || Number(a.enemy) - Number(b.enemy));
     for (const entity of entities) {
-      if (entity.scenery) this.scenery(entity);
+      if (entity.trafficCar) { this.ellipse(entity.x, entity.y, 113, 13, '#0008'); this.arcadeSprite('streetCar', entity.x, entity.y, Math.floor(entity.frame) % 3, 104, entity.facing); }
+      else if (entity.scenery) this.scenery(entity);
       else if (entity.prop) this.prop(entity);
       else if (entity.pickup) this.pickup(entity, state.time);
       else {
         let targetX = entity.x, targetY = entity.y;
-        if (online && entity.id === slot + 1 && entity.action !== 'dodge' && !entity.specialState && !entity.caughtBy && !entity.yanuFrozen && !entity.jualosSlip && !state.paused && ['fight', 'surprise', 'rest', 'clear'].includes(state.phase) && entity.hp > 0 && entity.stun <= 0) {
+        if (online && entity.id === slot + 1 && entity.action !== 'dodge' && !entity.specialState && !entity.caughtBy && !entity.yanuFrozen && !entity.jualosSlip && !(entity.groundGlueUntil > state.time) && !(entity.corruptedUntil > state.time) && !state.paused && ['fight', 'surprise', 'rest', 'clear'].includes(state.phase) && entity.hp > 0 && entity.stun <= 0) {
           const factor = (entity.attack ? .32 : 1) * (state.chapter === 2 && state.stadium?.boostStage === state.stage ? 1.15 : 1), norm = Math.max(1, Math.hypot(input.x || 0, input.y || 0));
           targetX = clamp(targetX + (input.x || 0) / norm * entity.speed * factor * Math.min(.13, age + ping / 2000), FLOOR.left, FLOOR.right);
           targetY = clamp(targetY + (input.y || 0) / norm * entity.speed * .68 * factor * Math.min(.13, age + ping / 2000), FLOOR.top, FLOOR.bottom);
@@ -157,9 +177,16 @@ export class Renderer {
       }
     }
     drawFinalSmoke(this,state);
+    this.drawWeaponProjectiles(state);
     drawNeighborhoodChoices(this, state);
     this.drawEffects(state.paused ? 0 : dt);
     c.fillStyle = this.vignette; c.fillRect(0, 0, W, H);
+    for (const p of state.players) {
+      if (!p.meleeChain || state.time > p.meleeChain.until || p.hp <= 0) continue;
+      c.save(); c.font = 'bold 12px monospace'; c.textAlign = 'center'; c.strokeStyle = '#07101b'; c.lineWidth = 4; c.fillStyle = p.id === 1 ? '#ffe09c' : '#83efff';
+      const label = `J${p.id} · ${p.meleeChain.steps.join(' › ')}`;
+      c.strokeText(label, clamp(p.x, 100, W - 100), p.y - p.z - 158); c.fillText(label, clamp(p.x, 100, W - 100), p.y - p.z - 158); c.restore();
+    }
     if (state.phase === 'surprise') this.surprisePanel(state);
     drawNeighborhoodPanel(this, state);
     if (state.combo > 1 && state.comboTime > 0) {
@@ -563,6 +590,14 @@ export class Renderer {
     if (h.kind === 'joArm') return; // The matching arm is rendered from the boss's attack clock.
     const c = this.ctx, warning = h.delay > 0, color = h.enemy || h.both ? '#ff696b' : '#83e6ca';
     c.save();
+    if (['chainBlast', 'chainElectric', 'chainWater', 'laneBullet'].includes(h.kind)) {
+      if (warning) { c.fillStyle = '#ff734733'; c.strokeStyle = '#ffad75'; c.lineWidth = 2; c.beginPath(); if (h.shape === 'line') c.rect(h.facing > 0 ? h.x : h.x - h.width, h.y - h.band, h.width, h.band * 2); else c.ellipse(h.x, h.y, h.radius, h.radius / 1.45, 0, 0, TAU); c.fill(); c.stroke(); }
+      else if (h.kind === 'chainElectric') this.arcadeSprite('chainScenery', h.x, h.y + 20, 7, 180 + Math.sin(time * 35) * 12);
+      else if (h.kind === 'chainWater') this.chainSprite(8, h.x + h.facing * h.width / 2, h.y - 45, h.width, 76 + Math.sin(time * 30) * 4, h.facing);
+      else if (h.kind === 'chainBlast') { /* The explosion event draws the burst once. */ }
+      else { c.strokeStyle = '#ffe49a'; c.lineWidth = 4; c.beginPath(); c.moveTo(h.x, h.y - 90); c.lineTo(h.x + h.facing * h.width, h.y - 90); c.stroke(); }
+      c.restore(); return;
+    }
     if(['harmelinPaper','harmelinPen'].includes(h.kind)){
       c.globalAlpha=.95;c.translate(h.x,h.y-18);c.rotate(Math.atan2(h.vy||0,h.vx||1));
       this.harmelinEffect(h.kind==='harmelinPen'?4:0,0,0,h.kind==='harmelinPen'?68:82,46);c.restore();return;
@@ -649,6 +684,19 @@ export class Renderer {
         if (h.kind === 'fire') { c.save(); c.translate(x, y); c.rotate(progress * 5 * h.facing); if (h.atlas) this.arcadeSprite(h.atlas, 0, 8, h.cell, 40); else this.fireSprite(Math.floor(time * 12) % 4, 0, 8, 40); c.restore(); }
         else { const image = this.assets.get(VISUALS.spit[2]); if (image) c.drawImage(image, 511, 17, 105, 110, x - 18, y - 22, 36, 38); }
       }
+    } else if (h.kind === 'yinyinCash') {
+      c.save(); c.translate(h.x,h.y-70); c.rotate(Math.sin(time*16)*.35);
+      c.fillStyle='#63b983';c.strokeStyle='#d4f5bc';c.lineWidth=2;c.fillRect(-18,-9,36,18);c.strokeRect(-18,-9,36,18);
+      c.fillStyle='#f1ffe0';c.font='bold 13px monospace';c.textAlign='center';c.fillText('€',0,5);c.restore();
+    } else if (h.kind === 'djeStretch') {
+      const from=h.x;
+      c.lineCap='round';c.strokeStyle='#292b33';c.lineWidth=17;c.beginPath();c.moveTo(from,h.y-85);c.lineTo(h.x+h.facing*h.width,h.y-85);c.stroke();
+      this.ellipse(h.x+h.facing*h.width,h.y-85,18,14,'#f0af69');
+    } else if (h.kind === 'wheelRush') {
+      c.strokeStyle='#bad8f1aa';c.lineWidth=3;
+      for(let i=0;i<3;i++){c.beginPath();c.moveTo(h.x-h.facing*90,h.y-28+i*12);c.lineTo(h.x-h.facing*18,h.y-28+i*12);c.stroke();}
+    } else if (h.kind === 'pipeStrike' || h.kind === 'panStrike') {
+      c.strokeStyle='#f5e4bba0';c.lineWidth=5;c.beginPath();c.ellipse(h.x+h.facing*45,h.y-60,75,42,0,-1.4,1.2);c.stroke();
     } else if (h.kind === 'streetBarrier') {
       c.globalAlpha = clamp(h.ttl / .25, .35, 1); this.classicFX(`street_${h.atlas}`, 12, h.x, h.y - 10, 76, h.vx < 0 ? -1 : 1);
     } else if (h.kind === 'cheesePuddle') {
@@ -656,7 +704,7 @@ export class Renderer {
     } else if (h.kind === 'mbkCharge') {
       c.globalAlpha = .75; this.classicFX('street_herve_mbk', 13, h.x - Math.sign(h.vx || 1) * 35, h.y + 4, 118);
     } else if (h.kind === 'streetProjectile') {
-      this.classicFX(`street_${h.atlas}`, h.cell ?? 9, h.x, h.y - 18, 54, h.vx < 0 ? -1 : 1);
+      this.classicFX(`street_${h.atlas}`, h.cell ?? 9, h.x, h.y - (h.renderHeight ?? 18), 54, h.vx < 0 ? -1 : 1);
     } else if (h.kind === 'huntingDog') {
       this.classicFX('street_titou', Math.floor((h.activeAge || 0) * 7) % 2 ? 10 : 9, h.x, h.y - 24, 112, h.vx < 0 ? -1 : 1);
     } else if (h.kind === 'streetPuddle') {
@@ -681,7 +729,7 @@ export class Renderer {
     } else if (h.kind === 'slime') {
       const image = this.assets.get(VISUALS.spit[2]);
       c.globalAlpha = clamp(h.ttl / .8, 0, 1); c.imageSmoothingEnabled = false;
-      if (image) c.drawImage(image, 345, 265, 394, 74, h.x - h.radius, h.y - h.radius * .32, h.radius * 2, h.radius * .64);
+      if (image) c.drawImage(image, 345, 302, 394, 37, h.x - h.radius, h.y - h.radius * .24, h.radius * 2, h.radius * .48);
     } else if (h.kind === 'golfImpact') {
       c.globalAlpha = clamp(h.ttl / .18, 0, 1); this.arcadeSprite('dash', h.x, h.y, 2, 72, h.facing);
     } else if (h.kind === 'thunder') {
@@ -733,12 +781,12 @@ export class Renderer {
       const miniLabel={cigarette:'MÉGOT EN APPROCHE',smoke:'NUAGE PERSISTANT',cough:'COUP DE TOUX',charge:'CHARGE TITUBANTE',bottle:'BOUTEILLE VOLANTE',whisky:'JET DE WHISKY'}[p.kind];
       c.fillStyle = p.healing ? '#a3ecc6' : '#ffab95'; c.font = 'bold 12px monospace'; c.textAlign = 'center'; c.fillText((p.kind === 'sleep' && p.hit ? 'IL DORT · +25 % DE DÉGÂTS' : miniLabel || PATTERN_LABELS[p.kind] || '').toUpperCase(), clamp(a.x, 180, 1100), a.y - 264 - (a.z || 0));
     }
-    if (a.recovering > 0 && !dead && (a.miniBoss || !a.shielded && !(a.sofa && !a.sofaBroken))) { c.fillStyle = '#b9f2ce'; c.font = 'bold 13px monospace'; c.textAlign = 'center'; c.fillText('VULNÉRABLE', a.x, a.y - (a.miniBoss?195:ELITES[a.kind]?.height || 176) - 52 - (a.z || 0)); }
+    if (a.recovering > 0 && !dead && (a.miniBoss || !a.shielded && !(a.sofa && !a.sofaBroken))) { c.fillStyle = '#b9f2ce'; c.font = 'bold 13px monospace'; c.textAlign = 'center'; c.fillText('VULNÉRABLE', a.x, a.y - (a.miniBoss?230:ELITES[a.kind]?.height || 176) - 52 - (a.z || 0)); }
     this.ellipse(a.x + 5, a.y + 3, dead ? 49 : a.boss ? 39 : 28, dead ? 11 : 9, '#02060aa6');
     if (!a.enemy && !dead) {
       c.strokeStyle = color; c.globalAlpha = .65; c.lineWidth = 1.6; c.beginPath(); c.ellipse(a.x, a.y + 2, 29, 9, 0, 0, TAU); c.stroke(); c.globalAlpha = 1;
     }
-    if (a.enemy && !dead && !a.boss) this.enemyBar(a);
+    if (a.enemy && !dead && !a.boss && !DYNAMIC_ENEMIES[a.kind]) this.enemyBar(a);
     if (a.enemy && !dead && a.karonuxFrost?.until > state.time) {
       this.arcadeSprite('karonuxFX', a.x, a.y, a.karonuxFrost.frozenUntil > state.time ? 6 : 4, a.boss ? 190 : 145);
       if (a.karonuxFrost.frozenUntil > state.time) return;
@@ -759,7 +807,7 @@ export class Renderer {
       if (form.charge > 0) c.fillText(`CHARGE ${Math.round(form.charge / 1.2 * 100)} %`, a.x, a.y - 200);
       return;
     }
-    if(a.miniBoss){this.drawMiniBoss(a,state);return;}
+    if(a.miniBoss){this.drawMiniBoss(a,state);if(!dead)this.enemyBar(a,220);return;}
     if(a.kind==='harmelinProviseur'){const c=this.ctx;c.save();if(a.hp<=0)c.globalAlpha=clamp((1.2-a.deadTime)/.4,0,1);this.arcadeSprite('miniBossProviseur',a.x,a.y-(a.z||0),a.hp<=0||a.stun>0?3:a.attack?2:a.moving?1:0,180,a.facing);c.restore();return;}
     if(a.harmelinRush){this.drawHarmelinStudent(a);return;}
     if(a.remySummon){this.drawRemySummon(a,state);return;}
@@ -777,6 +825,8 @@ export class Renderer {
     }
     let action = a.action;
     if (a.elite) { this.drawElite(a, state); return; }
+    if (DYNAMIC_ENEMIES[a.kind]) { this.drawDynamicEnemy(a, state); return; }
+    if ((a.enemy || a.recruit) && NEW_SPRITE_IDS.includes(a.kind)) { this.drawNewEnemy(a, state); return; }
     if ((a.enemy || a.recruit) && STREET_ENEMIES[a.kind]) { this.drawStreetEnemy(a, state); return; }
     if (!a.enemy && !dead && !a.specialState && this.drawInteraction(a, state)) return;
     if ((a.enemy || a.recruit) && !a.boss && CLASSIC_SPRITES[a.kind]) { this.drawClassic(a, state); return; }
@@ -882,19 +932,46 @@ export class Renderer {
         c.fillText(a.lives ? `À TERRE · ${Math.max(0, Math.ceil(14 - a.downTime))}s` : 'À TERRE', a.x, a.y - 48);
         if (state.players.length === 2) { c.fillStyle = '#f1eee7'; c.fillText('MAINTENIR E / LB', a.x, a.y - 31); }
         if (a.revive > 0) { c.fillStyle = '#183d36'; c.fillRect(a.x - 35, a.y - 22, 70, 4); c.fillStyle = '#9befca'; c.fillRect(a.x - 35, a.y - 22, 70 * a.revive / 1.7, 4); }
-      } else { c.fillText(a.id === slot + 1 ? `J${a.id} · TOI` : `J${a.id}`, a.x, a.y + 24); }
+      } else { c.fillText(a.id === slot + 1 ? `J${a.id} · TOI` : `J${a.id}`, a.x, a.y + 24);
+        if(a.groundGlueUntil>state.time){this.ellipse(a.x,a.y,34,10,'#a6d55ca0');c.fillStyle='#d5f697';c.fillText('SCOTCHÉ · SAUT / ESQUIVE',a.x,a.y-height-22);}
+        if(a.corruptedUntil>state.time){c.fillStyle='#9df4ad';c.fillText('CORROMPU · DIRECTIONS INVERSÉES',a.x,a.y-height-22);}
+      }
     }
   }
-  enemyBar(a) {
+  enemyBar(a, displayHeight) {
     const c = this.ctx, config = ELITES[a.kind] || ENEMIES[a.kind];
     const name = ELITES[a.kind]?.firstName || (a.kind === 'bolorouet' ? 'Julio' : config?.name?.split(' ·')[0]) || (a.kind === 'creation' ? 'Création' : fighter(a.kind).name);
-    const height = ELITES[a.kind]?.height || CLASSIC_SPRITES[a.kind]?.height || STREET_ENEMIES[a.kind]?.height || (a.boss ? 176 : a.kind === 'creation' ? 96 : 144);
+    const height = displayHeight || ELITES[a.kind]?.height || CLASSIC_SPRITES[a.kind]?.height || STREET_ENEMIES[a.kind]?.height || ENEMIES[a.kind]?.height || (a.boss ? 176 : a.kind === 'creation' ? 96 : 144);
     c.save(); c.font = 'bold 12px monospace'; c.textAlign = 'center';
     const width = Math.max(104, c.measureText(name).width + 22), x = clamp(a.x, width / 2 + 8, W - width / 2 - 8), y = a.y - height - (a.z || 0) - 34;
     c.fillStyle = '#080e19'; c.fillRect(x - width / 2 - 2, y - 2, width + 4, 24);
     c.fillStyle = '#293345'; c.fillRect(x - width / 2, y, width, 20);
     c.fillStyle = config?.color || '#ed968b'; c.fillRect(x - width / 2, y + 15, width * clamp(a.hp / a.maxHp, 0, 1), 5);
     c.fillStyle = '#ffffff'; c.fillText(name, x, y + 12); c.restore();
+  }
+  drawNewEnemy(a, state) {
+    const c=this.ctx, dead=a.hp<=0, p=a.newPattern, height=NEW_ENEMIES[a.kind]?.height||144;
+    c.save();
+    if(!dead)this.ellipse(a.x,a.y,29,8,'#0006');
+    if (!dead && p && !p.fired && p.kind!=='eat') {
+      c.fillStyle='#ff65562d'; c.strokeStyle='#ffbe87'; c.lineWidth=2;
+      const width=p.kind==='cash'?480:p.width;
+      c.beginPath(); c.rect(p.facing>0?a.x:a.x-width,p.targetY-p.band,width,p.band*2); c.fill(); c.stroke();
+    }
+    if(!dead && a.kind==='triso' && a.attack && !a.attack.hit){
+      c.fillStyle='#d4ee8e';c.font='bold 11px monospace';c.textAlign='center';c.fillText(a.attack.type==='special'?'BAVE · ÉVITE LA FLAQUE !':'COUP EN PRÉPARATION !',a.x,a.y-height-46);
+      if(a.attack.type==='special' && a.spitTarget){c.strokeStyle='#c2e877';c.lineWidth=2;c.beginPath();c.ellipse(a.spitTarget.x,a.spitTarget.y,BALANCE.triso.radius,BALANCE.triso.radius/1.45,0,0,TAU);c.stroke();}
+    }
+    let cell=Math.floor(state.time*3)%2;
+    if(a.moving)cell=2+Math.floor(state.time*8)%2;
+    if(a.attack){const base=a.attack.type==='special'?8:4;cell=base+Math.min(3,Math.floor(a.attack.elapsed/a.attack.duration*4));}
+    if(p)cell=(['pipe','pan'].includes(p.kind)?4:8)+(p.fired?2+Math.floor(state.time*6)%2:Math.min(1,Math.floor(p.elapsed/p.windup*2)));
+    if(a.stun>0)cell=12+Math.floor(state.time*8)%2;
+    if(dead){cell=a.deadTime<.25?14:15;c.globalAlpha=clamp((1.2-a.deadTime)/.4,0,1);}
+    if(a.flash>0)c.filter='brightness(2)';
+    this.arcadeSprite(`new_${a.kind}`,a.x,a.y-(a.z||0),cell,height,a.facing); c.filter='none';
+    if(!dead){this.enemyBar(a,height);if(a.recruit){c.fillStyle='#9ef5b6';c.font='bold 11px monospace';c.textAlign='center';c.fillText('ALLIÉ',a.x,a.y+22);}if(p){c.fillStyle=p.kind==='eat'?'#a6edbe':'#ffdfb3';c.font='bold 11px monospace';c.textAlign='center';c.fillText(p.kind==='eat'?'REPAS · INTERROMPS-LA !':p.fired?'':'CHANGE DE LIGNE !',a.x,a.y-height-46);}}
+    c.restore();
   }
   miniBossEffect(cell,x,y,width=90,height=65,facing=1){
     const asset=this.assets.arcadeFrame('miniBossFX',cell);if(!asset)return;
@@ -936,7 +1013,6 @@ export class Renderer {
     const p=a.pattern,cell=p?.kind==='harmelinClass'?7:p?.kind==='harmelinPaper'?(p.elapsed<p.windup?8:9):p?.kind==='harmelinPens'?(p.elapsed<p.windup?11:10):a.moving?4+Math.floor(state.time*8)%3:0;
     const c=this.ctx;c.save();if(a.hp<=0)c.globalAlpha=clamp((1.2-a.deadTime)/.4,0,1);else if(a.flash>0)c.filter='brightness(1.6)';
     this.arcadeSprite('miniBossHarmelin',a.x,a.y-(a.z||0),a.hp<=0?15:a.stun>0?12:cell,170,a.facing);c.restore();if(a.hp<=0)return;
-    c.textAlign='center';c.font='bold 11px monospace';c.fillStyle='#ffe8ca';c.fillText('MME HARMELIN',a.x,a.y-192);
   }
   drawHarmelinStudent(a){
     const number=Number(a.kind.slice(-1)),column=number-1,key=`miniBossHarmelinStudent${number}`,row=a.hp<=0?3:a.stun>0?2:a.moving?1:0,cell=row*4+column,c=this.ctx;
@@ -1080,9 +1156,44 @@ export class Renderer {
     if (q.landing > 0) { c.fillStyle = '#ffd376'; c.font = 'bold 14px monospace'; c.fillText('CANAPÉ EN APPROCHE !', clamp(a.x, 140, 1140), a.y - 30); }
   }
   weaponIcon(kind, x, y, width, facing = 1) {
-    const b = WEAPONS[kind], asset = b && this.assets.arcadeFrame('weaponItems', b.cell); if (!asset) return;
+    const b = WEAPONS[kind], asset = b && this.assets.arcadeFrame(b.atlas || 'weaponItems', b.cell); if (!asset) return;
     const c = this.ctx, [sx, sy, sw, sh] = asset.rect, w = width || b.width, h = w * sh / sw;
     c.save(); c.translate(x, y); c.scale(facing, 1); c.imageSmoothingEnabled = false; c.drawImage(asset.image, sx, sy, sw, sh, -w / 2, -h / 2, w, h); c.restore();
+  }
+  heavyWeaponSprite(cell, x, y, width, facing = 1) {
+    const asset = this.assets.arcadeFrame('heavyWeapons', cell); if (!asset) return;
+    const c = this.ctx, [sx, sy, sw, sh] = asset.rect, h = width * sh / sw;
+    c.save(); c.translate(x, y); c.scale(facing, 1); c.imageSmoothingEnabled = false; c.drawImage(asset.image, sx, sy, sw, sh, -width / 2, -h / 2, width, h); c.restore();
+  }
+  chainSprite(cell, x, y, width, height, facing = 1) {
+    const asset = this.assets.arcadeFrame('chainScenery', cell); if (!asset) return;
+    const c = this.ctx; c.save(); c.translate(x, y); c.scale(facing, 1); c.imageSmoothingEnabled = false; c.drawImage(asset.image, ...asset.rect, -width / 2, -height / 2, width, height); c.restore();
+  }
+  drawDynamicEnemy(a, state) {
+    const c = this.ctx, config = DYNAMIC_ENEMIES[a.kind], p = a.pattern, dead = a.hp <= 0;
+    c.save();
+    if (!dead && p) {
+      c.strokeStyle = '#ffab75'; c.fillStyle = '#ff594c35'; c.lineWidth = 2; c.beginPath();
+      if (a.kind === 'kamikaze') c.ellipse(a.x, a.y, 150, 150 / 1.45, 0, 0, TAU);
+      else if (a.kind === 'laneShooter') c.rect(p.facing > 0 ? a.x : a.x - 760, p.targetY - 18, 760, 36);
+      else c.rect(a.facing > 0 ? a.x : a.x - 115, a.y - 40, 115, 80);
+      c.fill(); c.stroke();
+      c.fillStyle = '#ffe4b2'; c.font = 'bold 12px monospace'; c.textAlign = 'center'; c.fillText(a.kind === 'kamikaze' ? `EXPLOSION ${(p.windup - p.elapsed).toFixed(1)} s` : a.kind === 'laneShooter' ? 'CHANGE DE LIGNE !' : 'BOUCLIER !', a.x, a.y - 212 - (a.z || 0));
+    }
+    if (dead) c.globalAlpha = clamp((1.2 - a.deadTime) / .4, 0, 1);
+    if (a.flash > 0) c.filter = 'brightness(2)';
+    this.arcadeSprite('dynamicEnemies', a.x, a.y - a.z, config.row * 4 + (dead ? 3 : p || a.attack ? 2 : a.moving ? 1 : 0), 144, a.facing);
+    c.filter = 'none';
+    if (!dead && a.kind === 'shieldGuard' && a.recovering > 0) { c.fillStyle = '#b9f2ce'; c.font = 'bold 10px monospace'; c.textAlign = 'center'; c.fillText('GARDE OUVERTE !', a.x, a.y + 26); }
+    c.restore();
+    if (!dead) this.enemyBar(a,144);
+  }
+  drawWeaponProjectiles(state) {
+    for (const shot of state.weaponProjectiles || []) {
+      if (shot.kind === 'rocket') { this.heavyWeaponSprite(6, shot.x - shot.facing * 55, shot.y - 88, 65); this.heavyWeaponSprite(3, shot.x, shot.y - 88, 76, shot.facing); }
+      else if (shot.kind === 'flame') { const w = 285 * (1 + Math.sin(shot.elapsed * 45) * .04); this.heavyWeaponSprite(4, shot.x + shot.facing * w / 2, shot.y - 72, w, shot.facing); }
+      else { this.ellipse(shot.x, shot.y, 18, 5, '#0006'); this.heavyWeaponSprite(2, shot.x, shot.y - (shot.z || 0) - 12, 27); if (shot.elapsed > .55) { this.ctx.fillStyle = '#ffcf72'; this.ctx.fillRect(shot.x - 3, shot.y - 35, 6, 6); } }
+    }
   }
   drawInteraction(a, state) {
     const g = a.grapple, pickup = a.interaction, attack = a.attack?.type === 'weapon' ? a.attack : null;
@@ -1095,12 +1206,23 @@ export class Renderer {
     const asset = this.assets.arcadeFrame(`actions_${a.kind}`, cell); if (!asset) return false;
     const c = this.ctx, height = 144 * (.94 + (a.y - FLOOR.top) / (FLOOR.bottom - FLOOR.top) * .12);
     c.save(); if (a.flash > 0) c.filter = 'brightness(2)';
-    if (b?.gun && !g && !pickup) {
+    if ((b?.gun || b?.projectile) && !g && !pickup) {
       this.weaponIcon(weapon, a.x + a.facing * (b.width * .3 + 40), a.y - a.z - height * (attack?.hit ? .73 : .68), b.width, a.facing);
     }
     this.arcadeSprite(`actions_${a.kind}`, a.x, a.y - a.z, cell, height, a.facing); c.restore();
     if (g && !g.throwing) { c.font = 'bold 11px monospace'; c.fillStyle = '#ffce83'; c.textAlign = 'center'; c.fillText('POING + ARRIÈRE · PROJETER', a.x, a.y - height - 16); }
     return true;
+  }
+  drawStreetTrafficWarning(state) {
+    const car = state.traffic; if (!car || car.warning <= 0) return;
+    const c = this.ctx; c.save();
+    c.fillStyle = '#ff7c3925'; c.fillRect(0, car.y - 36, W, 72);
+    c.strokeStyle = '#ffc078'; c.lineWidth = 2; c.setLineDash([18, 12]);
+    for (const y of [car.y - 36, car.y + 36]) { c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); }
+    c.setLineDash([]); c.fillStyle = '#ffe2a9'; c.textAlign = 'center'; c.font = 'bold 26px monospace';
+    for (let x = 85; x < W; x += 185) c.fillText(car.facing > 0 ? '››' : '‹‹', x, car.y + 8);
+    c.font = 'bold 13px monospace'; c.fillText(`VOITURE DANS ${car.warning.toFixed(1)} s · SAUTE OU CHANGE DE LIGNE`, W / 2, car.y - 46);
+    c.restore();
   }
   scenery(p) {
     const asset = this.assets.arcadeFrame(p.key); if (!asset) return;
@@ -1109,6 +1231,13 @@ export class Renderer {
     this.arcadeSprite(p.key, p.x, p.y, 0, p.height, p.facing || 1);
   }
   prop(p) {
+    if (CHAIN_PROPS[p.kind]) {
+      const c = this.ctx, b = CHAIN_PROPS[p.kind], broken = p.hp <= 0; c.save();
+      if (broken) c.globalAlpha = Math.min(.7, p.rubble / 2); if (p.flash > 0) c.filter = 'brightness(2)';
+      this.ellipse(p.x, p.y, 34, 8, '#0007'); this.arcadeSprite('chainScenery', p.x, p.y, b.cell + (broken || p.hp < p.maxHp ? 3 : 0), b.height);
+      c.filter = 'none'; if (!broken) { c.font = 'bold 10px monospace'; c.fillStyle = '#ffc68b'; c.textAlign = 'center'; c.fillText(b.name, p.x, p.y + 22); }
+      c.restore(); return;
+    }
     if (p.bourgTable) { drawBourgTable(this, p); return; }
     if (p.kind === 'sofa') {
       this.arcadeSprite('canape', p.x, p.y, p.hp > 3 ? 8 : 10, 128);
@@ -1126,8 +1255,9 @@ export class Renderer {
     this.ellipse(p.x + 3, p.y + 1, p.kind === 'car' ? 155 : 36, p.kind === 'car' ? 15 : 9, '#0008');
     if (p.bonus && !broken) { c.strokeStyle = '#8fefc8'; c.lineWidth = 2; c.beginPath(); c.ellipse(p.x, p.y + 2, p.kind === 'car' ? 167 : 43, 13, 0, 0, TAU); c.stroke(); }
     if (p.flash > 0) c.filter = 'brightness(1.7)';
-    this.arcadeSprite(p.kind, p.x + (p.flash > 0 ? Math.sin(p.flash * 90) * 3 : 0), p.y, frame);
+    this.arcadeSprite(p.kind === 'bin' ? 'streetBin' : p.kind, p.x + (p.flash > 0 ? Math.sin(p.flash * 90) * 3 : 0), p.y, frame);
     c.filter = 'none';
+    if (p.kind === 'bin' && !broken) { c.fillStyle = '#bef4cf'; c.font = 'bold 11px monospace'; c.textAlign = 'center'; c.fillText(Math.abs(p.vx || 0) > 35 ? 'ATTENTION DEVANT !' : 'COUP DE PIED · PROPULSER', p.x, p.y + 30); }
     if (!broken && p.hp < max) { c.fillStyle = '#12202b'; c.fillRect(p.x - 26, p.y + 15, 52, 4); c.fillStyle = '#ffcf7c'; c.fillRect(p.x - 26, p.y + 15, 52 * p.hp / max, 4); }
     c.restore();
   }
@@ -1193,6 +1323,9 @@ export class Renderer {
       e.ttl -= dt;
       if (e.ttl <= 0) continue;
       c.save(); c.globalAlpha = clamp(e.ttl / (e.life * .5), 0, 1);
+      if (e.type === 'weaponBlast') { const t = 1 - e.ttl / e.life, size = e.radius * (1 + t * .6); if (e.atlas === 'chainScenery' && t < .65) this.chainSprite(6, e.x, e.y, size, size * .85); else this.heavyWeaponSprite(t < .25 ? 5 : t < .65 ? 7 : 8, e.x, e.y, size); }
+      if (e.type === 'impactRing') { const t = 1 - e.ttl / e.life; c.strokeStyle = '#fff2c1'; c.lineWidth = (e.heavy ? 7 : 4) * (1 - t); c.beginPath(); c.ellipse(e.x, e.y, 8 + t * (e.heavy ? 65 : 36), 6 + t * 28, 0, 0, TAU); c.stroke(); }
+      if (e.type === 'comboBurst') { const t = 1 - e.ttl / e.life; c.translate(e.x, e.y); c.scale(e.facing || 1, 1); c.strokeStyle = '#93f4f1'; c.lineWidth = 8 * (1 - t); c.beginPath(); c.moveTo(-45, 20); c.quadraticCurveTo(70 + t * 140, -85, 130 + t * 100, 5); c.stroke(); }
       if (e.type === 'shot') {
         const progress = 1 - e.ttl / e.life, spread = e.weapon === 'shotgun' ? 5 : 1;
         c.translate(e.x, e.y); c.scale(e.facing, 1); c.globalCompositeOperation = 'lighter';
@@ -1225,7 +1358,7 @@ export class Renderer {
         c.beginPath(); c.ellipse(e.x, e.y - 30, 45 + progress * 230, 20 + progress * 75, 0, 0, TAU); c.stroke();
         c.globalCompositeOperation = 'source-over'; c.font = 'italic 23px Impact, sans-serif'; c.fillStyle = '#ffe7ba'; c.textAlign = 'center'; c.fillText(e.label.toUpperCase(), clamp(e.x, 180, W - 180), e.y - 190 - progress * 12);
       }
-      if (e.type === 'announcement') { c.textAlign = 'center'; c.font = '32px Impact, sans-serif'; c.fillStyle = e.color; c.fillText(e.text, W / 2, 210); }
+      if (e.type === 'announcement') { c.textAlign = 'center'; c.font = `${e.size || 32}px Impact, sans-serif`; c.fillStyle = e.color; c.fillText(e.text, W / 2, e.y || 210); }
       c.restore();
     }
     this.effects = this.effects.filter(e => e.ttl > 0);
@@ -1262,8 +1395,8 @@ export class Renderer {
       el.querySelector('.special-caption').textContent = specialState;
       if (!el.querySelector('.weapon-caption')) el.querySelector('.player-bars').insertAdjacentHTML('beforeend', '<span class="weapon-caption"></span>');
       const weapon = p.weapon && WEAPONS[p.weapon.kind];
-      el.querySelector('.weapon-caption').textContent = weapon ? `${weapon.name.toUpperCase()} · ${p.weapon.uses} ${weapon.gun ? 'MUNITIONS' : 'COUPS'} · J / X` : 'CONTACT · PRISE   POING + ARRIÈRE · PROJECTION';
-      if (r) { const progress = r.level === 20 ? 1 : (r.xp - xpForLevel(r.level)) / (xpForLevel(r.level + 1) - xpForLevel(r.level)); el.querySelector('.talent-caption').innerHTML = `<span>NIV. ${r.level}</span><span class="xp-track"><i style="width:${Math.round(progress * 100)}%"></i></span>${p.rogueDebt != null ? `<span>RIPOSTE ${Math.round(p.rogueDebt / (p.power * 2) * 100)}%</span>` : ''}${p.rogueRhythm != null ? `<span>RYTHME ${p.rogueRhythm}/3</span>` : ''}${p.rogueInstinctGauge != null ? `<span>INSTINCT ${p.rogueInstinctGauge}/3</span>` : ''}`; }
+      el.querySelector('.weapon-caption').textContent = weapon ? `${weapon.name.toUpperCase()} · ${p.weapon.uses} ${(weapon.gun || weapon.projectile) ? 'MUNITIONS' : 'COUPS'} · J / X` : 'CONTACT · PRISE   POING + ARRIÈRE · PROJECTION';
+      if (r) { const progress = (r.xp - xpForLevel(r.level)) / (xpForLevel(r.level + 1) - xpForLevel(r.level)); el.querySelector('.talent-caption').innerHTML = `<span>NIV. ${r.level}</span><span class="xp-track"><i style="width:${Math.round(progress * 100)}%"></i></span>${p.rogueDebt != null ? `<span>RIPOSTE ${Math.round(p.rogueDebt / (p.power * 2) * 100)}%</span>` : ''}${p.rogueRhythm != null ? `<span>RYTHME ${p.rogueRhythm}/3</span>` : ''}${p.rogueInstinctGauge != null ? `<span>INSTINCT ${p.rogueInstinctGauge}/3</span>` : ''}`; }
     }
     const progression = s.players[slot]?.progression;
     const stats = progression?.statPoints || 0, talents = progression?.points || 0;

@@ -49,12 +49,13 @@ test('Lorenzo throws three cigarettes, leaves finite fire and never hurts teamma
   assert.ok(g.state.hazards.every(h=>!h.enemy));
   run(g, 4.5); assert.equal(g.state.hazards.filter(h => h.kind === 'fire').length, 0);
 });
-test('Triso locks his target before spitting; puddles can be jumped and expire', () => {
+test('Triolo locks his target before spitting; puddles can be jumped and expire', () => {
   const { g, p } = arena('jo'); g.state.enemies = [];
   const triso = g.spawnEnemy('triso', { x: p.x + 250, y: p.y, cooldown: 0, invincible: 0 });
   g.step(); assert.equal(triso.attack.type, 'special'); const target = { ...triso.spitTarget }; p.x += 120;
   run(g, 1.1); const puddle = g.state.hazards.find(h => h.kind === 'slime'); assert.ok(puddle); assert.equal(puddle.x, target.x); assert.equal(puddle.y, target.y);
   triso.cooldown = 999; p.x = puddle.x; p.y = puddle.y; p.z = 100; p.vz = 0; const hp = p.hp;
   puddle.delay = 0; g.updateWorld(STEP); assert.equal(p.hp, hp); p.z = 0; p.invincible = 0; g.updateWorld(STEP); assert.ok(p.hp < hp);
-  p.invincible = 999; run(g, 5); assert.ok(!g.state.hazards.some(h => h.kind === 'slime'));
+  p.invincible = 999; run(g, 5); assert.ok(g.state.hazards.includes(puddle));
+  run(g, 4); assert.ok(!g.state.hazards.some(h => h.kind === 'slime'));
 });

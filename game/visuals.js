@@ -5,6 +5,7 @@ import { ENCORE_ELITES } from './elite-encore-data.js';
 import { SCENERY_SPRITES } from './scenery.js';
 import { HERO_ACTION_SPRITES } from './weapons.js';
 import { STREET_ENEMIES } from './street-enemies-data.js';
+import { NEW_ENEMIES, NEW_SPRITE_IDS } from './new-enemies-data.js';
 // Explicit pixel bounds for irregular generated sheets; normalize once for the atlas loader.
 const atlasCells = (width, height, cells) => cells.map(rect => rect.map((v, i) => v / (i % 2 ? height : width)));
 // Keep extended hands, prone bodies and detached FX inside their atlas region.
@@ -86,6 +87,20 @@ export const VISUALS = {
   spit: frames('/assets/enemies/triso/triso_special', 3),
 };
 export const ARCADE_SPRITES = {
+  ...Object.fromEntries(NEW_SPRITE_IDS.map(id => [`new_${id}`, {
+    file:id, folder:'enemies/new', cols:4, rows:4, height:NEW_ENEMIES[id]?.height || 144, cleanComponents:true,
+    rowCuts: {yinyin:[0,.265,.525,.758,1],caro:[0,.255,.51,.76,1],dje:[0,.285,.535,.775,1],karmoilefion:[0,.265,.525,.755,1],triso:[0,.255,.5,.735,1]}[id],
+    cells: {
+      yinyin:{5:[.25,.265,.535,.525],6:[.5,.265,.79,.525],10:[.475,.525,.79,.758],14:[.475,.758,.72,1],15:[.68,.758,1,1]},
+      caro:{5:[.25,.255,.54,.51],6:[.5,.255,.78,.51],14:[.48,.76,.75,1],15:[.70,.76,1,1]},
+      dje:{5:[.25,.285,.525,.535],10:[.5,.535,.78,.775]},
+      karmoilefion:{14:[.5,.755,.77,1]},
+      triso:{5:[.25,.255,.535,.5],14:[.475,.735,.75,1],15:[.71,.735,1,1]},
+    }[id],
+  }])),
+  chainScenery: { file: 'chain-scenery-v1', cols: 3, rows: 3, height: 80 },
+  dynamicEnemies: { file: 'dynamic-enemies-v1', cols: 4, rows: 3, height: 144, cleanComponents: true },
+  heavyWeapons: { file: 'heavy-weapons-v1', cols: 3, rows: 3, height: 80 },
   miniBossDamps:{cells:{4:[0,.245,.29,.50],5:[.29,.245,.53,.50],9:[.255,.50,.53,.755],10:[.50,.50,.80,.755],13:[.225,.755,.49,1],14:[.49,.755,.78,1],15:[.745,.755,1,1]},file:'damps',folder:'boss/mini_chene',cols:4,rows:4,height:195,rowCuts:[0,.245,.50,.755,1],cleanComponents:true},
   miniBossCainri:{file:'cainri',folder:'boss/mini_chene',cols:4,rows:4,height:195,rowCuts:[0,.255,.505,.755,1],cleanComponents:true,rowColumns:{1:[0,.25,.5,.75,1],2:[0,.25,.5,.75,1],3:[0,.26,.51,.76,1]}},
   miniBossJalatrix:{cells:{4:[0,.25,.28,.5],5:[.275,.25,.565,.5],6:[.555,.25,.815,.5],7:[.82,.25,1,.5],13:[.255,.75,.53,1],14:[.53,.75,.82,1],15:[.775,.73,1,1]},file:'jalatrix',folder:'boss/chateau_etang',cols:4,rows:4,height:165,rowCuts:[0,.25,.5,.75,1],cleanComponents:true},
@@ -175,6 +190,8 @@ export const ARCADE_SPRITES = {
   crate: { file: 'crate', cols: 3, rows: 1, height: 78 },
   barrel: { file: 'barrel', cols: 3, rows: 1, height: 98 },
   bin: { file: 'bin', cols: 3, rows: 1, height: 111 },
+  streetBin: { file: 'street-action-v1', cols: 3, rows: 1, height: 106, cells: [[0, 0, 1/3, .58], [1/3, 0, 2/3, .58], [2/3, 0, 1, .58]] },
+  streetCar: { file: 'street-action-v1', cols: 3, rows: 1, height: 104, cells: [[0, .58, 1/3, 1], [1/3, .58, 2/3, 1], [2/3, .58, 1, 1]] },
   car: { file: 'bonus-car', cols: 1, rows: 3, height: 145 },
   food: { file: 'food', cols: 1, rows: 1, height: 32 },
   energy: { file: 'energy', cols: 1, rows: 1, height: 38 },

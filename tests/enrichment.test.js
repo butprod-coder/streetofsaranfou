@@ -63,12 +63,12 @@ test('chapter talents are shared in duo, independent by fighter and spend only i
   assert.ok(g.spendStat(0, 'gustavax_v3_0_0')); g.spawnWave(); assert.equal(g.spendStat(0, 'gustavax_v3_0_1'), false);
   g.pause(true); assert.ok(g.spendStat(0, 'gustavax_v3_0_1')); assert.equal(g.spendStat(1, 'gustavax_v3_0_1'), false);
   g.awardChapterTalent(); g.awardChapterTalent();
-  assert.deepEqual(g.state.players.map(p => p.progression.points), [0, 1]);
+  assert.deepEqual(g.state.players.map(p => p.progression.points), [1, 2]);
   const profiles = g.state.players.map(p => structuredClone(p.progression));
   const enemy = g.state.enemies[0]; g.damage(enemy, 999, g.state.players[0], true);
   assert.deepEqual(g.state.players.map(p => p.progression.talents), profiles.map(p => p.talents));
   assert.ok(g.state.players.every((p,i) => p.progression.xp > profiles[i].xp));
-  assert.equal(g.state.events.filter(e => e.type === 'talent' && e.label.startsWith('CHAPITRE')).length, 0);
+  assert.equal(g.state.events.filter(e => e.type === 'talent' && e.label.startsWith('CHAPITRE')).length, 2);
   assert.ok(!g.state.events.some(e => ['xp', 'levelup'].includes(e.type)));
 });
 test('every boss has monotonic visible phases, different patterns and recovery windows', () => {
@@ -118,14 +118,14 @@ test('Kikor creates one protector, becomes vulnerable on its death, and cleans o
 });
 test('attributes preserve missing health, cannot resurrect, and reduce incoming damage', () => {
   const g = new Simulation(['gustavax']), p = g.state.players[0]; p.hp=30;
-  applyProfile(p,{xp:xpForLevel(6),attributes:{endurance:10}});assert.equal(p.hp,30);
-  const before=p.hp;g.damage(p,20,{x:0,facing:1},false);assert.equal(before-p.hp,14);
+  applyProfile(p,{xp:xpForLevel(6),attributes:{endurance:10}});assert.equal(p.maxHp-p.hp,155-30);
+  const before=p.hp;g.damage(p,20,{x:0,facing:1},false);assert.equal(before-p.hp,Math.round(20 * .85/(1+10*.015)));
   p.hp=0;applyProfile(p,p.progression);assert.equal(p.hp,0);
 });
-test('last district boss awards its point only once', () => {
+test('last district boss grants no extra talent beyond level five', () => {
   const g=new Simulation(['gustavax'],5);g.state.stage=4;g.clearStreet();assert.equal(g.state.players[0].progression.points,1);
-  g.state.stage=5;g.clearStreet();assert.equal(g.state.players[0].progression.points,2);
-  g.clearStreet();assert.equal(g.state.players[0].progression.points,2);assert.deepEqual(g.state.players[0].progression.completed,[5]);
+  g.state.stage=5;g.clearStreet();assert.equal(g.state.players[0].progression.points,1);
+  g.clearStreet();assert.equal(g.state.players[0].progression.points,1);assert.deepEqual(g.state.players[0].progression.completed,[5]);
 });
 test('Gustavax can move, punch and slam in wrestler form, then returns to ordinary combat', () => {
   const g = new Simulation(['gustavax']), p = g.state.players[0]; g.spawnWave(); g.state.spawnQueue = []; g.state.enemies = [];

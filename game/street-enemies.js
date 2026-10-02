@@ -74,7 +74,7 @@ export const streetEnemies = {
     } else if (p.kind === 'pistolShot') {
       const dx = p.targetX - e.x, dy = p.targetY - e.y, length = Math.max(1, Math.hypot(dx, dy));
       this.hazard(e, { kind: 'streetProjectile', atlas: e.kind, cell: 12, shape: 'line', width: 620, band: 13,
-        x: e.x + e.facing * 18, y: p.targetY, facing: e.facing, delay: 0, ttl: .16, pulse: 1, damage: e.power,
+        x: e.x + e.facing * 65, y: e.y, renderHeight: 114, facing: e.facing, delay: 0, ttl: .16, pulse: 1, damage: e.power,
         vx: dx / length * 750, vy: dy / length * 750 });
     } else if (p.kind === 'raclettePan') {
       this.hazard(e, { kind: 'streetFX', atlas: e.kind, cell: 15, shape: 'line', width: 150, band: 46,

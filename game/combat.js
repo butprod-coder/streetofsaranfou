@@ -13,6 +13,9 @@ import { jualosTransformations } from './jualos-transformations.js';
 import { yanuTransformations } from './yanu-transformations.js';
 import { joTransformations } from './jo-transformations.js';
 import { kikorTransformations } from './kikor-transformations.js';
+import { meleeCombos } from './melee-combos.js';
+import { dynamicCombat } from './dynamic-combat.js';
+import { newEnemies } from './new-enemies.js';
 const SIGNATURES = { karonux: 'rainbowStorm', kikor: 'preciousHunt', yanu: 'kayakRush', lorenzo: 'sofaDrop', jo: 'ferretHunt', gustavax: 'finalRing' };
 const live = a => a.hp > 0;
 const distance = (a, b) => Math.hypot(a.x - b.x, (a.y - b.y) * 1.4);
@@ -20,6 +23,9 @@ const nearest = (a, actors) => actors.filter(live).sort((x, y) => distance(a, x)
 
 /** Serializable combat extensions, stepped exclusively by the shared simulation. */
 export const combat = {
+  ...newEnemies,
+  ...dynamicCombat,
+  ...meleeCombos,
   ...ultimateSpecials,
   ...golfCombat,
   ...karonuxTransformations,
@@ -67,6 +73,8 @@ export const combat = {
       if (h.bossOwner && !s.enemies.some(e => e.id === h.owner && live(e))) { h.ttl = 0; continue; }
       h.age += dt;
       if (h.delay > 0) { h.delay -= dt; continue; }
+      if (h.kind === 'chainBlast' && !h.exploded) { h.exploded = true; this.event('weaponExplosion', { x: h.x, y: h.y - 45, radius: h.radius, atlas: 'chainScenery' }); }
+      if (['chainElectric', 'chainWater'].includes(h.kind) && !h.exploded) { h.exploded = true; this.event('chainActivate', { kind: h.kind, x: h.x, y: h.y - 60 }); }
       if (h.kind === 'barrelBlast' && !h.exploded) { h.exploded = true; this.event('explosion', { x: h.x, y: h.y }); }
       if (h.kind === 'lorenzoRing' && !h.ignited) { h.ignited = true; this.event('ember', { x: h.x, y: h.y, radius: 16 }); }
       const ignition = h.kind === 'fire' && !h.ignited;
@@ -94,15 +102,23 @@ export const combat = {
         const distance = Math.hypot(dx, dy * (h.verticalScale || 1.45));
         const hit = h.shape === 'ring' ? distance >= h.previousRadius - h.thickness && distance <= h.radius + h.thickness : h.shape === 'line' ? dx * h.facing >= -25 && dx * h.facing <= h.width && Math.abs(dy) < h.band : distance < h.radius;
         if (hit) {
-          this.damage(target, Math.round(ignition ? h.ignitionDamage || h.damage : h.damage), source, true);
+          this.damage(target, Math.round(ignition ? h.ignitionDamage || h.damage : h.damage), h.bypassShield ? { ...source, x: h.x, y: h.y, areaDamage: true } : source, true);
           if (h.knockback && target.hp > 0) { target.vx = (Math.sign(dx) || h.facing || 1) * h.knockback; target.stun = Math.max(target.stun || 0, .18); }
           if (h.electric && target.hp > 0) target.electrifiedUntil = s.time + .85;
           if (h.sticky && target.hp > 0 && !target.sticky) target.sticky = { owner: h.kind === 'cheesePuddle' ? null : h.owner, remaining: 1.25, rooted: h.kind !== 'cheesePuddle' };
           if (h.stunDuration && target.hp > 0) target.stun = Math.max(target.stun, h.stunDuration);
+          if (h.groundGlue && target.hp > 0 && !target.enemy && s.time >= (target.glueImmuneUntil || 0)) {
+            target.groundGlueUntil = s.time + .9; target.glueImmuneUntil = s.time + 2.6;
+            this.event('opening', { x: target.x, y: target.y - 175, label: 'SCOTCHÉ · SAUT / ESQUIVE !' });
+          }
+          if (h.corrupt && target.hp > 0 && !target.enemy && s.time >= (target.corruptImmuneUntil || 0)) {
+            target.corruptedUntil = s.time + 1.8; target.corruptImmuneUntil = s.time + 4;
+            this.event('opening', { x: target.x, y: target.y - 175, label: 'CORROMPU · DIRECTIONS INVERSÉES !' });
+          }
           h.hits[target.id] = s.time + h.pulse;
         }
       }
-      if (h.damage > 0) for (const prop of s.props.filter(p => (!h.enemy || p.bourgTable) && !(p.kind === 'easel' && !p.enemy))) {
+      if (h.damage > 0) for (const prop of s.props.filter(p => (!h.enemy || h.both || p.bourgTable) && !(p.kind === 'easel' && !p.enemy))) {
         const key = `prop${prop.id}`;
         if (prop.hp > 0 && !h.hits[key] && intersects(prop)) { this.hitProp(prop, h.propDamage || 2, source); h.hits[key] = 1; }
       }

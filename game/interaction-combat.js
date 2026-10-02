@@ -2,9 +2,11 @@ import { FLOOR, clamp } from './data.js';
 import { WEAPONS, WEAPON_IDS, GRAPPLE } from './weapons.js';
 import { HEAVY_ENEMIES } from './weapons.js';
 import { hasTalent } from './rogue-talents.js';
+import { heavyWeapons } from './heavy-weapons.js';
 
 const near = (a, b, range, band) => Math.abs(a.x - b.x) <= range && Math.abs(a.y - b.y) <= band;
 export const interactionCombat = {
+  ...heavyWeapons,
   streetWeapons() {
     const s = this.state;
     if (![0, 2, 4].includes(s.stage)) return [];
@@ -107,13 +109,19 @@ export const interactionCombat = {
     const w = p.weapon, b = w && WEAPONS[w.kind];
     if (!b || w.uses <= 0 || p.z > 0 || p.specialState) return false;
     p.action = 'weapon'; p.actionTime = 0; p.comboStep = 0;
-    p.attack = { type: 'weapon', weapon: w.kind, elapsed: 0, windup: b.windup, duration: b.duration, hit: false, heavy: true };
-    p.cooldown = b.duration + .02; return true;
+    const speed = p.bonuses.attackSpeed || 1;
+    p.attack = { type: 'weapon', weapon: w.kind, elapsed: 0, windup: b.windup / speed, duration: b.duration / speed, hit: false, heavy: true };
+    p.cooldown = (b.duration + .02) / speed; return true;
   },
   resolveWeaponAttack(p) {
     const kind = p.attack.weapon, b = WEAPONS[kind];
     if (!b || p.weapon?.kind !== kind || p.weapon.uses <= 0) return;
     p.weapon.uses--;
+    if (b.projectile) {
+      this.fireHeavyWeapon(p, kind);
+      if (p.weapon.uses <= 0) { p.weapon = null; this.event('equip', { actor: p.id, x: p.x, y: p.y - 125, label: 'PLUS DE MUNITIONS' }); }
+      return;
+    }
     const targets = this.state.enemies.filter(e => e.hp > 0 && e.invincible <= 0 && e.z < 40 &&
       (e.x - p.x) * p.facing >= -18 && (e.x - p.x) * p.facing <= b.range && Math.abs(e.y - p.y) <= b.band)
       .sort((a, z) => Math.abs(a.x - p.x) - Math.abs(z.x - p.x));

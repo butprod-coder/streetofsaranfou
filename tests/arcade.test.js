@@ -31,7 +31,7 @@ test('dodge tap counters survive released network input; brief recovery buffers 
   assert.equal(g.state.events.filter(e => e.type === 'dodge').length, 1);
 });
 test('scenery has damage stages, drops once and can be broken by specials', () => {
-  const g = arena(), p = g.state.players[0], crate = g.state.props.find(p => p.kind === 'crate');
+  const g = arena(), p = g.state.players[0], crate = g.makeProp('crate', 700, 540, { drop: 'food' }); g.state.props = [crate];
   g.hitProp(crate, 1, p); assert.equal(crate.hp, crate.maxHp - 1);
   g.hitProp(crate, 9, p); g.hitProp(crate, 9, p);
   assert.equal(g.state.pickups.filter(p => p.kind === 'food').length, 1); assert.ok(crate.rubble > 0);

@@ -53,7 +53,7 @@ export const THEME_DECOR = THEME_NAMES.map((theme, chapter) => labels[chapter].m
 }));
 export const DECOR_CATALOG = [...THEME_DECOR.flat(), ...definitions.map(([name, height]) => ({ key: `decor_${name}`, label: `Original · ${name}`, height }))];
 
-// Streets have no ambient props; only gameplay crates and explosive barrels remain.
+// Ambient decorations remain separate from interactive combat props.
 export function streetDecor() {
   return [];
 }
