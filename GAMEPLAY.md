@@ -10,6 +10,23 @@ Cette version enrichit le moteur Reborn existant. Le client solo et le serveur c
 
 ## Esquive et rues interactives
 
+### Armes improvisées et nouvelles rencontres
+
+**Jualas Schtrak** : veste sombre, démarche titubante, hoquets et grands coups de louche préparés pendant une seconde. Sa mort laisse systématiquement une **louche** récupérable avec la commande de ramasse habituelle (F / RT), pour dix coups. Les deux joueurs peuvent la ramasser. Sprites inspirés de la photo fournie, avec seize poses et une planche distincte pour la louche et son animation de frappe.
+
+Ramasser avec F / RT, utiliser avec J / X. Les quatre armes entrent dans la rotation des ramassables de campagne, en solo et en duo.
+
+- **Caddie** : quatre poussées. Roule dans la ligne choisie, percute et repousse plusieurs ennemis, sans blesser le partenaire.
+- **Extincteur** : huit jets. Portée courte et large ; aveugle les adversaires pendant 1,8 seconde et interrompt leurs attaques. Le recul du jet propulse le joueur vers l'arrière.
+- **Parasol** : sept balayages. Repousse fortement tous les ennemis devant soi, sur une bande large.
+- **Ballon** : six tirs. J / X lance le ballon au pied. K / Y près du ballon en mouvement permet de le renvoyer ; le partenaire peut aussi le reprendre. Chaque renvoi réarme ses collisions. Il disparaît après sa course ou à la sortie de la rue.
+
+**Kiks la Tchoin** est une variante de Kikor adulte en tenue rose, perruque et bottes : elle prépare un coup de fouet à 285 pixels, sur une ligne verrouillée. **Jalatrix · Le Gamer** invoque aléatoirement un Orc, Paladin, Elfe ou Tauren, réutilisant les sprites et animations du raid de Rémy. Une seule invocation vivante par gamer, douze secondes maximum, disparition au KO du propriétaire ; frapper le gamer pendant sa préparation annule l'invocation.
+
+**Julio** et **Djé · Le Gamin** utilisent deux nouvelles planches inspirées de la photo fournie : pull gris rayé et cheveux bruns pour Julio, pull bleu-vert et cheveux roux pour Djé. Ils apparaissent ensemble, verrouillent leur ligne, chargent puis récupèrent pendant 0,9 seconde. Les nouveaux ennemis ne dessinent plus de zone indicative au sol. Changer de ligne, sauter ou esquiver permet d'éviter leur frappe. Le Djé élastique et Jalatrix pêcheur existants sont conservés.
+
+Les sprites générés avec l'outil imagegen intégré fournissent seize poses par ennemi et douze cases d'objets/effets. Les prompts sont conservés dans `assets/enemies/new/IMPROVISED-PROMPTS.md`. Vérification : `node --test tests/improvised.test.js` et `node tests/improvised-browser.mjs`.
+
 - **Esquive** : Maj gauche/droite au clavier, RB/R1 sur une manette standard, bouton ⇧ tactile. Direction du déplacement ou direction du regard à l'arrêt. Départ dès la première frame, durée 0,26 s, protection 0,22 s, recharge 0,95 s, sans coût en énergie. Une pression doit être relâchée avant la suivante : maintenir ne permet plus d'esquiver en boucle. Une pression dans les dernières 0,14 s de récupération est mémorisée. Une attaque normale peut être annulée, mais pas une transformation spéciale en cours, sauf le catcheur de Gustavax qui conserve ses commandes. Indicateur de recharge sous les barres, silhouettes de traînée et poussière animée.
 - **Caisses** : 3 unités de résistance, sandwich (+35 PV). **Poubelles** : 4 unités, nourriture (+35 PV ; les canettes rendent 25 énergie). **Barils rouges** : 3 unités, sans loot. Il ne reste que quatre objets destructibles ordinaires par chapitre, avec des rues d’événement dégagées ; chaque ennemi vaincu a 10 % de chance de laisser un sandwich (+35 PV) et 10 % une canette (+25 énergie), sans double drop. Un poing enlève 1 unité, un pied ou dernier poing de combo 2. Les spéciaux endommagent aussi les objets. Trois états graphiques : intact, endommagé, débris. Chaque objet ne donne son ramassable et ses 50 points qu'une fois.
 - **Barils rouges** : 3 unités. Après destruction, cercle d’alerte pendant 0,8 s, explosion de rayon 170 et 45 dégâts de base. Elle touche les deux camps ; reculer, sauter ou esquiver permet de l’éviter. Réactions en chaîne possibles, chaque baril conservant son propre avertissement. Les débris disparaissent après 7 s. Les objets n’agissent pas comme des murs : ils ne peuvent coincer un joueur ni bloquer une sortie.

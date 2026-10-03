@@ -15,6 +15,7 @@
     "test:street-action": "node tests/street-action-browser.mjs",
     "test:combos": "node tests/melee-combos-browser.mjs",
     "test:heavy-weapons": "node tests/heavy-weapons-browser.mjs",
+    "test:improvised": "node tests/improvised-browser.mjs",
     "test:dynamic-combat": "node tests/dynamic-combat-browser.mjs",
     "test:arcade": "node tests/arcade-browser.mjs",
     "test:talents": "node tests/talents-browser.mjs",

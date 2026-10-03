@@ -534,7 +534,8 @@ export class Renderer {
     const c = this.ctx, [sx, sy, sw, sh] = asset.rect;
     const talentFX=/^(karonux|lorenzo|jualos|yanu|jo|kikor|gustavax)FX$/.test(key);
     // Effects use their own bounds: a small first atlas cell must not enlarge every other effect.
-    const size=(height||asset.height)*(talentFX?.72:1);
+    const bossFX=/^boss.*FX$|^miniBoss.*FX$/.test(key);
+    const size=(height||asset.height)*(talentFX?.72:bossFX?.6:1);
     const scale=talentFX?Math.min(size/sh,Math.min(240,size*2)/sw):size/asset.base[3];
     c.save(); c.translate(x, y); c.scale(facing, 1); c.imageSmoothingEnabled = false;
     c.drawImage(asset.image, sx, sy, sw, sh, -sw * scale / 2, -sh * scale, sw * scale, sh * scale); c.restore();
@@ -981,7 +982,7 @@ export class Renderer {
     const c=this.ctx, dead=a.hp<=0, p=a.newPattern, height=NEW_ENEMIES[a.kind]?.height||144;
     c.save();
     if(!dead)this.ellipse(a.x,a.y,29,8,'#0006');
-    if (!dead && p && !p.fired && p.kind!=='eat' && !['dje','caro','yinyin'].includes(a.kind)) {
+    if (!dead && p && !p.fired && p.kind!=='eat' && !['dje','caro','yinyin','tchoin','jalatrixGamer','julioKid','djeKid','jualasAlarm'].includes(a.kind)) {
       c.fillStyle='#ff65562d'; c.strokeStyle='#ffbe87'; c.lineWidth=2;
       const width=p.kind==='cash'?480:p.width;
       c.beginPath(); c.rect(p.facing>0?a.x:a.x-width,p.targetY-p.band,width,p.band*2); c.fill(); c.stroke();
@@ -992,8 +993,9 @@ export class Renderer {
     }
     let cell=Math.floor(state.time*3)%2;
     if(a.moving)cell=2+Math.floor(state.time*8)%2;
+    if(a.kind==='jualasAlarm' && a.recovering>0 && !p)cell=10+Number(a.recovering<.25);
     if(a.attack){const base=a.attack.type==='special'?8:4;cell=base+Math.min(3,Math.floor(a.attack.elapsed/a.attack.duration*4));}
-    if(p)cell=(['pipe','pan'].includes(p.kind)?4:8)+(p.fired?2+Math.floor(state.time*6)%2:Math.min(1,Math.floor(p.elapsed/p.windup*2)));
+    if(p)cell=(['pipe','pan','whip','ladle'].includes(p.kind)?4:8)+(p.fired?2+Math.floor(state.time*6)%2:Math.min(1,Math.floor(p.elapsed/p.windup*2)));
     if(a.stun>0)cell=12+Math.floor(state.time*8)%2;
     if(dead){cell=a.deadTime<.25?14:15;c.globalAlpha=clamp((1.2-a.deadTime)/.4,0,1);}
     if(a.flash>0)c.filter='brightness(2)';
@@ -1015,37 +1017,37 @@ export class Renderer {
   }
   miniBossEffect(cell,x,y,width=90,height=65,facing=1){
     const asset=this.assets.arcadeFrame('miniBossFX',cell);if(!asset)return;
-    const c=this.ctx,[sx,sy,sw,sh]=asset.rect,scale=Math.min(width/sw,height/sh);
+    const c=this.ctx,[sx,sy,sw,sh]=asset.rect,scale=.6*Math.min(width/sw,height/sh);
     c.save();c.translate(x,y);c.scale(facing,1);c.imageSmoothingEnabled=false;
     c.drawImage(asset.image,sx,sy,sw,sh,-sw*scale/2,-sh*scale/2,sw*scale,sh*scale);c.restore();
   }
   jalatrixEffect(cell,x,y,width=90,height=65,facing=1){
     const asset=this.assets.arcadeFrame('miniBossJalatrixFX',cell);if(!asset)return;
-    const c=this.ctx,[sx,sy,sw,sh]=asset.rect,scale=Math.min(width/sw,height/sh);
+    const c=this.ctx,[sx,sy,sw,sh]=asset.rect,scale=.6*Math.min(width/sw,height/sh);
     c.save();c.translate(x,y);c.scale(facing,1);c.imageSmoothingEnabled=false;
     c.drawImage(asset.image,sx,sy,sw,sh,-sw*scale/2,-sh*scale/2,sw*scale,sh*scale);c.restore();
   }
   mazzukaEffect(cell,x,y,width=90,height=65,facing=1){
     const asset=this.assets.arcadeFrame('miniBossMazzukaFX',cell);if(!asset)return;
-    const c=this.ctx,[sx,sy,sw,sh]=asset.rect,scale=Math.min(width/sw,height/sh);
+    const c=this.ctx,[sx,sy,sw,sh]=asset.rect,scale=.6*Math.min(width/sw,height/sh);
     c.save();c.translate(x,y);c.scale(facing,1);c.imageSmoothingEnabled=false;
     c.drawImage(asset.image,sx,sy,sw,sh,-sw*scale/2,-sh*scale/2,sw*scale,sh*scale);c.restore();
   }
   maireEffect(cell,x,y,width=95,height=75,facing=1){
     const asset=this.assets.arcadeFrame('miniBossMaireFX',cell);if(!asset)return;
-    const c=this.ctx,[sx,sy,sw,sh]=asset.rect,scale=Math.min(width/sw,height/sh);
+    const c=this.ctx,[sx,sy,sw,sh]=asset.rect,scale=.6*Math.min(width/sw,height/sh);
     c.save();c.translate(x,y);c.scale(facing,1);c.imageSmoothingEnabled=false;
     c.drawImage(asset.image,sx,sy,sw,sh,-sw*scale/2,-sh*scale/2,sw*scale,sh*scale);c.restore();
   }
   remyEffect(cell,x,y,width=105,height=85,facing=1){
     const asset=this.assets.arcadeFrame('miniBossRemyFX',cell);if(!asset)return;
-    const c=this.ctx,[sx,sy,sw,sh]=asset.rect,scale=Math.min(width/sw,height/sh);
+    const c=this.ctx,[sx,sy,sw,sh]=asset.rect,scale=.6*Math.min(width/sw,height/sh);
     c.save();c.translate(x,y);c.scale(facing,1);c.imageSmoothingEnabled=false;
     c.drawImage(asset.image,sx,sy,sw,sh,-sw*scale/2,-sh*scale/2,sw*scale,sh*scale);c.restore();
   }
   harmelinEffect(cell,x,y,width=100,height=76,facing=1){
     const asset=this.assets.arcadeFrame('miniBossHarmelinFX',cell);if(!asset)return;
-    const c=this.ctx,[sx,sy,sw,sh]=asset.rect,scale=Math.min(width/sw,height/sh);
+    const c=this.ctx,[sx,sy,sw,sh]=asset.rect,scale=.6*Math.min(width/sw,height/sh);
     c.save();c.translate(x,y);c.scale(facing,1);c.imageSmoothingEnabled=false;
     c.drawImage(asset.image,sx,sy,sw,sh,-sw*scale/2,-sh*scale/2,sw*scale,sh*scale);c.restore();
   }
@@ -1195,8 +1197,8 @@ export class Renderer {
     if (p && !p.hit) { c.fillStyle = '#ffe5aa'; c.font = 'bold 11px monospace'; c.fillText(ELITE_LABELS[p.kind] || 'ATTENTION !', clamp(a.x, 145, 1135), y - 27); }
     if (q.landing > 0) { c.fillStyle = '#ffd376'; c.font = 'bold 14px monospace'; c.fillText('CANAPÉ EN APPROCHE !', clamp(a.x, 140, 1140), a.y - 30); }
   }
-  weaponIcon(kind, x, y, width, facing = 1) {
-    const b = WEAPONS[kind], asset = b && this.assets.arcadeFrame(b.atlas || 'weaponItems', b.cell); if (!asset) return;
+  weaponIcon(kind, x, y, width, facing = 1, cell) {
+    const b = WEAPONS[kind], asset = b && this.assets.arcadeFrame(b.atlas || 'weaponItems', cell ?? b.cell); if (!asset) return;
     const c = this.ctx, [sx, sy, sw, sh] = asset.rect, w = width || b.width, h = w * sh / sw;
     c.save(); c.translate(x, y); c.scale(facing, 1); c.imageSmoothingEnabled = false; c.drawImage(asset.image, sx, sy, sw, sh, -w / 2, -h / 2, w, h); c.restore();
   }
@@ -1221,6 +1223,12 @@ export class Renderer {
   }
   drawWeaponProjectiles(state) {
     for (const shot of state.weaponProjectiles || []) {
+      if (['cart','football','foam'].includes(shot.kind)) {
+        const cell = shot.kind === 'foam' ? 5 + (Math.floor(shot.elapsed * 12) % 2) * 4 : shot.kind === 'cart' ? (Math.floor(shot.elapsed*12)%2)*4 : 3+(Math.floor(shot.elapsed*14)%2)*4;
+        const asset=this.assets.arcadeFrame('improvised',cell);
+        if(asset){const [sx,sy,sw,sh]=asset.rect,w=shot.kind==='foam'?240:shot.kind==='cart'?115:32,h=w*sh/sw;const c=this.ctx;c.save();c.translate(shot.x+(shot.kind==='foam'?shot.facing*115:0),shot.y-(shot.kind==='foam'?65:shot.kind==='cart'?40:18));c.scale(shot.facing,1);c.imageSmoothingEnabled=false;c.drawImage(asset.image,sx,sy,sw,sh,-w/2,-h/2,w,h);c.restore();}
+        continue;
+      }
       if (shot.kind === 'rocket') { this.heavyWeaponSprite(6, shot.x - shot.facing * 55, shot.y - 88, 65); this.heavyWeaponSprite(3, shot.x, shot.y - 88, 76, shot.facing); }
       else if (shot.kind === 'flame') { const w = 285 * (1 + Math.sin(shot.elapsed * 45) * .04); this.heavyWeaponSprite(4, shot.x + shot.facing * w / 2, shot.y - 72, w, shot.facing); }
       else { this.ellipse(shot.x, shot.y, 18, 5, '#0006'); this.heavyWeaponSprite(2, shot.x, shot.y - (shot.z || 0) - 12, 27); if (shot.elapsed > .55) { this.ctx.fillStyle = '#ffcf72'; this.ctx.fillRect(shot.x - 3, shot.y - 35, 6, 6); } }
@@ -1230,17 +1238,30 @@ export class Renderer {
     const g = a.grapple, pickup = a.interaction, attack = a.attack?.type === 'weapon' ? a.attack : null;
     const weapon = attack?.weapon || a.weapon?.kind, b = WEAPONS[weapon];
     if (!g && !pickup && !attack && !(b && !a.attack && !a.moving && a.z === 0 && a.stun <= 0)) return false;
+    if (['improvised','ladle'].includes(b?.atlas) && !g && !pickup) {
+      const pose=attack ? weapon==='football'?'kick':'punch' : 'idle';
+      const frame=this.assets.frame(a.kind,pose,attack?.hit?.75:.25)||this.assets.frame(a.kind,'idle',0);
+      const base=this.assets.frame(a.kind,'idle',0); if(!frame)return false;
+      const c=this.ctx,[sx,sy,sw,sh]=frame.rect,height=144*(.94+(a.y-FLOOR.top)/(FLOOR.bottom-FLOOR.top)*.12),scale=height/(frame.referenceHeight||base?.rect[3]||sh);
+      c.save();c.translate(a.x,a.y-a.z);c.scale(a.facing,1);c.imageSmoothingEnabled=false;if(a.flash>0)c.filter='brightness(2)';c.drawImage(frame.image,sx,sy,sw,sh,-sw*scale/2,-sh*scale,sw*scale,sh*scale);c.restore();
+      if(weapon==='ladle')this.weaponIcon(weapon,a.x+a.facing*(attack?.hit?70:40),a.y-a.z-80,b.width,a.facing,attack?.hit?1:0);
+      else if(weapon==='parasol')this.weaponIcon(weapon,a.x+a.facing*70,a.y-a.z-80,b.width,a.facing);
+      else if(weapon==='extinguisher')this.weaponIcon(weapon,a.x+a.facing*40,a.y-a.z-70,b.width,a.facing);
+      else if(!attack?.hit)this.weaponIcon(weapon,a.x+a.facing*55,a.y-a.z-20,b.width,a.facing);
+      return true;
+    }
     let cell;
     if (g) cell = g.throwing ? g.elapsed < GRAPPLE.throwAt ? 2 : 3 : g.elapsed < .16 ? 0 : 1;
     else if (pickup) cell = pickup.elapsed < .22 ? 4 : 5;
-    else cell = (weapon === 'knife' ? 6 : weapon === 'bat' ? 8 : 10) + Number(!!attack?.hit);
+    else cell = (weapon === 'knife' ? 6 : ['bat','parasol','football'].includes(weapon) ? 8 : 10) + Number(!!attack?.hit);
     const asset = this.assets.arcadeFrame(`actions_${a.kind}`, cell); if (!asset) return false;
     const c = this.ctx, height = 144 * (.94 + (a.y - FLOOR.top) / (FLOOR.bottom - FLOOR.top) * .12);
     c.save(); if (a.flash > 0) c.filter = 'brightness(2)';
-    if ((b?.gun || b?.projectile) && !g && !pickup) {
+    if ((b?.gun || b?.projectile || weapon === 'parasol') && !g && !pickup) {
       this.weaponIcon(weapon, a.x + a.facing * (b.width * .3 + 40), a.y - a.z - height * (attack?.hit ? .73 : .68), b.width, a.facing);
     }
     this.arcadeSprite(`actions_${a.kind}`, a.x, a.y - a.z, cell, height, a.facing); c.restore();
+    if (weapon === 'football' && attack) this.weaponIcon(weapon,a.x+a.facing*55,a.y-18,30,a.facing);
     if (g && !g.throwing) { c.font = 'bold 11px monospace'; c.fillStyle = '#ffce83'; c.textAlign = 'center'; c.fillText('POING + ARRIÈRE · PROJETER', a.x, a.y - height - 16); }
     return true;
   }

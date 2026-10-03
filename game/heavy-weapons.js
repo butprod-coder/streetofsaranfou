@@ -6,6 +6,7 @@ export const heavyWeapons = {
     const b = WEAPONS[kind], damage = Math.round(p.power * b.power * (p.bonuses.weaponPower || 1));
     const shot = { id: this.nextId++, owner: p.id, kind: b.projectile, x: p.x + p.facing * 36, y: p.y, facing: p.facing, elapsed: 0, damage, hits: {}, fromX: p.x + p.facing * 36 };
     shot.critical = this.criticalStrike(p)?.critical ?? false;
+    if (shot.kind === 'foam') p.vx -= p.facing * 360;
     if (shot.kind === 'grenade') {
       const target = this.state.enemies.filter(e => e.hp > 0 && (e.x - p.x) * p.facing > 60 && (e.x - p.x) * p.facing <= b.range && Math.abs(e.y - p.y) < b.band).sort((a, z) => Math.abs(a.x - p.x) - Math.abs(z.x - p.x))[0];
       shot.toX = clamp(target?.x ?? p.x + p.facing * b.range, FLOOR.left, FLOOR.right);
@@ -25,6 +26,28 @@ export const heavyWeapons = {
     s.weaponProjectiles = (s.weaponProjectiles || []).filter(shot => {
       const owner = s.players.find(p => p.id === shot.owner); if (!owner) return false;
       shot.elapsed += dt;
+      if (['cart', 'football', 'foam'].includes(shot.kind)) {
+        const foam = shot.kind === 'foam', ball = shot.kind === 'football';
+        const before = shot.x;
+        if (!foam) shot.x += shot.facing * (ball ? 720 : 580) * dt;
+        for (const e of s.enemies) {
+          if (e.hp <= 0 || e.invincible > 0 || e.z > 40 || shot.hits[e.id]) continue;
+          const inRange = foam ? (e.x - shot.x) * shot.facing >= -15 && (e.x - shot.x) * shot.facing <= 230 : e.x >= Math.min(before, shot.x) - (ball ? 22 : 50) && e.x <= Math.max(before, shot.x) + (ball ? 22 : 50);
+          if (!inRange || Math.abs(e.y - shot.y) > (foam ? 65 : ball ? 30 : 42)) continue;
+          shot.hits[e.id] = true;
+          this.damage(e, shot.damage, owner, !foam, true, shot);
+          e.vx = shot.facing * (foam ? 210 : 430);
+          if (foam) { e.blindedUntil = s.time + 1.8; e.attack = null; e.pattern = null; e.newPattern = null; }
+        }
+        // A nearby kick sends the live ball back, including the partner's kick.
+        if (ball) for (const player of s.players) {
+          if (player.hp <= 0 || player.attack?.type !== 'kick' || player.attack.hit || player.z > 30 || Math.abs(player.x - shot.x) > 80 || Math.abs(player.y - shot.y) > 35 || (shot.kickReadyAt || 0) > s.time) continue;
+          shot.kickReadyAt = s.time + .6; shot.owner = player.id; shot.facing = player.facing; shot.hits = {}; shot.elapsed = 0; shot.fromX = shot.x;
+          this.event('swing', { actor: player.id, x: shot.x, y: shot.y - 20 });
+        }
+        if (shot.elapsed >= (foam ? .5 : ball ? 1.8 : 1.25) || shot.x < FLOOR.left - 60 || shot.x > FLOOR.right + 60) return false;
+        return true;
+      }
       if (shot.kind === 'rocket') {
         const before = shot.x; shot.x += shot.facing * 780 * dt;
         const impacts = [...s.enemies.filter(e => e.hp > 0 && e.z < 60), ...s.props.filter(p => p.hp > 0)].filter(e => Math.abs(e.y - shot.y) < 35 && e.x >= Math.min(before, shot.x) - 18 && e.x <= Math.max(before, shot.x) + 18).sort((a, b) => Math.abs(a.x - before) - Math.abs(b.x - before));

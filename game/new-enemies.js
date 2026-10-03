@@ -14,12 +14,21 @@ export const newEnemies = {
     if (!target) return true;
     if (e.newPattern) {
       const p = e.newPattern; p.elapsed += dt; e.moving = false;
-      e.action = ['pipe', 'pan'].includes(p.kind) ? 'punch' : 'special';
+      e.action = ['pipe', 'pan', 'whip', 'ladle'].includes(p.kind) ? 'punch' : 'special';
       if (p.elapsed < p.windup) return true;
       if (!p.fired) {
         p.fired = true;
         const line = (kind, width, band, power = 1) => this.hazard(e, { kind, shape: 'line', x: e.x, y: p.targetY, facing: p.facing, width, band, delay: 0, ttl: .14, pulse: 5, damage: e.power * power });
         if (p.kind === 'cash') this.hazard(e, { kind: 'yinyinCash', x: e.x + p.facing * 35, y: p.targetY, radius: 24, vx: p.facing * 320, delay: 0, ttl: 1.5, pulse: 5, damage: e.power * .35, corrupt: true });
+        else if (p.kind === 'summon') {
+          if (!s.enemies.some(a => a.owner === e.id && a.gamerSummon && a.hp > 0) && s.enemies.filter(a => a.hp > 0).length < 10) {
+            const roster = ['remyOrc', 'remyPaladin', 'remyElf', 'remyTauren'];
+            this.spawnEnemy(roster[Math.floor(this.random() * roster.length)], { owner: e.id, gamerSummon: true, remySummon: true, summonUntil: s.time + 12, x: clamp(e.x + p.facing * 85, FLOOR.left, FLOOR.right), y: e.y, cooldown: 1 });
+            this.event('opening', { x: e.x, y: e.y - 180, label: 'POUR LA HORDE !' });
+          }
+        } else if (p.kind === 'whip') { line('whipStrike', 285, 30, 1.1); this.event('swing', { actor:e.id,x:e.x,y:e.y-80,heavy:true }); }
+        else if (p.kind === 'ladle') { line('ladleStrike', 160, 42); this.event('swing', { actor:e.id,x:e.x,y:e.y-75,heavy:true }); }
+        else if (p.kind === 'kidRush') p.ramX = e.x;
         else if (p.kind === 'eat') {
           const heal = Math.min(e.maxHp - e.hp, Math.round(e.maxHp * .15)); e.hp += heal;
         } else if (p.kind === 'stretch') line('djeStretch', 370, 25, 1.2);
@@ -31,8 +40,12 @@ export const newEnemies = {
       if (p.kind === 'wheel' && p.elapsed < p.windup + .65) {
         e.x = clamp(p.ramX + p.facing * Math.min(.65,p.elapsed-p.windup)*520, FLOOR.left,FLOOR.right); e.y=p.targetY;
       }
-      if (p.elapsed >= p.windup + (p.kind === 'wheel' ? .75 : .4)) {
-        e.newPattern = null; e.cooldown = p.kind === 'eat' ? 3.5 : 1.7 * difficulty(s.difficulty).recovery; e.recovering = .5;
+      if (p.kind === 'kidRush' && p.elapsed < p.windup + .6) {
+        const previous = e.x; e.x = clamp(p.ramX + p.facing * Math.min(.6, p.elapsed - p.windup) * 520, FLOOR.left, FLOOR.right); e.y = p.targetY; e.moving = true;
+        if (!p.connected && target.invincible <= 0 && target.z < 35 && Math.abs(target.y-e.y) < 28 && target.x >= Math.min(previous,e.x)-35 && target.x <= Math.max(previous,e.x)+35) { p.connected = true; this.damage(target, e.power, e, false); }
+      }
+      if (p.elapsed >= p.windup + (p.kind === 'wheel' ? .75 : p.kind === 'kidRush' ? .7 : .4)) {
+        e.newPattern = null; e.cooldown = p.kind === 'eat' ? 3.5 : 1.7 * difficulty(s.difficulty).recovery; e.recovering = p.kind === 'kidRush' ? .9 : .5;
       }
       return true;
     }
@@ -42,7 +55,11 @@ export const newEnemies = {
     const occupied = s.enemies.filter(a=>a.hp>0&&(a.newPattern||a.pattern||a.attack&&!a.attack.hit)).length;
     if (e.cooldown <= 0 && occupied < (s.players.length>1?3:2)) {
       let kind, width=125, band=38, windup=.7, label;
-      if (e.kind === 'caro' && e.hp < e.maxHp*.75 && s.time >= (e.eatReadyAt||0)) {
+      if (e.kind === 'jualasAlarm' && Math.abs(dx)<160 && Math.abs(dy)<42) { kind='ladle'; width=160; band=42; windup=1.05; label='COUP DE LOUCHE · HIC !'; }
+      else if (e.kind === 'jalatrixGamer' && !s.enemies.some(a => a.owner === e.id && a.gamerSummon && a.hp > 0) && s.enemies.filter(a => a.hp > 0).length < 10) { kind='summon'; windup=1.4; width=0; label='INVOCATION · INTERROMPS-LE !'; }
+      else if (e.kind === 'tchoin' && Math.abs(dx)<285 && Math.abs(dy)<30) { kind='whip'; width=285; band=30; windup=.85; label='CLAQUEMENT DE FOUET !'; }
+      else if (['julioKid','djeKid'].includes(e.kind) && Math.abs(dx)<310 && Math.abs(dy)<28) { kind='kidRush'; width=310; band=28; windup=.7; label='SPRINT · CHANGE DE LIGNE !'; }
+      else if (e.kind === 'caro' && e.hp < e.maxHp*.75 && s.time >= (e.eatReadyAt||0)) {
         kind='eat'; windup=1.5; label='ELLE MANGE · INTERROMPS-LA !'; e.eatReadyAt=s.time+8;
       } else if (e.kind==='yinyin' && Math.abs(dx)<480 && Math.abs(dy)<35) {
         kind=(e.newAttackCount||0)%2 || Math.abs(dx)>135?'cash':'pipe'; width=135;
@@ -53,14 +70,20 @@ export const newEnemies = {
       if (kind) {
         e.newAttackCount=(e.newAttackCount||0)+1;
         e.newPattern={kind,elapsed:0,windup:windup*difficulty(s.difficulty).telegraph,facing:e.facing,targetY:e.y,width,band,fired:false};
-        e.actionTime=0; e.action=['pipe','pan'].includes(kind)?'punch':'special';
+        e.actionTime=0; e.action=['pipe','pan','whip','ladle'].includes(kind)?'punch':'special';
         if(!['dje','caro','yinyin'].includes(e.kind))this.event('opening',{x:e.x,y:e.y-180,label}); return true;
       }
     }
-    const distance = e.kind==='dje'?230:e.kind==='karmoilefion'?260:e.kind==='yinyin'?100:80;
+    const distance = e.kind==='jalatrixGamer'?270:e.kind==='tchoin'?180:['julioKid','djeKid'].includes(e.kind)?95:e.kind==='dje'?230:e.kind==='karmoilefion'?260:e.kind==='yinyin'?100:80;
     const desired=clamp(target.x-e.facing*distance,FLOOR.left,FLOOR.right), length=Math.max(1,Math.hypot(desired-e.x,dy*1.4));
     e.moving=Math.abs(desired-e.x)>12||Math.abs(dy)>10; e.action=e.moving?'walk':'idle';
     if(e.moving){e.x=clamp(e.x+(desired-e.x)/length*e.speed*dt,FLOOR.left,FLOOR.right);e.y=clamp(e.y+dy/length*e.speed*.8*dt,FLOOR.top,FLOOR.bottom);}
+    if(e.kind==='jualasAlarm') {
+      // Deterministic weaving: shared solo/co-op state, including recovery hiccups.
+      e.x=clamp(e.x+Math.sin(s.time*3.5+e.id)*30*dt,FLOOR.left,FLOOR.right);
+      e.y=clamp(e.y+Math.cos(s.time*4+e.id)*35*dt,FLOOR.top,FLOOR.bottom);
+      if(s.time>=(e.hiccupAt||0)){e.hiccupAt=s.time+3;this.event('opening',{x:e.x,y:e.y-170,label:'HIC !'});}
+    }
     return true;
   },
 };

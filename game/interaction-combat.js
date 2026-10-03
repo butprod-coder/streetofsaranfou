@@ -125,7 +125,10 @@ export const interactionCombat = {
     const targets = this.state.enemies.filter(e => e.hp > 0 && e.invincible <= 0 && e.z < 40 &&
       (e.x - p.x) * p.facing >= -18 && (e.x - p.x) * p.facing <= b.range && Math.abs(e.y - p.y) <= b.band)
       .sort((a, z) => Math.abs(a.x - p.x) - Math.abs(z.x - p.x));
-    for (const target of b.gun && kind !== 'shotgun' ? targets.slice(0, 1) : targets) this.damage(target, Math.round(p.power * b.power * (p.bonuses.weaponPower || 1)), p, true, true);
+    for (const target of b.gun && kind !== 'shotgun' ? targets.slice(0, 1) : targets) {
+      this.damage(target, Math.round(p.power * b.power * (p.bonuses.weaponPower || 1)), p, true, true);
+      if (kind === 'parasol') target.vx = p.facing * 540;
+    }
     for (const prop of this.state.props) if (prop.hp > 0 && !(prop.kind === 'easel' && !prop.enemy) &&
       (prop.x - p.x) * p.facing >= -18 && (prop.x - p.x) * p.facing <= b.range && Math.abs(prop.y - p.y) <= b.band) this.hitProp(prop, kind === 'bat' ? 3 : 2, p);
     if (b.gun) {

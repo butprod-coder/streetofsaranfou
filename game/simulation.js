@@ -146,6 +146,11 @@ export class Simulation {
   }
 
   spawnEncounterEnemy(kind) {
+    if (['kids_duo','julioKid','djeKid'].includes(kind)) {
+      const first=this.spawnEnemy('julioKid');
+      const second=this.spawnEnemy('djeKid',{x:first.x,y:clamp(first.y+45,FLOOR.top,FLOOR.bottom),facing:first.facing,cooldown:first.cooldown});
+      return [first,second];
+    }
     if (kind !== 'om_supporters') return this.spawnEnemy(kind);
     const s=this.state, leftDistance=Math.min(...s.players.map(p=>Math.abs(p.x-85))), rightDistance=Math.min(...s.players.map(p=>Math.abs(p.x-1195)));
     const side=leftDistance>rightDistance?1:-1, baseX=side>0?FLOOR.left+30:FLOOR.right-30, centerY=FLOOR.top+60+this.random()*85;
@@ -277,7 +282,7 @@ export class Simulation {
 
     if (s.phase === 'fight' || s.phase === 'surprise' && s.surprise?.warning <= 0) {
       s.spawnTimer -= dt;
-      const queued=s.spawnQueue[0],needed=queued==='om_supporters'?3:1;
+      const queued=s.spawnQueue[0],needed=queued==='om_supporters'?3:['kids_duo','julioKid','djeKid'].includes(queued)?2:1;
       if (s.spawnQueue.length && s.spawnTimer <= 0 && s.enemies.filter(alive).length+needed <= activeEnemyLimit(this.routeDepth(), s.players.length)) {
         this.spawnEncounterEnemy(s.spawnQueue.shift()); s.spawnTimer = 1.2 + this.random() * .7;
       }
@@ -617,6 +622,10 @@ export class Simulation {
       if (target.grabbedBy) { const holder = s.players.find(p => p.id === target.grabbedBy); if (holder) this.releaseGrab(holder); }
       this.event('ko', { x: target.x, y: target.y, actor: target.id, enemy: target.enemy, boss: target.boss, miniBoss:target.miniBoss, kind:target.kind });
       if (target.enemy) {
+        if (target.kind === 'jualasAlarm' && !target.ladleDropped) {
+          target.ladleDropped = true;
+          s.pickups.push({ id: this.nextId++, kind: 'weapon', weapon: 'ladle', uses: 10, x: target.x, y: target.y });
+        }
         if((target.boss || target.miniBoss)&&!target.owner&&!target.remySummon)this.awardTalentMilestone(`encounter:${this.routeDepth()}:${s.chapter}:${s.stage}:${target.id}`);
         this.rogueOnKill(source, target);
         this.yanuTransformationKill(source);
@@ -634,6 +643,8 @@ export class Simulation {
   }
 
   updateEnemy(e, dt) {
+    if (e.gamerSummon && (e.summonUntil <= this.state.time || !this.state.enemies.some(owner => owner.id === e.owner && owner.hp > 0))) { e.hp = 0; e.gamerSummon = false; }
+    if (e.hp > 0 && e.blindedUntil > this.state.time) { e.attack = null; e.pattern = null; e.newPattern = null; this.tickActor(e, dt); e.action = 'hurt'; e.moving = false; return; }
     if(e.boss&&this.updateBossBlockbuster(e,dt)){this.tickActor(e,dt);return;}
     if(e.kind==='mairePolice')this.updateMairePolice(e,dt);
     if (this.updateGustavaxEnemy(e, dt)) return;

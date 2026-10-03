@@ -14,7 +14,7 @@ function arena(kind, x=500) {
 }
 function advance(sim,e,time){for(let t=0;t<time;t+=1/60){sim.state.time+=1/60;sim.tickActor(e,1/60);sim.updateNewEnemy(e,1/60);sim.updateWorld(1/60);}}
 test('all five enemies have sixteen unique frames and participate in randomized waves',()=>{
-  for(const kind of NEW_SPRITE_IDS){assert.ok(ENCOUNTER_ROSTER.includes(kind));const frames=['idle','walk','punch','special','hurt','dead'].flatMap(a=>animation(kind,a,true));assert.equal(new Set(frames.map(f=>f.cell)).size,16);assert.ok(frames.every(f=>f.url===`/assets/enemies/new/${kind}.png`));}
+  for(const kind of NEW_SPRITE_IDS){assert.ok(ENCOUNTER_ROSTER.includes(['julioKid','djeKid'].includes(kind)?'kids_duo':kind));const frames=['idle','walk','punch','special','hurt','dead'].flatMap(a=>animation(kind,a,true));assert.equal(new Set(frames.map(f=>f.cell)).size,16);assert.ok(frames.every(f=>f.url===`/assets/enemies/new/${kind}.png`));}
   const {sim}=arena('yinyin');const kinds=randomEnemyKinds(0,ENCOUNTER_ROSTER.length,()=>sim.random());assert.equal(new Set(kinds).size,ENCOUNTER_ROSTER.length);
 });
 test('Yinyin alternates pipe attacks and avoidable cash, corrupting only the hit player',()=>{

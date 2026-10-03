@@ -1,5 +1,10 @@
 // Arcade values, shared by solo and the authoritative cooperative simulation.
 export const WEAPONS = {
+  ladle: { name: 'Louche', atlas: 'ladle', cell: 0, uses: 10, power: 1.8, range: 165, band: 60, windup: .2, duration: .55, width: 72 },
+  cart: { name: 'Caddie', atlas: 'improvised', cell: 0, uses: 4, power: 1.8, range: 650, band: 42, windup: .22, duration: .7, width: 105, projectile: 'cart' },
+  extinguisher: { name: 'Extincteur', atlas: 'improvised', cell: 1, uses: 8, power: .45, range: 230, band: 65, windup: .1, duration: .65, width: 48, projectile: 'foam' },
+  parasol: { name: 'Parasol', atlas: 'improvised', cell: 2, uses: 7, power: 1.25, range: 205, band: 100, windup: .24, duration: .65, width: 120 },
+  football: { name: 'Ballon', atlas: 'improvised', cell: 3, uses: 6, power: 1.2, range: 800, band: 30, windup: .18, duration: .5, width: 30, projectile: 'football' },
   bazooka: { name: 'Bazooka', atlas: 'heavyWeapons', cell: 0, uses: 3, power: 4.5, range: 850, band: 35, windup: .25, duration: 1.15, width: 110, gun: true, projectile: 'rocket' },
   flamethrower: { name: 'Lance-flammes', atlas: 'heavyWeapons', cell: 1, uses: 12, power: .65, range: 285, band: 62, windup: .1, duration: .65, width: 90, gun: true, projectile: 'flame' },
   grenade: { name: 'Grenades', atlas: 'heavyWeapons', cell: 2, uses: 4, power: 3.8, range: 360, band: 50, windup: .2, duration: 1.05, width: 28, projectile: 'grenade' },

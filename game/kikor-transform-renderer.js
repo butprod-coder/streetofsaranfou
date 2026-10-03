@@ -6,8 +6,11 @@ export function drawKikorTransformation(r,p,state){
   if(a.branch===1&&a.rank>=3)c.fillText(['BAGARREUR','LANCEUR','PROTECTEUR'][a.role],p.x,p.y-p.z-210);
 }
 export function drawKikorMinion(r,m,state){
-  const base=m.clone?12:m.role*4,cell=base+(m.emerging>0?3:m.striking>0?2:m.action==='walk'?1:0);
-  r.arcadeSprite('kikorMinions',m.x,m.y,cell,m.clone?48:72,m.facing);
+  const cell=m.striking>0 ? (m.role===1?7+Math.floor(state.time*10)%2:3+Math.floor(state.time*10)%2) : m.action==='walk'?1+Math.floor(state.time*8)%2:0;
+  r.ctx.save();
+  if(m.emerging>0)r.ctx.globalAlpha=Math.max(.25,1-m.emerging/.5);
+  r.arcadeSprite('kikor_e',m.x,m.y,cell,m.clone?48:72,m.facing);
+  r.ctx.restore();
   if(m.role===2&&m.hp>0){r.ctx.save();r.ctx.globalAlpha=.25;r.arcadeSprite('kikorFX',m.x,m.y,7,85);r.ctx.restore();}
 }
 export function drawKikorWorld(r,state){

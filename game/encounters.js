@@ -1,8 +1,8 @@
 import { BALANCE, difficulty } from './balance.js';
 import { ENEMIES } from './data.js';
 import { ELITE_ORDER } from './elite-data.js';
-const OM_SUPPORTERS = ['karonux_om', 'orelsan_om', 'gustavax_om'];
-export const ENCOUNTER_ROSTER = [...new Set([...Object.keys(ENEMIES).filter(id=>!ENEMIES[id].miniBoss&&!ENEMIES[id].summonOnly&&!ENEMIES[id].storyBossOnly&&!OM_SUPPORTERS.includes(id)), 'om_supporters', ...ELITE_ORDER])];
+const OM_SUPPORTERS = ['karonux_om', 'orelsan_om', 'gustavax_om', 'julioKid', 'djeKid'];
+export const ENCOUNTER_ROSTER = [...new Set([...Object.keys(ENEMIES).filter(id=>!ENEMIES[id].miniBoss&&!ENEMIES[id].summonOnly&&!ENEMIES[id].storyBossOnly&&!OM_SUPPORTERS.includes(id)), 'om_supporters', 'kids_duo', ...ELITE_ORDER])];
 export const STARTING_ENEMIES = ['remy', 'charlingals', 'orelsan'];
 export function createEnemyOrder(random = Math.random) {
   const order = [...ENCOUNTER_ROSTER];

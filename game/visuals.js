@@ -87,9 +87,17 @@ export const VISUALS = {
   spit: frames('/assets/enemies/triso/triso_special', 3),
 };
 export const ARCADE_SPRITES = {
+  ladle: { file: 'ladle-v1', cols: 2, rows: 1, height: 55 },
   ...Object.fromEntries(NEW_SPRITE_IDS.map(id => [`new_${id}`, {
     file:id, folder:'enemies/new', cols:4, rows:4, height:NEW_ENEMIES[id]?.height || 144, cleanComponents:true,
-    rowCuts: {yinyin:[0,.265,.525,.758,1],caro:[0,.255,.51,.76,1],dje:[0,.285,.535,.775,1],karmoilefion:[0,.265,.525,.755,1],triso:[0,.255,.5,.735,1]}[id],
+    ...({
+      jualasAlarm: { rowColumns:{1:[0,.24,.53,.79,1],2:[0,.25,.52,.79,1],3:[0,.25,.47,.71,1]} },
+      tchoin: { rowCuts:[0,.28,.53,.76,1], rowColumns:{1:[0,.26,.56,.79,1],2:[0,.25,.53,.77,1]} },
+      jalatrixGamer: { rowColumns:{1:[0,.215,.53,.78,1],2:[0,.205,.5,.79,1]} },
+      julioKid: { rowCuts:[0,.28,.53,.76,1], rowColumns:{1:[0,.25,.515,.78,1]} },
+      djeKid: { rowCuts:[0,.28,.53,.76,1], rowColumns:{1:[0,.25,.515,.80,1],2:[0,.24,.5,.76,1]} },
+    }[id] || {}),
+    rowCuts: {jualasAlarm:[0,.26,.52,.755,1],yinyin:[0,.265,.525,.758,1],caro:[0,.255,.51,.76,1],dje:[0,.285,.535,.775,1],karmoilefion:[0,.265,.525,.755,1],triso:[0,.255,.5,.735,1]}[id],
     cells: {
       yinyin:{5:[.25,.265,.535,.525],6:[.5,.265,.79,.525],10:[.475,.525,.79,.758],14:[.475,.758,.72,1],15:[.68,.758,1,1]},
       caro:{5:[.25,.255,.54,.51],6:[.5,.255,.78,.51],14:[.48,.76,.75,1],15:[.70,.76,1,1]},
@@ -104,6 +112,11 @@ export const ARCADE_SPRITES = {
   chainScenery: { file: 'chain-scenery-v1', cols: 3, rows: 3, height: 80 },
   dynamicEnemies: { file: 'dynamic-enemies-v1', cols: 4, rows: 3, height: 144, cleanComponents: true },
   heavyWeapons: { file: 'heavy-weapons-v1', cols: 3, rows: 3, height: 80 },
+  improvised: { file: 'improvised-v1', cols: 4, rows: 3, height: 90, cells: atlasCells(1536,1024,[
+    [40,40,370,350],[400,40,760,340],[800,30,1180,340],[1220,110,1490,330],
+    [0,370,370,665],[650,380,890,600],[830,350,1200,670],[1200,380,1536,660],
+    [30,675,385,980],[495,685,835,970],[830,675,1220,980],[1220,675,1536,980],
+  ]), exclude: { 9: atlasCells(1536,1024,[[495,750,515,980]]) } },
   miniBossDamps:{cells:{4:[0,.245,.29,.50],5:[.29,.245,.53,.50],9:[.255,.50,.53,.755],10:[.50,.50,.80,.755],13:[.225,.755,.49,1],14:[.49,.755,.78,1],15:[.745,.755,1,1]},file:'damps',folder:'boss/mini_chene',cols:4,rows:4,height:195,rowCuts:[0,.245,.50,.755,1],cleanComponents:true},
   miniBossCainri:{file:'cainri',folder:'boss/mini_chene',cols:4,rows:4,height:195,rowCuts:[0,.255,.505,.755,1],cleanComponents:true,rowColumns:{1:[0,.25,.5,.75,1],2:[0,.25,.5,.75,1],3:[0,.26,.51,.76,1]}},
   miniBossJalatrix:{cells:{4:[0,.25,.28,.5],5:[.275,.25,.565,.5],6:[.555,.25,.815,.5],7:[.82,.25,1,.5],13:[.255,.75,.53,1],14:[.53,.75,.82,1],15:[.775,.73,1,1]},file:'jalatrix',folder:'boss/chateau_etang',cols:4,rows:4,height:165,rowCuts:[0,.25,.5,.75,1],cleanComponents:true},
