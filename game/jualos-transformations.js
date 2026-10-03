@@ -1,3 +1,4 @@
+import { tune, stars, feedback } from './talent-upgrades.js';
 import { FLOOR, clamp } from './data.js';
 import { HEAVY_ENEMIES } from './weapons.js';
 import { jualosSelection } from './jualos-talents.js';
@@ -8,7 +9,7 @@ export const jualosTransformations={
   beginJualos(p){
     const {branch,rank}=jualosSelection(p);if(branch<0)return false;
     this.releaseGrab(p);p.energy-=100;p.attack=null;p.cooldown=p.specialCd=0;p.vx=p.vy=p.vz=p.z=0;
-    p.specialState={kind:'jualos',transformation:true,branch,rank,ultimate:rank===6,duration:rank===6?9:rank>=4?7:5,elapsed:0,pose:0,poseUntil:0,nextAttack:0,nextHeavy:0,nextJump:0,charge:0,held:{},taps:{...p.taps},hits:{}};
+    p.specialState={kind:'jualos',transformation:true,branch,rank,ultimate:rank===6,duration:(rank===6?9:rank>=4?7:5)+tune(p,3,"duration",0),elapsed:0,pose:0,poseUntil:0,nextAttack:0,nextHeavy:0,nextJump:0,charge:0,held:{},taps:{...p.taps},hits:{}};
     p.action='special';p.invincible=Math.max(p.invincible,.4);
     if(branch===0&&rank===6){for(const e of [...this.state.enemies])if(ordinary(e)&&distance(p,e)<440)this.recruitJualos(p,e,true);pose(p.specialState,7,.7);}
     this.event('special',{actor:p.id,kind:'blast',label:['COMMERCIAL','GROS PORC','GUITARISTE'][branch],x:p.x,y:p.y});return true;
@@ -17,32 +18,34 @@ export const jualosTransformations={
   recruitJualos(p,e,takeover=false){
     const a=p.specialState,s=this.state;
     if(!a||!ordinary(e)||!takeover&&HEAVY_ENEMIES.has(e.kind))return false;
-    if(!takeover&&s.allies.filter(r=>r.recruit&&r.owner===p.id&&r.hp>0).length>=(a.rank>=3?2:1))return false;
+    if(!takeover&&s.allies.filter(r=>r.recruit&&r.owner===p.id&&r.hp>0).length>=(a.rank>=3?tune(p,2,"capacity",2):1))return false;
     this.releaseGrab(e);e.attack=null;e.pattern=null;e.lorenzoConfused=null;
     const charge=s.hazards.find(h=>h.id===e.newPattern?.hazard);if(charge)charge.ttl=0;e.newPattern=null;
     s.enemies=s.enemies.filter(other=>other!==e);
-    Object.assign(e,{enemy:false,ally:true,recruit:true,owner:p.id,permanent:a.rank>=5,contractUntil:s.time+(a.duration-a.elapsed)+(a.rank>=4?4:0),ttl:1,cooldown:.15,stun:0,invincible:0,action:'idle',aggressive:a.rank>=2,vx:0,vy:0,vz:0,z:0});
-    s.allies.push(e);this.jualosFX(e.x,e.y-120,10);return true;
+    Object.assign(e,{enemy:false,ally:true,recruit:true,owner:p.id,permanent:a.rank>=5,contractUntil:s.time+(a.duration-a.elapsed)+(a.rank>=4?tune(p,3,"contract",4):0),ttl:1,cooldown:.15,stun:0,invincible:0,action:'idle',aggressive:a.rank>=2,vx:0,vy:0,vz:0,z:0});
+    if(a.rank>=5){const ratio=e.hp/e.maxHp;e.maxHp=Math.round(tune(p,4,"allyHealth",e.maxHp));e.hp=e.maxHp*ratio;}s.allies.push(e);this.jualosFX(e.x,e.y-120,10);return true;
   },
   endJualos(p){
     p.z=p.vz=0;
-    for(const r of this.state.allies)if(r.recruit&&r.owner===p.id&&!r.permanent)r.contractUntil=Math.min(r.contractUntil,this.state.time+(p.specialState.rank>=4?4:0));
+    for(const r of this.state.allies)if(r.recruit&&r.owner===p.id&&!r.permanent)r.contractUntil=Math.min(r.contractUntil,this.state.time+(p.specialState.rank>=4?tune(p,3,"contract",4):0));
   },
   jualosStrike(p,radius,power,push=0,radial=false){
     const hits=[];
     for(const e of this.state.enemies)if(e.hp>0&&e.invincible<=0&&distance(p,e)<radius&&(radial||(e.x-p.x)*p.facing>=-25)){
       this.damage(e,p.specialPower*power*(p.specialState.rank===6?1.35:1),p,true);hits.push(e);
       if(push&&!e.boss&&!e.vehicle){e.vx=(Math.sign(e.x-p.x)||p.facing)*push;e.stun=Math.max(e.stun,.45);}
+      if(push&&p.specialState.branch===1&&stars(p,1)===3&&!e.boss&&!e.vehicle)e.karonuxLaunch={owner:p.id,until:this.state.time+.6,hits:[]};
     }
     for(const prop of this.state.props)if(prop.hp>0&&distance(p,prop)<radius)this.hitProp(prop,2,p);
     return hits;
   },
   jualosChord(p){
     const a=p.specialState;
+    const critical=this.criticalStrike(p)?.critical??false;
     for(const direction of a.rank>=5?[-1,1]:[p.facing]){
-      (this.state.jualosWaves||=[]).push({id:this.nextId++,owner:p.id,x:p.x,y:p.y,direction,age:0,ttl:1.7,radius:a.rank===6?125:a.rank>=4?85:50,power:p.specialPower*(a.rank===6?2:a.rank>=4?1.4:1),pierce:a.rank>=2,hits:{},rank:a.rank});
+      (this.state.jualosWaves||=[]).push({id:this.nextId++,owner:p.id,x:p.x,y:p.y,direction,critical,age:0,ttl:1.7,radius:tune(p,0,"waveRange",tune(p,3,"waveRange",a.rank===6?125:a.rank>=4?85:50)),power:p.specialPower*tune(p,1,"wavePower",tune(p,4,"rearPower",a.rank===6?2:a.rank>=4?1.4:1)),pierce:a.rank>=2,hits:{},rank:a.rank});
     }
-    pose(a,a.rank>=5?6:3);a.nextAttack=a.elapsed+.42;
+    pose(a,a.rank>=5?6:3);a.nextAttack=a.elapsed+.32;a.chords=(a.chords||0)+1;if(stars(p,4)===3&&a.chords%3===0){const wave=this.state.jualosWaves.at(-1);this.state.jualosWaves.push({...wave,id:this.nextId++,y:clamp(p.y+70,FLOOR.top,FLOOR.bottom),hits:{}});};
   },
   updateJualosTransformation(p,input,dt){
     const a=p.specialState;a.elapsed+=dt;p.action='special';p.vx=p.vy=p.vz=0;
@@ -53,20 +56,20 @@ export const jualosTransformations={
     if(a.branch===1&&a.rank===6&&a.elapsed>=a.duration-.8&&!a.finale){a.finale=true;a.chargeUntil=a.duration;a.chargeX=p.facing;a.chargeY=0;a.hits={};p.x=p.facing>0?FLOOR.left:FLOOR.right;this.jualosFX(p.x,p.y,15);}
     const rolling=a.branch===1&&a.rank>=3&&input.dodge&&!a.finale;
     const charging=a.branch===1&&(rolling||a.elapsed<(a.chargeUntil||0));
-    const speed=charging?(a.finale?(FLOOR.right-FLOOR.left)/.72:rolling?540:a.rank>=4?720:470):p.speed;
+    const speed=charging?(a.finale?(FLOOR.right-FLOOR.left)/.72:rolling?tune(p,2,"rollSpeed",580):tune(p,3,"chargeSpeed",a.rank>=4?720:510)):p.speed;
     const dx=charging&&!rolling?a.chargeX:x,dy=charging&&!rolling?a.chargeY:y,old={x:p.x,y:p.y};
     p.x=clamp(p.x+(dx||(rolling&&!y?p.facing:0))*speed*dt,FLOOR.left,FLOOR.right);p.y=clamp(p.y+dy*speed*.7*dt,FLOOR.top,FLOOR.bottom);
     if(a.branch===0){
       if((fresh.punch||input.punch)&&a.elapsed>=a.nextAttack){
-        const e=this.state.enemies.filter(e=>ordinary(e)&&!HEAVY_ENEMIES.has(e.kind)&&distance(p,e)<300&&(e.x-p.x)*p.facing>=-20).sort((e,f)=>distance(p,e)-distance(p,f))[0];
+        const e=this.state.enemies.filter(e=>ordinary(e)&&!HEAVY_ENEMIES.has(e.kind)&&distance(p,e)<tune(p,0,"recruitRange",330)&&(e.x-p.x)*p.facing>=-20).sort((e,f)=>distance(p,e)-distance(p,f))[0];
         if(e)this.recruitJualos(p,e);pose(a,2);a.nextAttack=a.elapsed+.5;
       }
-      if((fresh.kick||input.kick)&&a.elapsed>=a.nextHeavy){this.jualosStrike(p,135,1.2,220);pose(a,5);a.nextHeavy=a.elapsed+.5;}
+      if((fresh.kick||input.kick)&&a.elapsed>=a.nextHeavy){const hits=this.jualosStrike(p,145,1.2,260);if(stars(p,1)===3&&hits[0])for(const r of this.state.allies)if(r.recruit&&r.owner===p.id){feedback(this,p,3,hits[0].x,hits[0].y);r.commandTarget=hits[0].id;r.assaultUntil=this.state.time+1;r.cooldown=0;this.jualosFX(r.x,r.y-65,10);}pose(a,5);a.nextHeavy=a.elapsed+.5;}
     }else if(a.branch===1){
-      if(a.slam){a.slam.age+=dt;p.z=Math.sin(Math.min(1,a.slam.age/.65)*Math.PI)*140;pose(a,6,.1);if(a.slam.age>=.65){a.slam=null;p.z=0;this.jualosStrike(p,a.rank===6?290:200,2.6,650,true);this.jualosFX(p.x,p.y,a.rank===6?15:14);pose(a,7,.35);}return;}
-      if((fresh.punch||input.punch)&&a.elapsed>=a.nextAttack&&!charging){this.jualosStrike(p,150,a.rank>=2?1.7:1,a.rank>=2?600:180);pose(a,3);this.jualosFX(p.x+p.facing*80,p.y-30,a.rank>=2?13:12);a.nextAttack=a.elapsed+.38;}
+      if(a.slam){a.slam.age+=dt;p.z=Math.sin(Math.min(1,a.slam.age/.65)*Math.PI)*140;pose(a,6,.1);if(a.slam.age>=.65){a.slam=null;p.z=0;this.jualosStrike(p,tune(p,4,"slamRange",a.rank===6?290:200),2.6,650,true);this.jualosFX(p.x,p.y,a.rank===6?15:14);pose(a,7,.35);}return;}
+      if((fresh.punch||input.punch)&&a.elapsed>=a.nextAttack&&!charging){this.jualosStrike(p,tune(p,0,"snoutRange",165),tune(p,1,"snoutPower",a.rank>=2?1.7:1),tune(p,1,"snoutPush",a.rank>=2?600:180));pose(a,3);this.jualosFX(p.x+p.facing*80,p.y-30,a.rank>=2?13:12);a.nextAttack=a.elapsed+.28;}
       if(fresh.kick&&a.elapsed>=a.nextHeavy&&!a.finale){a.chargeUntil=a.elapsed+.55;a.chargeX=x||y?x:p.facing;a.chargeY=y;a.hits={};a.nextHeavy=a.elapsed+.9;}
-      if(fresh.jump&&a.rank>=5&&a.elapsed>=a.nextJump&&!a.finale){a.slam={age:0};a.nextJump=a.elapsed+1.3;}
+      if(fresh.jump&&a.rank>=5&&a.elapsed>=a.nextJump&&!a.finale){a.slam={age:0};a.nextJump=a.elapsed+tune(p,4,"slamRate",1);}
       if(charging){pose(a,rolling?5:4,.1);p.invincible=Math.max(p.invincible,.06);
         for(const e of this.state.enemies){const vx=p.x-old.x,vy=(p.y-old.y)*1.5,t=clamp(((e.x-old.x)*vx+(e.y-old.y)*1.5*vy)/(vx*vx+vy*vy||1),0,1);
           if(e.hp<=0||e.invincible>0||a.elapsed<(a.hits[e.id]||0)||Math.hypot(e.x-old.x-vx*t,(e.y-old.y)*1.5-vy*t)>100)continue;
@@ -77,8 +80,8 @@ export const jualosTransformations={
     }else{
       if((fresh.punch||input.punch)&&a.elapsed>=a.nextAttack)this.jualosChord(p);
       a.charge=input.kick?a.charge+dt:0;
-      if(a.rank>=3&&a.charge>=.45&&a.elapsed>=a.nextHeavy){a.feedbackUntil=a.elapsed+1.2;a.nextHeavy=a.elapsed+1.8;a.charge=0;pose(a,5,1.2);}
-      if(a.elapsed<(a.feedbackUntil||0)&&a.elapsed>=(a.nextFeedback||0)){this.jualosStrike(p,210,.35,0,true).forEach(e=>{e.stun=Math.max(e.stun,1);});a.nextFeedback=a.elapsed+.25;this.jualosFX(p.x,p.y-70,7);}
+      if(a.rank>=3&&a.charge>=tune(p,2,"feedbackCharge",.32)&&a.elapsed>=a.nextHeavy){a.feedbackUntil=a.elapsed+1.2;a.nextHeavy=a.elapsed+1.8;a.charge=0;pose(a,5,1.2);}
+      if(a.elapsed<(a.feedbackUntil||0)&&a.elapsed>=(a.nextFeedback||0)){this.jualosStrike(p,tune(p,2,"feedbackRange",210),.35,0,true).forEach(e=>{e.stun=Math.max(e.stun,1);});a.nextFeedback=a.elapsed+.25;this.jualosFX(p.x,p.y-70,7);}
       if(a.rank===6&&a.elapsed>=a.duration-1&&!a.finale){a.finale=true;pose(a,7,1);this.hazard(p,{kind:'special',radius:2000,delay:0,ttl:.95,pulse:2,damage:p.specialPower*4,stunDuration:1});this.jualosFX(p.x,p.y,7);}
     }
   },
@@ -89,15 +92,15 @@ export const jualosTransformations={
       if(!owner||r.hp<=0){r.ttl=0;continue;}
       if(!r.permanent&&s.time>=r.contractUntil){r.ttl=0;const e={...r,enemy:true,ally:false,recruit:false,owner:null,action:'idle',cooldown:.5};delete e.ttl;s.enemies.push(e);continue;}
       r.ttl=1;r.cooldown-=dt;r.actionTime+=dt;r.flash=Math.max(0,r.flash-dt);
-      const e=s.enemies.filter(e=>e.hp>0).sort((e,f)=>distance(r,e)-distance(r,f))[0],target=e||owner,d=distance(r,target);r.facing=Math.sign(target.x-r.x)||r.facing;
-      if(d>(e?65:100)){r.x=clamp(r.x+(target.x-r.x)/Math.max(1,d)*(r.aggressive?300:210)*dt,FLOOR.left,FLOOR.right);r.y=clamp(r.y+(target.y-r.y)/Math.max(1,d)*180*dt,FLOOR.top,FLOOR.bottom);r.action='walk';}
-      else if(e&&r.cooldown<=0){r.cooldown=r.aggressive?.42:.8;r.action='punch';r.actionTime=0;if(e.invincible<=0)this.damage(e,Math.max(8,r.power)*(r.aggressive?1.25:1),owner,false);}
+      const commanded=s.enemies.find(e=>e.id===r.commandTarget&&e.hp>0);const e=commanded||s.enemies.filter(e=>e.hp>0).sort((e,f)=>distance(r,e)-distance(r,f))[0],target=e||owner,d=distance(r,target);r.facing=Math.sign(target.x-r.x)||r.facing;
+      if(d>(e?65:100)){r.x=clamp(r.x+(target.x-r.x)/Math.max(1,d)*tune(owner,1,"allySpeed",r.assaultUntil>s.time?540:r.aggressive?320:240)*dt,FLOOR.left,FLOOR.right);r.y=clamp(r.y+(target.y-r.y)/Math.max(1,d)*180*dt,FLOOR.top,FLOOR.bottom);r.action='walk';}
+      else if(e&&r.cooldown<=0){r.cooldown=tune(owner,1,"allyRate",r.aggressive?.36:.65);r.action='punch';r.actionTime=0;if(e.invincible<=0)this.damage(e,Math.max(8,r.power)*(r.aggressive?1.25:1),owner,false,false,{summoned:true});}
       else if(r.actionTime>.25)r.action='idle';
     }
     s.jualosWaves=(s.jualosWaves||[]).filter(w=>{
       w.age+=dt;w.ttl-=dt;const old=w.x;w.x+=w.direction*620*dt;const p=s.players.find(p=>p.id===w.owner&&p.hp>0);if(!p||w.ttl<=0)return false;
       const targets=s.enemies.filter(e=>e.hp>0&&e.invincible<=0&&!w.hits[e.id]&&Math.abs(e.y-w.y)*1.5<w.radius&&e.x>=Math.min(old,w.x)-w.radius&&e.x<=Math.max(old,w.x)+w.radius).sort((a,b)=>Math.abs(a.x-old)-Math.abs(b.x-old));
-      for(const e of targets){w.hits[e.id]=true;this.damage(e,w.power,p,true);if(!w.pierce)return false;}
+      for(const e of targets){w.hits[e.id]=true;this.damage(e,w.power,p,true,false,w);if(!w.pierce)return false;}
       return true;
     });
   },

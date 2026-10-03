@@ -89,7 +89,8 @@ export const karonuxCombat = {
     if (!e.boss || e.vehicle || this.jualosChanging(e) || this.joChanneling(e) || e.sofa && !e.sofaBroken || e.recovering > 0 || e.pattern?.kind === 'sleep') return;
     e.guardHits = this.state.time - (e.guardLastHit ?? -10) < 1.15 ? (e.guardHits || 0) + (heavy ? 2 : 1) : (heavy ? 2 : 1);
     e.guardLastHit = this.state.time;
-    if (e.guardHits < 5) return;
+    if (e.guardHits < 5 || this.state.time < (e.guardBreakReadyAt||0)) return;
+    e.guardBreakReadyAt=this.state.time+5;
     this.releaseYanuFreeze(e.id);
     e.guardHits = 0; e.pattern = null; e.attack = null; e.cooldown = e.recovering = 1.6;
     this.state.hazards = this.state.hazards.filter(h => h.owner !== e.id);

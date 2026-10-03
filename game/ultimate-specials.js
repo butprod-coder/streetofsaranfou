@@ -1,4 +1,5 @@
 import { FLOOR, clamp } from './data.js';
+import { tune } from './talent-upgrades.js';
 
 export const ULTIMATE_COOLDOWN = 2.5;
 export const ULTIMATE_SPECIALS = {
@@ -61,8 +62,9 @@ export const ultimateSpecials = {
     this.event('opening',{x:p.x,y:p.y-190,label:ULTIMATE_SPECIALS[p.kind][a.branch][0]});
   },
   ultimateStrike(p,origin,radius,power,stun=.7) {
+    radius=tune(p,5,'ultimateRange',radius);power=tune(p,5,'ultimatePower',power);
     for(const e of this.state.enemies)if(targetable(e)&&e.invincible<=0&&distance(origin,e)<=radius){
-      const hp=e.hp;this.damage(e,p.specialPower*power,p,true);
+      const hp=e.hp;this.damage(e,p.specialPower*power,p,true,false,p.specialState?.ultimateRush||null);
       if(e.hp<hp&&e.hp>0){e.stun=Math.max(e.stun,e.boss?Math.min(.2,stun):stun);if(!e.boss&&!e.vehicle)e.vx=(Math.sign(e.x-origin.x)||p.facing)*420;}
     }
     for(const prop of this.state.props)if(prop.hp>0&&distance(origin,prop)<radius)this.hitProp(prop,3,p);
@@ -91,28 +93,28 @@ export const ultimateSpecials = {
     a.pose=7;a.poseUntil=a.elapsed+.4;
     switch(p.kind){
       case 'karonux':
-        if(branch===1){const frozen=foes().filter(e=>e.karonuxFrost?.frozenUntil>s.time);if(!frozen.length)return false;for(const e of frozen)e.karonuxFrost.amount=Math.max(3,e.karonuxFrost.amount);this.karonuxShatter(p,frozen,true);}
+        if(branch===1){const frozen=foes().filter(e=>e.karonuxFrost?.frozenUntil>s.time);if(!frozen.length)return false;for(const e of frozen){e.karonuxFrost.amount=Math.max(3,e.karonuxFrost.amount);this.ultimateStrike(p,e,1,ULTIMATE_TEAM_HIT);}this.karonuxShatter(p,frozen,true);}
         else{strike(branch===0?340:360,ULTIMATE_HIT,1);fx(14);a.pose=branch===0?5:7;}
         break;
       case 'lorenzo':
         if(branch===0){this.lorenzoCigarettes(p,36,true);this.lorenzoCloud(p,p.x,p.y,150);strike(320,ULTIMATE_HIT);a.pose=7;fx(6);}
-        else if(branch===1){for(const e of foes().slice(0,4))this.lorenzoSwarm(p,e,3,2);this.lorenzoDive(p,true);fx(12);}
+        else if(branch===1){for(const e of foes().filter(e=>distance(p,e)<tune(p,5,'ultimateRange',650)).slice(0,4)){this.lorenzoSwarm(p,e,3,2);this.ultimateStrike(p,e,1,ULTIMATE_TEAM_HIT);}this.lorenzoDive(p,true);fx(12);}
         else this.beginUltimateRush(p,7);
         break;
       case 'jualos':
-        if(branch===0){for(const e of [...foes()])if(distance(p,e)<360)this.recruitJualos(p,e,true);for(const ally of s.allies.filter(m=>m.recruit&&m.owner===p.id&&m.hp>0)){ally.cooldown=0;this.ultimateStrike(p,ally,230,ULTIMATE_TEAM_HIT);}strike(250,ULTIMATE_TEAM_HIT);fx(11);}
+        if(branch===0){for(const e of [...foes()])if(distance(p,e)<tune(p,5,'ultimateRange',360))this.recruitJualos(p,e,true);for(const ally of s.allies.filter(m=>m.recruit&&m.owner===p.id&&m.hp>0)){ally.cooldown=0;this.ultimateStrike(p,ally,230,ULTIMATE_TEAM_HIT);}strike(250,ULTIMATE_TEAM_HIT);fx(11);}
         else if(branch===1)this.beginUltimateRush(p,6);
         else{this.jualosChord(p);for(const w of s.jualosWaves.filter(w=>w.owner===p.id&&w.age===0)){w.power=p.specialPower*ULTIMATE_HIT;w.radius=155;}strike(240,ULTIMATE_TEAM_HIT,1.3);fx(7);a.pose=7;}
         break;
       case 'yanu':
-        if(branch===0){for(const e of foes().filter(e=>distance(p,e)<650).slice(0,5)){this.ultimateStrike(p,e,1,ULTIMATE_HIT,1);fx(0,e.x,e.y-50);}this.leapYanu(p);}
+        if(branch===0){for(const e of foes().filter(e=>distance(p,e)<tune(p,5,'ultimateRange',650)).slice(0,5)){this.ultimateStrike(p,e,1,ULTIMATE_HIT,1);fx(0,e.x,e.y-50);}this.leapYanu(p);}
         else if(branch===1){strike(600,ULTIMATE_HIT,1.6);fx(2);}
         else{for(let i=0;i<4;i++)this.plantYanu(p,p.x+(i%2?130:-130),p.y+(i<2?-45:45));for(const t of s.yanuPlants.filter(t=>t.owner===p.id)){t.giant=true;t.nextBite=s.time;}strike(380,ULTIMATE_HIT);for(const e of foes())if(distance(p,e)<380&&!e.boss)e.yanuRoots={until:s.time+1.5,owner:p.id};fx(13);}
         break;
       case 'jo':
         if(branch===0){this.unloadJo(p,true);strike(360,ULTIMATE_HIT);fx(2);a.pose=6;}
         else if(branch===1){a.heat=100;strike(380,ULTIMATE_HIT);for(let i=-1;i<=1;i++)this.joFirePatch(p,p.x+i*110,p.y);fx(7);}
-        else{const targets=foes().filter(e=>distance(p,e)<650).slice(0,5);for(const e of targets){this.joBackstab(p,e);this.ultimateStrike(p,e,1,ULTIMATE_HIT);}fx(11);a.pose=5;}
+        else{const targets=foes().filter(e=>distance(p,e)<tune(p,5,'ultimateRange',650)).slice(0,5);for(const e of targets){this.joBackstab(p,e);this.ultimateStrike(p,e,1,ULTIMATE_HIT);}fx(11);a.pose=5;}
         break;
       case 'kikor':
         if(branch===0){strike(380,ULTIMATE_HIT);for(let i=-1;i<=1;i++){this.kikorPaint(p,p.x+i*125,p.y);this.drawKikorCreature(p,true);}fx(1);}

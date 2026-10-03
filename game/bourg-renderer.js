@@ -22,8 +22,7 @@ export function drawBourgWorld(r,s) {
   if(e.kind==='bakery'){r.arcadeSprite('decor_village_3',BAKERY.x,BAKERY.y,0,120);}
   if(e.kind==='terrace'){r.arcadeSprite('decor_chalkboard',1080,470,0,100);label(c,'SAUVEZ MA TERRASSE !',1080,490);}
   if(e.kind==='scooter'){
-    const x=790,y=495;r.ellipse(x,y,95,14,'#07131c88');c.fillStyle='#111d28';for(const dx of [-62,62]){c.beginPath();c.arc(x+dx,y-12,21,0,Math.PI*2);c.fill();c.strokeStyle='#a8bec8';c.lineWidth=4;c.stroke();}
-    c.fillStyle='#c04a39';c.beginPath();c.moveTo(x-76,y-30);c.lineTo(x-35,y-75);c.lineTo(x+6,y-75);c.lineTo(x+10,y-33);c.lineTo(x+48,y-33);c.lineTo(x+42,y-100);c.lineTo(x+65,y-104);c.lineTo(x+80,y-25);c.closePath();c.fill();c.fillStyle='#18242e';c.fillRect(x-57,y-85,67,14);c.fillStyle='#bc9d76';c.fillRect(x-75,y-104,35,22);
+    const x=790,y=495;r.ellipse(x,y,95,14,'#07131c88');r.arcadeSprite('remy',x,y,0,175);
     if(e.status==='active'){c.fillStyle=Math.sin(e.elapsed*12)>0?'#ff6256':'#ffdaa5';c.beginPath();c.arc(x+67,y-92,9,0,Math.PI*2);c.fill();}label(c,e.status==='choice'?'COFFRE FERMÉ · ALARME':'COFFRE OUVERT',x,y+30);
   }
   if(e.kind==='shells'){r.arcadeSprite('guylux',650,455,0,140);label(c,'GUYLUX · SANS MISE',650,465);}

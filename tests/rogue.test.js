@@ -22,11 +22,11 @@ test('126 unique nodes, three branches, character-specific ranks, legal investme
   const ids=new Set();
   for(const f of FIGHTERS){const nodes=TALENTS[f.id];assert.equal(nodes.length,['karonux','lorenzo','jualos','yanu','jo','kikor','gustavax'].includes(f.id) ? 18 : 15);assert.equal(new Set(nodes.map(n=>n.branch)).size,3);
     for(const n of nodes){assert.ok(!ids.has(n.id));ids.add(n.id);const {p}=arena(f.id);learn(p,n.name);assert.ok(n.description.length>12);}
-    let p=normalizeProfile({milestones:[...TALENT_MILESTONES, ...KARONUX_MILESTONES],xp:xpForLevel(20),completed:[0,1,2,3,4,5]},f.id);assert.equal(p.points,['karonux','lorenzo','jualos','yanu','jo','kikor','gustavax'].includes(f.id) ? 6 : 8);assert.equal(p.statPoints,38);
+    let p=normalizeProfile({milestones:[...TALENT_MILESTONES, ...KARONUX_MILESTONES],xp:xpForLevel(20),completed:[0,1,2,3,4,5]},f.id);assert.equal(p.points,['karonux','lorenzo','jualos','yanu','jo','kikor','gustavax'].includes(f.id) ? 6 : 8);assert.equal(p.statPoints,72);
     for(const n of nodes.filter(n=>n.branchIndex===0&&nodes.find(q=>q.branch===n.branch&&q.tier===n.tier)===n))p=spendPoint(p,n.id);
     assert.equal(spendPoint(p,nodes[11].id),null);assert.equal(spendPoint(p,nodes[0].id),null);
     assert.equal(normalizeProfile({xp:Infinity,points:999},f.id).points,1);
-    for(let i=0;i<20;i++)p=spendAttribute(p,'endurance');assert.equal(p.attributes.endurance,20);
+    for(let i=0;i<10;i++)p=spendAttribute(p,'endurance');assert.equal(p.attributes.endurance,10);assert.equal(spendAttribute(p,'endurance'),null);
   }assert.equal(ids.size,126);
 });
 test('enemy bags have exactly equal frequencies and arrivals obey active cap',()=>{

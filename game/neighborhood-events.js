@@ -91,7 +91,7 @@ export const neighborhoodEvents = {
       this.startNeighborhoodFight();
     } else if (e.kind === 'merchant') {
       e.choices[p.id] = choice.id;
-      if (choice.id === 'food') p.hp = Math.min(p.maxHp, p.hp + 35);
+      if (choice.id === 'food') this.healPlayer(p,35);
       if (choice.id === 'energy') p.energy = Math.min(100, p.energy + 50);
       if (choice.id === 'bat') { this.dropWeapon(p); p.weapon = { kind: 'bat', uses: WEAPONS.bat.uses }; }
       this.event('surprise', { neighborhood: true, label: `J${p.id} · ${choice.id === 'skip' ? 'UNE AUTRE FOIS !' : choice.label}` });

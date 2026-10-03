@@ -25,7 +25,7 @@ export const estateEvents = {
     const active=s.players.filter(p=>p.hp>0&&p.connected!==false);
     if(e.kind==='picnic') {
       if(active.some(p=>p.energy<25)) {e.choices={};e.notice='Il faut 25 énergie par joueur. Vous pouvez passer.';return;}
-      for(const p of active){p.energy-=25;p.hp=Math.min(p.maxHp,p.hp+35);}
+      for(const p of active){p.energy-=25;this.healPlayer(p,35);}
       s.estate.helpStage=s.stage+1;this.finishNeighborhood('success');return;
     }
     e.status='active';e.elapsed=0;

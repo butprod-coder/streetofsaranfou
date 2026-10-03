@@ -7,7 +7,7 @@ export const dynamicCombat = {
     if (target.kind !== 'shieldGuard' || target.hp <= 0 || target.stun > 0 || target.recovering > 0 || target.grabbedBy || target.thrown || source.areaDamage || source.specialState || WEAPONS[source.attack?.weapon]?.projectile) return false;
     if ((source.x - target.x) * target.facing < -10 || Math.abs(source.y - target.y) > 75) return false;
     target.flash = .12;
-    if (this.state.time >= (target.shieldHintAt || 0)) { target.shieldHintAt = this.state.time + 1; this.event('opening', { x: target.x, y: target.y - 160, label: 'BOUCLIER · PASSE DANS SON DOS !' }); this.event('shieldBlock', { x: target.x, y: target.y - 75 }); }
+    if (this.state.time >= (target.shieldHintAt || 0)) { target.shieldHintAt = this.state.time + 1; this.event('shieldBlock', { x: target.x, y: target.y - 75 }); }
     return true;
   },
   updateDynamicEnemy(e, dt) {
@@ -37,7 +37,6 @@ export const dynamicCombat = {
     if (e.cooldown <= 0 && inRange && occupied < limit) {
       e.pattern = { kind: e.kind, elapsed: 0, windup: e.kind === 'kamikaze' ? 1.4 : e.kind === 'laneShooter' ? 1.15 : .9, facing: e.facing, targetY: target.y };
       e.action = 'special'; e.moving = false;
-      this.event('opening', { x: e.x, y: e.y - 170, label: e.kind === 'kamikaze' ? 'MÈCHE ALLUMÉE · FRAPPE OU ÉLOIGNE-TOI !' : e.kind === 'laneShooter' ? 'TIR EN PRÉPARATION · CHANGE DE LIGNE !' : 'COUP DE BOUCLIER !' });
       return true;
     }
     if (e.recovering > 0) { e.action = 'idle'; return true; }

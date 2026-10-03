@@ -118,7 +118,7 @@ test('Kikor creates one protector, becomes vulnerable on its death, and cleans o
 });
 test('attributes preserve missing health, cannot resurrect, and reduce incoming damage', () => {
   const g = new Simulation(['gustavax']), p = g.state.players[0]; p.hp=30;
-  applyProfile(p,{xp:xpForLevel(6),attributes:{endurance:10}});assert.equal(p.maxHp-p.hp,155-30);
+  applyProfile(p,{xp:xpForLevel(6),completed:[0],attributes:{endurance:10}});assert.equal(p.maxHp-p.hp,155-30);
   const before=p.hp;g.damage(p,20,{x:0,facing:1},false);assert.equal(before-p.hp,Math.round(20 * .85/(1+10*.015)));
   p.hp=0;applyProfile(p,p.progression);assert.equal(p.hp,0);
 });

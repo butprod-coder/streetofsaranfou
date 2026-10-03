@@ -17,10 +17,10 @@ function arena(branch = 0, rank = 6) {
 function advance(sim, p, seconds, input = {}) {
   for (let t = 0; t < seconds; t += 1/60) { sim.state.time += 1/60; if (p.specialState) sim.updateSpecial(p, { ...blankInput(), ...input }, 1/60); sim.updateKaronuxWorld(1/60); }
 }
-test('six awards only: initial point, five later bosses, no duplicate stage reward', () => {
+test('every boss milestone is rewarded once, including the final boss', () => {
   let p = normalizeProfile({}, 'karonux'); assert.equal(p.points, 1);
   for (const key of ['street:0:0','street:0:2','boss:0','street:1:2','boss:1','boss:2','boss:3','boss:4','boss:5']) p = awardTalent(awardTalent(p,key),key);
-  assert.equal(p.points, 6); assert.deepEqual(p.milestones, KARONUX_MILESTONES);
+  assert.equal(p.points, 7); assert.deepEqual(p.milestones, [...KARONUX_MILESTONES,'boss:5']);
 });
 test('first purchase locks both other branches, prerequisites and saved lock survive normalization', () => {
   let p = normalizeProfile({ milestones: KARONUX_MILESTONES }, 'karonux');

@@ -15,7 +15,7 @@ function arena(kind, branch=0, rank=5, duo=false) {
 }
 function hit(sim,p,type='punch',final=false) {p.attack=null;p.cooldown=0;if(final){p.comboStep=2;p.comboWindow=1;}sim.startAttack(p,type);sim.resolveAttack(p);}
 
-test('six campaign milestones, including KO partner, never stack on replays or XP',()=>{
+test('street completion and XP do not grant extra talent points',()=>{
   const sim=new Simulation(['gustavax','gustavax']);
   assert.deepEqual(sim.state.players.map(p=>p.progression.points),[1,1]);
   const totals=[];
@@ -23,9 +23,9 @@ test('six campaign milestones, including KO partner, never stack on replays or X
     sim.state.chapter=chapter;sim.state.stage=stage;sim.state.players[1].hp=0;sim.clearStreet();sim.clearStreet();
     if(stage===2||stage===5)totals.push(sim.state.players[0].progression.points);
   }
-  assert.deepEqual(totals,[1,2,2,3,3,4,4,5,5,6,6,6]);
-  for(const p of sim.state.players){assert.equal(p.progression.points,6);assert.equal(addExperience(p.progression,10000).points,6);}
-  sim.state.chapter=0;sim.state.stage=2;sim.clearStreet();assert.equal(sim.state.players[0].progression.points,6);
+  assert.deepEqual(totals,Array(12).fill(1));
+  for(const p of sim.state.players){assert.equal(p.progression.points,1);assert.equal(addExperience(p.progression,10000).points,1);}
+  sim.state.chapter=0;sim.state.stage=2;sim.clearStreet();assert.equal(sim.state.players[0].progression.points,1);
   assert.equal(new Simulation(['jo']).state.players[0].progression.points,1);
 });
 test('linear prerequisite and global ultimate exclusivity survive normalization',()=>{
@@ -34,7 +34,7 @@ test('linear prerequisite and global ultimate exclusivity survive normalization'
   for(const n of TALENTS.gustavax.slice(0,5))p=spendPoint(p,n.id);
   assert.equal(p.points,1);assert.equal(p.completed.length,0);
   assert.equal(canLearn({...p,talents:[...p.talents,...TALENTS.gustavax.slice(5,9).map(n=>n.id)]},TALENTS.gustavax[9]),false);
-  assert.equal(spendPoint(p,TALENTS.gustavax[0].id),null);
+  assert.equal(spendPoint(p,TALENTS.gustavax[0].id).talentRanks[TALENTS.gustavax[0].id],2);
   assert.equal(normalizeProfile({...p,milestones:[...KARONUX_MILESTONES,...KARONUX_MILESTONES,'forged'],points:99}).points,1);
 });
 test('checkpoint preserves awards and purchases without regranting the first-street reward',()=>{

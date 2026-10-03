@@ -52,7 +52,29 @@ export class Audio {
     gain.gain.setValueAtTime(volume, at); gain.gain.exponentialRampToValueAtTime(.001, at + length);
     source.connect(filter).connect(gain).connect(this.effectsBus); source.start(at); source.stop(at + length); source.onended = () => { source.disconnect(); filter.disconnect(); gain.disconnect(); };
   }
+  bossAttack(event) {
+    const now=this.context?.currentTime||0,impact=event.kind==='impact';
+    if(!impact){this.hiss(.3,.10,now,1800);this.tone(110+event.style*45,.4,.14,'sawtooth',now,250+event.style*70);return;}
+    this.soundtrack?.duck();
+    if(event.style===1){this.hiss(.18,.3,now,2600);this.tone(240,.17,.32,'triangle',now,45);this.tone(65,.22,.25,'sine',now+.03,28);}
+    else if(event.style===2){this.tone(85,.4,.28,'sawtooth',now,170);this.tone(127,.35,.18,'triangle',now,42);this.hiss(.35,.25,now,950);}
+    else {this.tone(62,.32,.45,'triangle',now,26);this.hiss(.22,.25,now,700);this.tone(115,.12,.18,'square',now,35);}
+  }
+  bossDeath(kind) {
+    if(!this.context||this.muted)return;
+    // A descending voiced breath, synthesized locally through two vocal formants.
+    const ctx=this.context,now=ctx.currentTime,root={karonux:105,jualos:85,yanu:145,lorenzo:120,jo:155,kikor:130,gustavax:75}[kind]||110;
+    const voice=ctx.createOscillator(),gain=ctx.createGain();voice.type='sawtooth';voice.frequency.setValueAtTime(root,now);voice.frequency.exponentialRampToValueAtTime(root*.48,now+1.05);
+    gain.gain.setValueAtTime(.001,now);gain.gain.linearRampToValueAtTime(.24,now+.12);gain.gain.exponentialRampToValueAtTime(.001,now+1.15);gain.connect(this.effectsBus);
+    const filters=[ctx.createBiquadFilter(),ctx.createBiquadFilter()];
+    for(const [i,filter] of filters.entries()){filter.type='bandpass';filter.Q.value=i?4:2;filter.frequency.setValueAtTime(i?1150:530,now);filter.frequency.exponentialRampToValueAtTime(i?650:260,now+1.1);voice.connect(filter);filter.connect(gain);}
+    voice.start(now);voice.stop(now+1.2);voice.onended=()=>{voice.disconnect();filters.forEach(f=>f.disconnect());gain.disconnect();};
+    this.hiss(.85,.10,now+.15,350);this.soundtrack?.duck();
+  }
   effect(event) {
+    if(event.type==='bossAction')this.bossAttack(event);
+    if(event.type==='ko'&&(event.boss||event.miniBoss))this.bossDeath(event.kind);
+    if(event.type==='hit'&&event.criticalVisual){this.tone(760,.12,event.quietCritical?.12:.28,'triangle',0,210);if(!event.quietCritical)this.hiss(.08,.18,0,2200);}
     if(event.type==='yanuBeat')this.soundtrack?.raveBeat(event.beat);
     if (event.type === 'taunt') {
       this.say(event.label);

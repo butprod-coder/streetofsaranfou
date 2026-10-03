@@ -29,7 +29,7 @@ export const finalArena = {
     s.hazards=[];s.allies=[];
     if(s.stage===6){s.phase='won';s.finale.defeated=true;s.score+=5000;this.event('win');return;}
     s.score+=500;
-    for(const p of s.players){if(p.hp<=0)this.revivePlayer(p,.5);p.hp=Math.min(p.maxHp,p.hp+p.maxHp*.3);if(s.stage===5)p.lives=Math.max(2,p.lives);}
+    for(const p of s.players){if(p.hp<=0)this.revivePlayer(p,.5);this.healPlayer(p,p.maxHp*.3);if(s.stage===5)p.lives=Math.max(2,p.lives);}
     s.stage++;this.enterStreet();
     if(s.stage===6)this.event('rage',{label:'ASSEZ JOUÉ. GUSTAVAX SE LÈVE.'});
     else this.event('taunt',{x:640,y:235,label:['« Ce n’était que le début. »','« Vous abîmez mon tapis. »','« La bande, au travail ! »'][s.stage%3]});

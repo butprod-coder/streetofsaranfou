@@ -133,7 +133,7 @@ export const rogueCombat = {
     if(t(p,'Grand coup de rouleau')&&a.type==='kick'&&e.roguePaint?.[p.id]?.stacks&&this.rogueReady(p,'roller',.4))for(const other of this.state.enemies)if(other!==e&&(other.x-e.x)*p.facing>=0&&near(other,e,180))this.roguePaint(p,other);
     if(t(p,'Cible du maître'))p.rogueTarget=e.id;
     if(a.type==='punch'&&p.comboStep===3&&t(p,'Travail d’équipe')&&this.rogueReady(p,'team',1))this.rogueCoordinated(p,e);
-    if(active(p,'rogueFeast',now)&&this.rogueReady(p,'feast',.35)){const heal=Math.min(4,p.rogueFeastBudget||0);p.hp=Math.min(p.maxHp,p.hp+heal);p.rogueFeastBudget-=heal;}
+    if(active(p,'rogueFeast',now)&&this.rogueReady(p,'feast',.35)){const heal=Math.min(4,p.rogueFeastBudget||0);this.healPlayer(p,heal);p.rogueFeastBudget-=heal;}
     if(t(p,'Aquaplaning')&&(this.state.rogueZones||[]).some(z=>z.owner===p.id&&z.kind==='oil'&&near(z,e,z.radius)))this.roguePush(p,e,620,true);
     if(t(p,'Rebond du poing')&&a.type==='punch'&&p.comboStep===3&&this.rogueReady(p,'fistBounce',.5)){const second=this.state.enemies.find(o=>o!==e&&alive(o)&&near(o,e,180));if(second){this.rogueDamage(p,second,.8);this.rogueFX(p,'REBOND DU POING',190,'arms');}}
     if(a.rogueDive&&!a.rogueLanded){a.rogueLanded=true;if(t(p,'Réception musclée'))this.rogueBurst(p,p.x,p.y,active(p,'rogueRing',now)?210:110,active(p,'rogueRing',now)?1.3:.45,'RÉCEPTION');

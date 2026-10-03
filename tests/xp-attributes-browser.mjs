@@ -13,21 +13,22 @@ try {
   await page.evaluate(async () => {
     const { renderAttributes } = await import('/game/rogue-ui.js');
     const { normalizeProfile, xpForLevel, spendAttribute } = await import('/game/progression.js');
-    const player = { kind: 'yanu', progression: normalizeProfile({ xp: xpForLevel(40), attributes: { strength: 12, endurance: 12, attackSpeed: 12, moveSpeed: 12, specialCharge: 12 } }, 'yanu') };
+    const player = { kind: 'yanu', progression: normalizeProfile({ xp: xpForLevel(40), completed:[0,1,2,3,4,5], attributes: { strength: 9, endurance: 9, attackSpeed: 9, moveSpeed: 9, specialCharge: 9, precision:9, weaponMastery:9, recovery:0 } }, 'yanu') };
     const render = () => renderAttributes(player, key => { player.progression = spendAttribute(player.progression, key); render(); });
     render(); document.querySelector('#attributes').classList.add('active');
     window.xpQA = player;
   });
-  assert.equal(await page.locator('[data-attribute]').count(), 5);
-  for (const key of ['strength', 'endurance', 'attackSpeed', 'moveSpeed', 'specialCharge']) {
+  assert.equal(await page.locator('[data-attribute]').count(), 8);
+  for (const key of ['strength', 'endurance', 'attackSpeed', 'moveSpeed', 'specialCharge', 'precision', 'weaponMastery']) {
     await page.locator(`[data-attribute=${key}]`).click();
-    assert.match(await page.locator(`[data-attribute=${key}]`).textContent(), /Rang 13/);
+    assert.match(await page.locator(`[data-attribute=${key}]`).textContent(), /10\/10 MAX/);
+    assert.equal(await page.locator(`[data-attribute=${key}]`).isDisabled(), true);
   }
   assert.match(await page.locator('#attribute-progress').textContent(), /Niveau 40/);
-  assert.doesNotMatch(await page.locator('#attributes').textContent(), /\/20|\/10|Dix rangs/);
-  assert.equal(await page.evaluate(() => window.xpQA.progression.statPoints), 13);
+  assert.match(await page.locator('#attribute-progress').textContent(), /72\/72 gagnés/);
+  assert.equal(await page.evaluate(() => window.xpQA.progression.statPoints), 2);
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/xp-attributes.png' });
   assert.deepEqual(errors, []);
-  console.log('PASS: five attributes, spending above rank ten, level forty and updated menu.');
+  console.log('PASS: eight capped attributes, disabled maximum ranks and 72 earned stage points.');
 } finally { await browser?.close(); await new Promise(r => server.server.close(r)); }

@@ -30,7 +30,7 @@ export const campaignRoute = {
     const players=s.players.filter(p=>p.connected!==false);
     if(!players.length||!players.every(p=>s.routeReady[p.id]))return true;
     s.chapter=nextDistrict(s);s.stage=0;s.routeReady={};
-    for(const player of s.players){player.hp=Math.min(player.maxHp,Math.max(1,player.hp)+player.maxHp*.4);player.lives=Math.min(5,player.lives+1);}
+    for(const player of s.players){player.hp=Math.max(1,player.hp);this.healPlayer(player,player.maxHp*.4);player.lives=Math.min(5,player.lives+1);}
     this.enterStreet();return true;
   },
 };

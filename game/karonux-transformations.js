@@ -1,3 +1,4 @@
+import { tune, stars, feedback } from './talent-upgrades.js';
 import { FLOOR, clamp } from './data.js';
 import { karonuxSelection } from './karonux-talents.js';
 
@@ -10,7 +11,7 @@ export const karonuxTransformations = {
     this.releaseGrab(p);
     p.energy -= 100; p.attack = null; p.cooldown = 0; p.z = p.vz = p.vx = p.vy = 0;
     p.specialState = { kind: 'karonux', transformation: true, branch, rank, ultimate: rank === 6,
-      duration: rank >= 6 ? 9 : rank >= 4 ? 7 : 5, elapsed: 0, nextAttack: 0,
+      duration: (rank >= 6 ? 9 : rank >= 4 ? 7 : 5)+tune(p,3,"duration",0), elapsed: 0, nextAttack: 0,
       nextDodge: 0, nextJump: 0, nextPulse: 0, pose: 7, poseUntil: .25, hits: {}, speed: 0,
       chain: 0, chainUntil: 0, combo: 0, charge: 0, held: { special: true }, taps: { ...p.taps } };
     p.specialCd = 0; p.action = 'special'; p.invincible = Math.max(p.invincible, .4);
@@ -25,7 +26,7 @@ export const karonuxTransformations = {
   karonuxFrost(p, e, amount) {
     if (e.hp <= 0) return;
     const f = e.karonuxFrost ||= { amount: 0, until: 0, frozenUntil: 0, owner: p.id };
-    f.owner = p.id; f.amount = Math.min(3, f.amount + amount); f.until = this.state.time + 4;
+    f.owner = p.id; f.amount = Math.min(3, f.amount + tune(p,0,"frost",amount)); f.until = this.state.time + 4;
     if (f.amount >= 3) { f.frozenUntil = this.state.time + (e.boss ? 1 : 2.5); e.attack = null; e.vx = e.vy = 0; }
   },
   karonuxShatter(p, targets, contagious = false) {
@@ -34,12 +35,12 @@ export const karonuxTransformations = {
     while (queue.length) {
       const source = queue.shift(); if (seen.has(source.id)) continue;
       seen.add(source.id); source.karonuxFrost = null;
-      this.karonuxEffect(source.x, source.y, 2);
-      for (const e of this.state.enemies) if (nearby(source, e, 155)) {
+      this.karonuxEffect(source.x, source.y, 2);feedback(this,p,1,source.x,source.y);
+      for (const e of this.state.enemies) if (nearby(source, e, tune(p,1,"shatterRange",155))) {
         const frozen = e.karonuxFrost?.frozenUntil > this.state.time;
-        this.damage(e, p.specialPower * 1.5, p, true);
+        this.damage(e, p.specialPower * tune(p,1,"shatterPower",1.5), p, true);
         if (contagious && e !== source && e.hp > 0 && !seen.has(e.id)) {
-          this.karonuxFrost(p, e, 2);
+          this.karonuxFrost(p, e, tune(p,4,"contagion",2));
           if (frozen || e.karonuxFrost?.frozenUntil > this.state.time) queue.push(e);
         }
       }
@@ -90,20 +91,20 @@ export const karonuxTransformations = {
     a.moving = !!(x || y); if (a.elapsed >= a.poseUntil) a.pose = a.moving ? Math.floor(a.elapsed * 8) % 2 : 0;
     const pose = (cell, duration) => { a.pose = cell; a.poseUntil = a.elapsed + duration; };
     if (fresh.dodge && a.elapsed >= a.nextDodge) {
-      a.nextDodge = a.elapsed + 1; a.dashUntil = a.elapsed + .25; a.dashX = x || y ? x / norm : p.facing; a.dashY = y / norm;
+      a.nextDodge = a.elapsed + tune(p,4,"spinRate",.8); a.dashUntil = a.elapsed + .25; a.dashX = x || y ? x / norm : p.facing; a.dashY = y / norm;
       p.invincible = Math.max(p.invincible, .22); pose(a.branch === 1 ? 5 : 6, .35);
-      if (a.branch === 2 && a.rank >= 5) { this.karonuxStrike(p, a.rank === 6 ? 210 : 170, 1.8, { radial: true, heavy: true, launch: 330 }); this.karonuxEffect(p.x, p.y, 13); }
+      if (a.branch === 2 && a.rank >= 5) { this.karonuxStrike(p, tune(p,4,"spinRange",a.rank === 6 ? 210 : 170), 1.8, { radial: true, heavy: true, launch: 330 }); this.karonuxEffect(p.x, p.y, 13); }
     }
     if (a.branch === 1) {
       if (dash && a.rank >= 3 && a.elapsed >= (a.nextTrail || 0)) {
         a.nextTrail = a.elapsed + .07;
         const trails = this.state.karonuxTrails ||= [];
-        trails.push({ owner: p.id, x: p.x, y: p.y, until: this.state.time + 2.5 });
+        trails.push({ owner: p.id, x: p.x, y: p.y, until: this.state.time + tune(p,2,"trailLife",2.5) });
         if (trails.length > 40) trails.shift();
       }
       if (a.rank >= 4 && a.elapsed >= a.nextPulse) {
-        a.nextPulse = a.elapsed + .45;
-        for (const e of this.state.enemies) if (nearby(p, e, 150)) this.karonuxFrost(p, e, .55);
+        a.nextPulse = a.elapsed + tune(p,3,"blizzardRate",.45);
+        for (const e of this.state.enemies) if (nearby(p, e, tune(p,3,"blizzardRange",150))) this.karonuxFrost(p, e, .55);
         this.karonuxEffect(p.x, p.y, 0);
       }
       if (a.elapsed >= a.nextAttack && (input.punch || fresh.punch || input.kick || fresh.kick)) {
@@ -112,36 +113,36 @@ export const karonuxTransformations = {
         this.karonuxEffect(p.x + p.facing * 85, p.y - 35, 0);
       }
     } else {
-      if (a.rank >= 3 && input.kick && a.elapsed >= a.nextAttack) { a.charge = Math.min(1.2, a.charge + dt); pose(4, .1); }
+      if (a.rank >= 3 && input.kick && a.elapsed >= a.nextAttack) { a.charge = Math.min(1.2, a.charge + dt*tune(p,2,"chargeRate",1)); pose(4, .1); }
       if (a.elapsed >= a.nextAttack && (a.charge > 0 && !input.kick || a.rank < 3 && (input.kick || fresh.kick) || a.rank >= 3 && fresh.kick && !input.kick)) {
-        this.karonuxStrike(p, 170, 1.5 + a.charge * 1.7, { heavy: true, launch: 400 + a.charge * 500 });
+        this.karonuxStrike(p, 170, 1.5 + a.charge * 1.7, { heavy: true, launch: tune(p,2,"launch",400 + a.charge * 500) });
         a.charge = 0; a.nextAttack = a.elapsed + .55; pose(4, .35);
       } else if (a.elapsed >= a.nextAttack && !input.kick && (input.punch || fresh.punch)) {
         a.combo = a.rank >= 2 ? a.combo % 3 + 1 : 1;
         const heavy = a.combo === 3; pose(heavy ? 4 : a.combo === 2 ? 3 : 2, .2);
-        this.karonuxStrike(p, heavy ? 165 : 145, heavy ? 1.6 : 1, { heavy, launch: heavy ? 550 : 180 }); a.nextAttack = a.elapsed + .24;
+        this.karonuxStrike(p, tune(p,0,"strikeRange",heavy ? 165 : 145), heavy ? tune(p,1,"comboPower",1.6) : 1, { radial:heavy&&stars(p,1)===3, heavy, launch: heavy ? 550 : 180 }); a.nextAttack = a.elapsed + tune(p,1,"comboRate",.2);
       }
-      if (fresh.jump && a.rank >= 4 && a.elapsed >= a.nextJump) { a.nextJump = a.elapsed + 1.4; a.landAt = a.elapsed + .6; pose(5, .6); }
+      if (fresh.jump && a.rank >= 4 && a.elapsed >= a.nextJump) { a.nextJump = a.elapsed + tune(p,3,"jumpRate",1.1); a.landAt = a.elapsed + .6; pose(5, .6); }
       if (a.landAt) {
         p.z = Math.sin(Math.max(0, (a.landAt - a.elapsed) / .6) * Math.PI) * 85; p.vz = 0;
-        if (a.elapsed >= a.landAt) { a.landAt = 0; p.z = 0; pose(7, .3); this.karonuxStrike(p, a.rank === 6 ? 210 : 175, 2, { radial: true, heavy: true, launch: 600 }); this.karonuxEffect(p.x, p.y, 14); }
+        if (a.elapsed >= a.landAt) { a.landAt = 0; p.z = 0; pose(7, .3); this.karonuxStrike(p, tune(p,3,"landingRange",a.rank === 6 ? 210 : 175), 2, { radial: true, heavy: true, launch: 600 }); this.karonuxEffect(p.x, p.y, 14); }
       }
     }
   },
   driveKaronux(p, input, fresh, x, y, dt) {
     const a = p.specialState, old = { x: p.x, y: p.y };
     if (a.elapsed > a.chainUntil) a.chain = 0;
-    a.speed = Math.min(a.rank >= 6 ? 650 : a.rank >= 4 ? 550 : 450, a.speed + (a.rank >= 6 ? 2400 : a.rank >= 4 ? 1300 : 700) * dt);
+    a.speed = Math.min(a.rank >= 6 ? 650 : a.rank >= 4 ? 550 : 450, a.speed + tune(p,3,"acceleration",a.rank >= 6 ? 2400 : a.rank >= 4 ? 1300 : 950) * dt);
     if (!x && !y) a.speed = Math.max(0, a.speed - 1800 * dt);
-    if (fresh.punch && a.rank >= 2 && a.elapsed >= a.nextAttack) { a.reverseUntil = a.elapsed + .28; a.nextAttack = a.elapsed + .7; }
+    if (fresh.punch && a.rank >= 2 && a.elapsed >= a.nextAttack) { a.reverseUntil = a.elapsed + .28; a.nextAttack = a.elapsed + tune(p,1,"reverseDelay",.55); }
     if (fresh.kick && a.rank >= 3 && a.elapsed >= a.nextDodge) {
-      a.driftUntil = a.elapsed + .5; a.nextDodge = a.elapsed + .9;
-      this.karonuxStrike(p, a.rank === 6 ? 225 : 165, 1.7, { radial: true, heavy: true, launch: a.rank === 6 ? 800 : 500 });
+      a.driftUntil = a.elapsed + .5; a.nextDodge = a.elapsed + tune(p,2,"driftDelay",.7);
+      this.karonuxStrike(p, tune(p,2,"driftRange",a.rank === 6 ? 225 : 165), 1.7, { radial: true, heavy: true, launch: a.rank === 6 ? 800 : 500 });
       this.karonuxEffect(p.x, p.y, 13);
     }
     const reverse = a.elapsed < (a.reverseUntil || 0), drift = a.elapsed < (a.driftUntil || 0);
     if (x && !reverse) p.facing = Math.sign(x);
-    const speed = (reverse ? 700 : a.speed) * (1 + a.chain * .08);
+    const speed = (reverse ? tune(p,1,"reverseSpeed",700) : a.speed) * (1 + a.chain * tune(p,4,"chainSpeed",.08)) * (a.elapsed<(a.turboUntil||0)?1.25:1);
     p.x = clamp(p.x + (reverse ? -p.facing : x) * speed * dt, FLOOR.left, FLOOR.right);
     p.y = clamp(p.y + y * speed * .65 * dt, FLOOR.top, FLOOR.bottom);
     a.moving = p.x !== old.x || p.y !== old.y; a.pose = reverse ? 4 : drift ? 5 + Math.floor(a.elapsed * 12) % 2 : a.moving ? Math.floor(a.elapsed * 10) % 2 : 0;
@@ -156,9 +157,9 @@ export const karonuxTransformations = {
       if (a.moving && swept && !hit.touching && a.elapsed >= hit.next) {
         hit.next = a.elapsed + .65;
         if (this.state.enemies.includes(e)) {
-          this.damage(e, p.specialPower * (a.rank === 6 ? 2.5 : 1.7), p, true);
-          if (!e.boss && !e.vehicle) { e.vx = (reverse ? -p.facing : p.facing) * (a.rank >= 4 ? 800 : 450); e.stun = Math.max(e.stun, .5); }
-          if (a.rank >= 5) { a.chain = Math.min(5, a.chain + 1); a.chainUntil = a.elapsed + 1.5; }
+          this.damage(e, p.specialPower * tune(p,0,"impact",a.rank === 6 ? 2.5 : 1.7), p, true);
+          if (!e.boss && !e.vehicle) { e.vx = (reverse ? -p.facing : p.facing) * tune(p,0,"push",a.rank >= 4 ? 800 : 450); e.stun = Math.max(e.stun, .5); }
+          if (a.rank >= 5) { a.chain = Math.min(5, a.chain + 1); a.chainUntil = a.elapsed + tune(p,4,"chainLife",1.5); if(stars(p,4)===3 && a.chain>=3){a.turboUntil=a.elapsed+.6;feedback(this,p,0);} }
           if (a.rank < 4) a.speed *= .65;
         } else this.hitProp(e, 3, p);
         this.karonuxEffect(e.x, e.y, 12);
@@ -171,7 +172,9 @@ export const karonuxTransformations = {
     this.state.karonuxTrails = (this.state.karonuxTrails || []).filter(t => t.until > now);
     for (const e of this.state.enemies) {
       if (e.karonuxFrost && e.karonuxFrost.until <= now) e.karonuxFrost = null;
-      for (const t of this.state.karonuxTrails) if (nearby(t, e, 65) && (e.karonuxSlipUntil || 0) < now) {
+      for (const t of this.state.karonuxTrails) if (nearby(t, e, tune(this.state.players.find(p=>p.id===t.owner)||{kind:"karonux"},2,"trailRange",65)) && (e.karonuxSlipUntil || 0) <= now) {
+        const owner=this.state.players.find(p=>p.id===t.owner);
+        if(owner&&stars(owner,2)===3&&e.karonuxFrost?.frozenUntil>now)this.karonuxShatter(owner,[e]);
         e.karonuxSlipUntil = now + .8; e.vx = (e.facing || 1) * 240; e.stun = Math.max(e.stun, .4); e.action = 'hurt'; break;
       }
       const launch = e.karonuxLaunch;

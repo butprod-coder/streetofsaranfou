@@ -56,7 +56,7 @@ export const lateEvents = {
       e.equipment[p.id]=choice.id;
       if(choice.id==='ball')p.gymBalls=1;
       if(choice.id==='bat'){this.dropWeapon(p);p.weapon={kind:'bat',uses:8};}
-      if(choice.id==='food')p.hp=Math.min(p.maxHp,p.hp+35);
+      if(choice.id==='food')this.healPlayer(p,35);
       this.updateLate(0);return true;
     }
     if(e.kind==='vending'&&!e.alarm) {
@@ -104,7 +104,7 @@ export const lateEvents = {
     const s=this.state;
     if(!p.gymBalls||p.hp<=0||p.z>0||p.specialState||s.phase!=='fight')return false;
     p.gymBalls=0;p.cooldown=.4;p.action='punch';p.actionTime=0;
-    (s.gymProjectiles ||= []).push({x:p.x,y:p.y,owner:p.id,vx:p.facing*550,vy:0,remaining:4,hits:[]});
+    (s.gymProjectiles ||= []).push({x:p.x,y:p.y,owner:p.id,vx:p.facing*550,vy:0,remaining:4,hits:[],damage:22*(p.bonuses.weaponPower||1),critical:this.rollCritical(p,{})});
     return true;
   },
   updateGymBalls(dt) {
@@ -116,7 +116,7 @@ export const lateEvents = {
       const target=s.enemies.filter(a=>a.hp>0&&!b.hits.includes(a.id)).sort((a,c)=>Math.hypot(a.x-b.x,a.y-b.y)-Math.hypot(c.x-b.x,c.y-b.y))[0];
       if(target&&Math.hypot(target.x-b.x,target.y-b.y)<450){const dx=target.x-b.x,dy=target.y-b.y,len=Math.hypot(dx,dy)||1;b.vx=dx/len*550;b.vy=dy/len*550;}
       b.x+=b.vx*dt;b.y+=b.vy*dt;
-      if(target&&target.invincible<=0&&nearLate(b,target,48)){b.hits.push(target.id);this.damage(target,22,owner,true);if(target.hp>0)target.stun=Math.max(target.stun,1.2);if(b.hits.length>=3)b.remaining=0;}
+      if(target&&target.invincible<=0&&nearLate(b,target,48)){b.hits.push(target.id);this.damage(target,b.damage??22,owner,true,false,b);if(target.hp>0)target.stun=Math.max(target.stun,1.2);if(b.hits.length>=3)b.remaining=0;}
     }
     s.gymProjectiles=(s.gymProjectiles||[]).filter(b=>b.remaining>0&&b.x>-60&&b.x<1340&&b.y>400&&b.y<700);
   },
@@ -142,7 +142,7 @@ export const lateEvents = {
       }
     }
     if(e.kind==='photo'&&e.photos<3&&e.elapsed>=(e.photos+1)*6){e.photos++;e.flashUntil=e.elapsed+.2;this.event('schoolPhoto');
-      for(const p of active(s))if(inPhoto(p)){p.hp=Math.min(p.maxHp,p.hp+15);e.photoHits++;}
+      for(const p of active(s))if(inPhoto(p)){this.healPlayer(p,15);e.photoHits++;}
       for(const foe of s.enemies)if(foe.hp>0&&inPhoto(foe)){foe.stun=Math.max(foe.stun,2.5);foe.attack=null;foe.pattern=null;}
     }
   },

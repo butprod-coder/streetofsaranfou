@@ -57,7 +57,7 @@ export const bourgEvents = {
     if (!isBourg(e) || e.status !== 'active') return false;
     if (p.hp <= 0 || p.connected === false || p.z > 0 || p.attack || p.stun > 0) return true;
     if (e.kind === 'bakery') {
-      if (e.held[p.id]) { e.held[p.id] = false; p.hp = Math.min(p.maxHp, p.hp+15); return true; }
+      if (e.held[p.id]) { e.held[p.id] = false; this.healPlayer(p,15); return true; }
       if (near(p, BAKERY)) { if (e.stock > 0) { e.stock--; e.taken++; e.held[p.id] = true; } return true; }
     }
     if (e.kind === 'shells') {

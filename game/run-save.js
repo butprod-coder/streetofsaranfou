@@ -15,7 +15,7 @@ export function checkpoint(state) {
   if (state?.practice || state?.sandbox) return null;
   if (!state || !['intro', 'rest', 'clear', 'badges'].includes(state.phase) || state.enemies.some(e => e.hp > 0) || !state.players.some(p => p.hp > 0)) return null;
   return validateCheckpoint({ version: 4, runId: state.runId, chapter: state.chapter, stage: state.stage, wave: state.wave, phase: state.phase, route: state.route, finale:state.finale,
-    time: state.time, seed: state.rngSeed, streetSeed: state.streetSeed, streetBag: state.streetBag, enemyOrder: state.enemyOrder, randomOpening: true, nextId: state.nextEntityId,
+    time: state.time, seed: state.rngSeed, criticalSeed:state.criticalSeed, streetSeed: state.streetSeed, streetBag: state.streetBag, enemyOrder: state.enemyOrder, randomOpening: true, nextId: state.nextEntityId,
     difficulty: state.difficulty, score: state.score, kills: state.kills, bestCombo: state.bestCombo, neighborhood: state.neighborhood, estate: state.estate, stadium: state.stadium, bourg: state.bourg, night: state.night, school: state.school,
     players: state.players.map(p => ({ kind: p.kind, profile: p.progression, health: p.hp / p.maxHp, energy: p.energy, lives: p.lives,
       weapon: p.weapon, gymBalls: p.gymBalls, rewards: {}, choices: [], supportRole: p.supportRole, sleepSaveChapter: p.sleepSaveChapter,
@@ -34,15 +34,23 @@ export function validateCheckpoint(raw) {
     if (!p || !FIGHTERS.some(f => f.id === p.kind)) throw new Error('Personnage invalide.');
     const rewards = {};
     const choices = [];
-    const profile=normalizeProfile(p.profile,p.kind);
+    let savedProfile=p.profile;
+    if ((savedProfile?.progressionVersion || 0) < 4) {
+      const attributeStages = raw.chapter === 6
+        ? Array.from({length:36},(_,i)=>`${Math.floor(i/6)}:${i%6}`)
+        : Array.from({length:raw.stage+(['clear','badges'].includes(raw.phase)?1:0)},(_,stage)=>`${raw.chapter}:${stage}`);
+      savedProfile={...savedProfile,attributeStages:[...(Array.isArray(savedProfile?.attributeStages)?savedProfile.attributeStages:[]),...attributeStages]};
+    }
+    const profile=normalizeProfile(savedProfile,p.kind);
     const recruits=p.kind==='jualos'&&profile.talents.includes('jualos_v3_0_4')&&Array.isArray(p.recruits)?p.recruits.slice(0,128).filter(a=>a&&Object.hasOwn(ENEMIES,a.kind)&&a.health>0).map(a=>({kind:a.kind,health:number(a.health,1)})):[];
-    const staff=p.kind==='gustavax'&&profile.talents.includes('gustavax_v3_1_5')&&Array.isArray(p.staff)?p.staff.slice(0,6).filter(a=>a&&['staff','manager'].includes(a.role)&&a.health>0).map(a=>({role:a.role,health:number(a.health,1)})):[];
+    const staff=p.kind==='gustavax'&&profile.talents.includes('gustavax_v3_1_5')&&Array.isArray(p.staff)?p.staff.slice(0,8).filter(a=>a&&['staff','manager'].includes(a.role)&&a.health>0).map(a=>({role:a.role,health:number(a.health,1)})):[];
     return { kind: p.kind, profile, recruits, staff, health: number(p.health, 1), energy: number(p.energy,100), lives: integer(p.lives,5),
       weapon: p.weapon && Object.hasOwn(WEAPONS,p.weapon.kind) ? { kind: p.weapon.kind, uses: integer(p.weapon.uses,24) } : null,
       gymBalls: integer(p.gymBalls,1), rewards, choices, supportRole: ['heal','guard','attack'].includes(p.supportRole) ? p.supportRole : 'attack', sleepSaveChapter: integer(p.sleepSaveChapter,5,-1) };
   });
   if (!players.some(p => p.health > 0)) throw new Error('Cette sortie est terminée.');
   return { version:4, runId:raw.runId, chapter:raw.chapter, stage:raw.stage, phase:raw.phase, route:cleanRoute(raw.route,raw.chapter,raw.phase), finale:raw.chapter===6?{order:[...raw.finale.order]}:null, wave:integer(raw.wave,4,-1), time:number(raw.time,86400),
+    criticalSeed:Number.isInteger(raw.criticalSeed)?integer(raw.criticalSeed,0xffffffff):undefined,
     seed:integer(raw.seed,0xffffffff), streetSeed:integer(raw.streetSeed,0xffffffff), streetBag:bag(raw.streetBag), neighborhood:cleanNeighborhood(raw.neighborhood, raw.streetSeed), estate:cleanNeighborhood(raw.estate, raw.streetSeed, 1), stadium:cleanNeighborhood(raw.stadium, raw.streetSeed, 2), bourg:cleanNeighborhood(raw.bourg, raw.streetSeed, 3), night:cleanNeighborhood(raw.night, raw.streetSeed, 4), school:cleanNeighborhood(raw.school, raw.streetSeed, 5),
     randomOpening: true, enemyOrder: [...new Set([...(raw.randomOpening ? [] : STARTING_ENEMIES), ...bag(raw.enemyOrder), ...ENCOUNTER_ROSTER])], nextId:integer(raw.nextId,1000000,10),
     difficulty:['easy','normal','hard'].includes(raw.difficulty)?raw.difficulty:'normal', score:integer(raw.score,10000000), kills:integer(raw.kills,10000),bestCombo:integer(raw.bestCombo,10000), players,
@@ -57,6 +65,7 @@ export function restoreCheckpoint(raw) {
   s.route=save.route; s.routeReady={};s.finale=save.finale;
   s.stage=save.stage; s.enemyBag=[...save.streetBag]; s.enemyOrder=[...save.enemyOrder]; sim.seed=save.streetSeed; sim.nextId=10; sim.enterStreet();
   s.runId=save.runId; s.time=save.time; s.tick=Math.floor(save.time*60); s.phase=save.phase;
+  if(save.criticalSeed!==undefined)s.criticalSeed=save.criticalSeed;
   s.wave=save.phase==='intro'?-1:['clear','badges'].includes(save.phase)?s.waves.length-1:Math.min(s.waves.length-2,Math.max(0,save.wave));
   s.chapterStory=false;
   s.phaseTime=save.phase==='intro'?1.5:5; s.score=save.score;s.kills=save.kills;s.bestCombo=save.bestCombo;

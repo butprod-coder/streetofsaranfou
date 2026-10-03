@@ -46,5 +46,23 @@ try {
   });
   assert.ok(await page.evaluate(()=>window.newEnemyQA.labels.includes('Triolo')));
   await page.screenshot({path:'test-results/new-enemies-combat.png'});
+  const attack=await page.evaluate(()=>{
+    const {sim,r,assets}=window.newEnemyQA,e=sim.state.enemies.find(e=>e.kind==='dje');
+    const rects=Array.from({length:6},(_,i)=>assets.arcadeFrame('djeStretch',i).rect);
+    const draws=[],original=r.ctx.drawImage.bind(r.ctx);
+    r.ctx.drawImage=(img,...args)=>{if(img===assets.get('/assets/enemies/new/dje-stretch.png'))draws.push(args);return original(img,...args);};
+    e.attack=null;e.stun=0;e.x=520;e.y=560;
+    e.newPattern={kind:'stretch',windup:.95,elapsed:0,width:370,facing:1,fired:true};
+    for(const elapsed of [.5,.8,.89,1.02,1.17,1.3]){e.newPattern.elapsed=elapsed;r.drawNewEnemy(e,sim.state);}
+    r.ctx.drawImage=original;return {rects,draws};
+  });
+  assert.equal(attack.draws.length,6);
+  assert.ok(attack.rects.every(rect=>rect[3]>250),'complete bodies and feet');
+  assert.ok(attack.draws[3][6]>attack.draws[2][6],'full extension is longer than half extension');
+  assert.ok(attack.draws[4][6]<attack.draws[3][6],'arms retract');
+  for(const facing of [1,-1]){
+    await page.evaluate(facing=>{const {sim,r}=window.newEnemyQA,e=sim.state.enemies.find(e=>e.kind==='dje');e.x=facing===1?450:830;e.newPattern.facing=facing;e.newPattern.elapsed=1.02;r.draw(sim.state,.016);},facing);
+    await page.screenshot({path:`test-results/dje-sprites-${facing===1?'right':'left'}.png`});
+  }
   assert.deepEqual(errors,[]);console.log('PASS: 80 transparent sprite frames, five enemies in combat, status labels and attack effects.');
 } finally {await browser?.close();await new Promise(r=>server.server.close(r));}

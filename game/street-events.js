@@ -3,6 +3,7 @@ import { randomEnemyKinds, streetEnemyRoster } from './encounters.js';
 import { hasTalent } from './rogue-talents.js';
 import { streetAction } from './street-action.js';
 import { chainScenery } from './chain-scenery.js';
+import { awardStageAttributes } from './progression.js';
 
 export function surprisePlan(chapter, stage) {
   if (stage === 1) return chapter % 2 ? 'delivery' : 'car';
@@ -116,10 +117,12 @@ export const streetEvents = {
     const key = `${s.chapter}:${s.stage}`;
     if (s.rewardedStreet === key) return;
     s.rewardedStreet = key;
+    if (!s.practice && !s.sandbox) {
+      for (const p of s.players) p.progression = awardStageAttributes(p.progression, s.chapter, s.stage);
+      this.event('opening', { x: 640, y: 360, label: '+2 POINTS DE CARACTÉRISTIQUE' });
+    }
     s.phase = 'clear'; this.event('clear'); s.score += 250;
-    if (s.stage === 0 && this.routeDepth() === 0) this.awardTalentMilestone('street:0:0');
-    if (s.stage === 2 && this.routeDepth() < 2) this.awardTalentMilestone(`street:${this.routeDepth()}:2`);
-    if (s.stage === 5) this.awardChapterTalent();
+    if (s.stage === 5) for(const p of s.players)p.progression.completed=[...new Set([...p.progression.completed,s.chapter])];
     for (const p of s.players) if (p.hp <= 0) this.revivePlayer(p, .4);
     if (s.stage === 5 && this.openRouteBoard()) return;
     if (s.stage === 5 && s.players.some(p => p.hp > 0 && p.hp < p.maxHp * BALANCE.scenery.bossReliefHealth) && !s.pickups.some(p => p.kind === 'food')) {

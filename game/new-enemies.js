@@ -22,7 +22,6 @@ export const newEnemies = {
         if (p.kind === 'cash') this.hazard(e, { kind: 'yinyinCash', x: e.x + p.facing * 35, y: p.targetY, radius: 24, vx: p.facing * 320, delay: 0, ttl: 1.5, pulse: 5, damage: e.power * .35, corrupt: true });
         else if (p.kind === 'eat') {
           const heal = Math.min(e.maxHp - e.hp, Math.round(e.maxHp * .15)); e.hp += heal;
-          this.event('opening', { x:e.x, y:e.y-175, label: `PÂTES · +${heal} PV` });
         } else if (p.kind === 'stretch') line('djeStretch', 370, 25, 1.2);
         else if (p.kind === 'wheel') {
           p.ramX = e.x;
@@ -55,7 +54,7 @@ export const newEnemies = {
         e.newAttackCount=(e.newAttackCount||0)+1;
         e.newPattern={kind,elapsed:0,windup:windup*difficulty(s.difficulty).telegraph,facing:e.facing,targetY:e.y,width,band,fired:false};
         e.actionTime=0; e.action=['pipe','pan'].includes(kind)?'punch':'special';
-        this.event('opening',{x:e.x,y:e.y-180,label}); return true;
+        if(!['dje','caro','yinyin'].includes(e.kind))this.event('opening',{x:e.x,y:e.y-180,label}); return true;
       }
     }
     const distance = e.kind==='dje'?230:e.kind==='karmoilefion'?260:e.kind==='yinyin'?100:80;

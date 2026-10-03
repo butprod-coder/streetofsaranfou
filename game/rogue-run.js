@@ -9,7 +9,7 @@ export const rogueRun = {
       if (!p.progression) continue;
       const level = p.progression.level, next = addExperience(p.progression, Math.round(amount * BALANCE.progression.xpMultiplier));
       applyProfile(p, next);
-      if (next.level > level) this.event('talent', { actor: p.id, label: 'NIVEAU ' + next.level + ' · CARACTÉRISTIQUES · PAUSE' });
+      if (next.level > level) this.event('talent', { actor: p.id, label: 'NIVEAU ' + next.level });
     }
   },
   spendAttribute(slot, key) {

@@ -1,4 +1,6 @@
 import { finalArena } from './final-arena.js';
+import { criticalCombat } from './critical-combat.js';
+import { bossBlockbuster } from './boss-blockbuster.js';
 import { campaignRoute, shuffledRoute } from './campaign-route.js';
 import { lateEvents } from './late-events.js';
 import { bourgEvents } from './bourg-events.js';
@@ -245,7 +247,7 @@ export class Simulation {
         if (++s.stage > 5) {
           s.stage = 0; s.chapter++;
           if (s.chapter >= CHAPTERS.length) { s.chapter = CHAPTERS.length - 1; s.stage = 5; s.phase = 'won'; this.event('win'); return; }
-          for (const p of s.players) { p.hp = Math.min(p.maxHp, Math.max(1, p.hp) + p.maxHp * .4); p.lives = Math.min(5, p.lives + 1); }
+          for (const p of s.players) { p.hp = Math.max(1,p.hp); this.healPlayer(p,p.maxHp*.4); p.lives = Math.min(5, p.lives + 1); }
         }
         this.enterStreet();
       }
@@ -289,7 +291,7 @@ export class Simulation {
       if (s.wave < s.waves.length - 1) {
         s.phase = 'rest'; s.phaseTime = s.waves[s.wave + 1].rest;
         this.event('breather', { label: 'UNE SECONDE POUR SOUFFLER…' });
-        for (const p of s.players) { if (p.hp > 0) p.hp = Math.min(p.maxHp, p.hp + 7); }
+        for (const p of s.players) { if (p.hp > 0) this.healPlayer(p,7); }
       } else {
         if (!this.beginSurprise()) this.clearStreet();
       }
@@ -525,7 +527,7 @@ export class Simulation {
     this.event('swing', { actor: a.id, x: a.x, y: a.y - 60 - a.z, facing: a.facing, heavy: attack.heavy, special, enemy: a.enemy });
   }
 
-  damage(target, amount, source, heavy, chargeEnergy = false) {
+  damage(target, amount, source, heavy, chargeEnergy = false, strike = null) {
     const s = this.state;
     if (target.hp <= 0) return;
     if (this.shieldBlocks(target, source)) return;
@@ -549,6 +551,9 @@ export class Simulation {
     if (!target.enemy) amount = Math.max(1, Math.round(amount * difficulty(s.difficulty).damage * (1 - target.bonuses.defense)));
     amount = Math.round(this.rogueBeforeDamage(target, amount, source, heavy));
     if (amount <= 0) return;
+    const criticalContext = target.enemy ? this.criticalStrike(source, strike) : null;
+    const critical = criticalContext?.critical === true;
+    if (critical) amount = Math.round(amount * 1.5);
     if (this.damageJoPallet(target, amount, heavy)) return;
     if (this.lorenzoSofaDamage(target, amount, source, heavy)) return;
     if (target.boss && (target.recovering > 0 || target.pattern?.kind === 'sleep' && target.pattern.hit)) amount = Math.round(amount * 1.25);
@@ -562,6 +567,7 @@ export class Simulation {
     if (target.enemy && amount > 0 && source?.specialState && !source.enemy) this.schoolSpecialHit(source, target);
     amount=this.kikorProtect(target,amount);
     target.hp = Math.max(0, target.hp - amount); target.flash = .12;
+    if(target.boss&&target.hp>0&&amount>0)this.bossPressureHit(target);
     if (DYNAMIC_ENEMIES[target.kind] && target.pattern) { target.pattern = null; target.cooldown = .9; target.recovering = .9; }
     if (target.boss && target.kind === 'lorenzo' && !target.sofa && !target.sofaBroken && target.hp <= target.maxHp * BALANCE.bosses.lorenzo.phases[0]) this.beginLorenzoSofa(target);
     if (target.boss && target.kind === 'jualos' && !target.commercial && target.hp <= target.maxHp * BALANCE.bosses.jualos.phases[0]) this.beginJualosCommercial(target);
@@ -576,14 +582,16 @@ export class Simulation {
       if (heavy && target.pattern && !target.pattern.hit) { target.pattern = null; target.cooldown = .8; target.recovering = .8; }
     }
     const preservedAttack = target.rogueArmor ? { attack:target.attack, action:target.action, comboStep:target.comboStep } : null;
-    target.stun = (target.miniBoss ? .18 : target.boss ? .09 : heavy ? .34 : .23) * (target.enemy ? 1 : target.bonuses.stagger);
+    target.stun = target.cinematicCounter ? 0 : (target.miniBoss ? .18 : target.boss ? .09 : heavy ? .34 : .23) * (target.enemy ? 1 : target.bonuses.stagger);
     // Boss wind-ups remain readable and cannot be stun-locked indefinitely.
     if (!target.boss || !target.attack) { target.attack = null; target.action = 'hurt'; target.actionTime = 0; }
     const meleeImpact = !source.specialState && ['punch', 'kick'].includes(source.attack?.type);
     target.vx = (Math.sign(target.x - source.x) || source.facing) * (target.boss ? 65 : heavy ? (meleeImpact ? 390 : 340) : (meleeImpact ? 135 : 110));
     if (!target.enemy) { this.resetMeleeCombo(target); target.sitting = null; target.seatHold = 0; target.invincible = .65; target.comboStep = 0; s.combo = 0; }
     if (preservedAttack) { Object.assign(target, preservedAttack); target.stun = 0; target.vx = 0; }
-    this.event('hit', { x: target.x, y: target.y - 72 - target.z, amount, heavy, enemy: target.enemy, actor: target.id, facing: Math.sign(target.x - source.x) || source.facing, finishing: target.hp <= 0 });
+    const criticalVisual = critical && s.time >= (criticalContext.visualAt ?? -1);
+    if (criticalVisual) criticalContext.visualAt = s.time + .18;
+    this.event('hit', { x: target.x, y: target.y - 72 - target.z, amount, heavy, critical, criticalVisual, quietCritical: strike?.summoned === true || source.ally === true, enemy: target.enemy, actor: target.id, facing: Math.sign(target.x - source.x) || source.facing, finishing: target.hp <= 0 });
     if (target.newPattern) {
       const hazard = s.hazards.find(h => h.id === target.newPattern.hazard);
       if (hazard) hazard.ttl = 0;
@@ -607,8 +615,9 @@ export class Simulation {
       if (!target.enemy) this.dropWeapon(target);
       if (!target.enemy) this.clearRogueTransient(target);
       if (target.grabbedBy) { const holder = s.players.find(p => p.id === target.grabbedBy); if (holder) this.releaseGrab(holder); }
-      this.event('ko', { x: target.x, y: target.y, actor: target.id, enemy: target.enemy, boss: target.boss });
+      this.event('ko', { x: target.x, y: target.y, actor: target.id, enemy: target.enemy, boss: target.boss, miniBoss:target.miniBoss, kind:target.kind });
       if (target.enemy) {
+        if((target.boss || target.miniBoss)&&!target.owner&&!target.remySummon)this.awardTalentMilestone(`encounter:${this.routeDepth()}:${s.chapter}:${s.stage}:${target.id}`);
         this.rogueOnKill(source, target);
         this.yanuTransformationKill(source);
         this.kikorParticipationKill(source,target);
@@ -625,6 +634,7 @@ export class Simulation {
   }
 
   updateEnemy(e, dt) {
+    if(e.boss&&this.updateBossBlockbuster(e,dt)){this.tickActor(e,dt);return;}
     if(e.kind==='mairePolice')this.updateMairePolice(e,dt);
     if (this.updateGustavaxEnemy(e, dt)) return;
     if (this.updateJoCargo(e, dt)) return;
@@ -638,7 +648,8 @@ export class Simulation {
     if (e.karonuxFrost?.until > this.state.time) e.speed *= .55;
     if (e.rogueSlow > 0) e.speed *= .55;
     if (e.kikorPaintUntil > this.state.time) e.speed *= .5;
-    try { if(e.harmelinRush)this.updateHarmelinStudent(e,dt);else if(e.remySummon)this.updateRemySummon(e,dt);else this.updateEnemyAction(e, dt); } finally { e.speed = speed; }
+    const before=e.pattern;
+    try { if(e.harmelinRush)this.updateHarmelinStudent(e,dt);else if(e.remySummon)this.updateRemySummon(e,dt);else this.updateEnemyAction(e, dt);this.bossActionBeat(e,before); } finally { e.speed = speed; }
   }
 
   updateEnemyAction(e, dt) {
@@ -720,7 +731,7 @@ export class Simulation {
       if (!player) return true;
       const before = item.kind === 'food' ? player.hp : player.energy;
       if (item.kind === 'food' && hasTalent(player, 'Deuxième service')) { player.rogueDouble = true; this.rogueFX(player, 'DOUBLE FRAPPE PRÊTE', 90); }
-      if (item.kind === 'food') player.hp = Math.min(player.maxHp, player.hp + (item.amount ?? BALANCE.scenery.food) + player.bonuses.food);
+      if (item.kind === 'food') this.healPlayer(player, (item.amount ?? BALANCE.scenery.food) + player.bonuses.food);
       else if (item.kind === 'energy') player.energy = Math.min(100, player.energy + (item.amount ?? BALANCE.scenery.energy));
 
       const amount = Math.round((item.kind === 'food' ? player.hp : player.energy) - before);
@@ -739,4 +750,4 @@ export class Simulation {
 
   snapshot() { return JSON.parse(JSON.stringify({ ...this.state, rngSeed: this.seed, nextEntityId: this.nextId })); }
 }
-Object.assign(Simulation.prototype, finalArena, combat, karonuxCombat, kikorCombat, yanuCombat, lorenzoCombat, joCombat, jualosCombat, streetEvents, elites, interactionCombat, enemyTactics, rogueRun, rogueCombat, streetEnemies, neighborhoodEvents, estateEvents, stadiumEvents, bourgEvents, lateEvents, campaignRoute);
+Object.assign(Simulation.prototype, bossBlockbuster, criticalCombat, finalArena, combat, karonuxCombat, kikorCombat, yanuCombat, lorenzoCombat, joCombat, jualosCombat, streetEvents, elites, interactionCombat, enemyTactics, rogueRun, rogueCombat, streetEnemies, neighborhoodEvents, estateEvents, stadiumEvents, bourgEvents, lateEvents, campaignRoute);

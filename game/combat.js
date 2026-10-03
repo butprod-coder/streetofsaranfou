@@ -6,6 +6,7 @@ import { FLOOR, fighter, clamp } from './data.js';
 import { refreshPlayerStats } from './progression.js';
 import { ENCORE_RULES } from './elite-encore-data.js';
 import { hasTalent } from './rogue-talents.js';
+import { bufferTalentInput } from './talent-input.js';
 import { golfCombat } from './golf.js';
 import { karonuxTransformations } from './karonux-transformations.js';
 import { lorenzoTransformations } from './lorenzo-transformations.js';
@@ -57,6 +58,7 @@ export const combat = {
       damage: source.power, hits: {}, pulse: .7, kind: 'shock', ...options };
     h.x = clamp(h.x, FLOOR.left, FLOOR.right); h.y = clamp(h.y, FLOOR.top, FLOOR.bottom);
     if (['fire', 'slime'].includes(h.kind)) { h.flight = h.delay; h.fromX ??= source.x; h.fromY ??= source.y - 80; }
+    if (!h.enemy && h.damage > 0 && h.critical === undefined) h.critical = this.criticalStrike(source)?.critical ?? false;
     this.state.hazards.push(h); return h;
   },
   updateWorld(dt) {
@@ -102,7 +104,7 @@ export const combat = {
         const distance = Math.hypot(dx, dy * (h.verticalScale || 1.45));
         const hit = h.shape === 'ring' ? distance >= h.previousRadius - h.thickness && distance <= h.radius + h.thickness : h.shape === 'line' ? dx * h.facing >= -25 && dx * h.facing <= h.width && Math.abs(dy) < h.band : distance < h.radius;
         if (hit) {
-          this.damage(target, Math.round(ignition ? h.ignitionDamage || h.damage : h.damage), h.bypassShield ? { ...source, x: h.x, y: h.y, areaDamage: true } : source, true);
+          this.damage(target, Math.round(ignition ? h.ignitionDamage || h.damage : h.damage), h.bypassShield ? { ...source, x: h.x, y: h.y, areaDamage: true } : source, true, false, h);
           if (h.knockback && target.hp > 0) { target.vx = (Math.sign(dx) || h.facing || 1) * h.knockback; target.stun = Math.max(target.stun || 0, .18); }
           if (h.electric && target.hp > 0) target.electrifiedUntil = s.time + .85;
           if (h.sticky && target.hp > 0 && !target.sticky) target.sticky = { owner: h.kind === 'cheesePuddle' ? null : h.owner, remaining: 1.25, rooted: h.kind !== 'cheesePuddle' };
@@ -113,7 +115,7 @@ export const combat = {
           }
           if (h.corrupt && target.hp > 0 && !target.enemy && s.time >= (target.corruptImmuneUntil || 0)) {
             target.corruptedUntil = s.time + 1.8; target.corruptImmuneUntil = s.time + 4;
-            this.event('opening', { x: target.x, y: target.y - 175, label: 'CORROMPU · DIRECTIONS INVERSÉES !' });
+            if(source.kind!=='yinyin')this.event('opening', { x: target.x, y: target.y - 175, label: 'CORROMPU · DIRECTIONS INVERSÉES !' });
           }
           h.hits[target.id] = s.time + h.pulse;
         }
@@ -146,7 +148,7 @@ export const combat = {
           const d = Math.max(1, distance(a, target)); a.x += (target.x - a.x) / d * 255 * dt; a.y += (target.y - a.y) / d * 205 * dt;
         } else if (a.cooldown <= 0) {
           a.cooldown = .65 * owner.bonuses.allyRate; a.action = 'punch'; a.actionTime = 0; a.striking = .24;
-          if (target.invincible <= 0) this.damage(target, a.power * (target.paintOwner === owner.id ? 1.3 : 1) * (hasTalent(owner, 'Portrait de famille') && owner.supportRole === 'attack' ? 1.2 : 1), a, false);
+          if (target.invincible <= 0) this.damage(target, a.power * (target.paintOwner === owner.id ? 1.3 : 1) * (hasTalent(owner, 'Portrait de famille') && owner.supportRole === 'attack' ? 1.2 : 1), a, false,false,{summoned:true});
         }
       }
       this.physics(a, dt);
@@ -188,6 +190,7 @@ export const combat = {
   },
   updateSpecial(p, input, dt) {
     if (p.specialState?.transformation) {
+      input=bufferTalentInput(p,input,dt);
       this.updateUltimateSpecial(p,input,dt);
       if(this.updateUltimateRush(p,dt))return;
       const update={karonux:'updateKaronuxTransformation',lorenzo:'updateLorenzoTransformation',jualos:'updateJualosTransformation',yanu:'updateYanuTransformation',jo:'updateJoTransformation',kikor:'updateKikorTransformation',gustavax:'updateGustavaxTransformation'}[p.kind];
