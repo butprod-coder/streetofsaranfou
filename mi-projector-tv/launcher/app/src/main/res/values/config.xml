@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Number of dock slots, and of columns in the app grid below it (4 to 7). -->
+    <integer name="columns">5</integer>
+
+    <!-- Dock apps, left to right, by package name. Apps that aren't installed are skipped.
+         Find package names with:  adb shell pm list packages  -->
+    <string-array name="dock_apps">
+        <item>com.netflix.ninja</item>
+        <item>com.google.android.youtube.tv</item>
+        <item>com.disney.disneyplus</item>
+        <item>com.amazon.amazonvideo.livingroom</item>
+        <item>com.smarterspro.smartersprotv</item>
+    </string-array>
+
+    <!-- Apps never shown in the grid (besides this launcher itself). -->
+    <string-array name="hidden_apps">
+    </string-array>
+
+    <!-- Plain background colour. To use an image instead, push one to
+         /sdcard/Android/data/tv.clean.home/files/wallpaper.jpg (see README). -->
+    <color name="background">#000000</color>
+</resources>

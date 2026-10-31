@@ -1,5 +1,9 @@
 import { blankInput, ACTIONS, clamp } from './data.js';
 const KEYMAP = { KeyW: 'up', KeyZ: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyA: 'left', KeyQ: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right', KeyJ: 'punch', KeyK: 'kick', KeyL: 'special', Space: 'jump', ShiftLeft: 'dodge', ShiftRight: 'dodge', KeyE: 'revive', KeyG: 'grab', KeyF: 'interact' };
+// Casques, webcams et autres HID que Windows expose parfois comme « gamepad » : ils ne doivent jamais prendre un emplacement J1/J2.
+const NOT_A_PAD = /headset|headphone|earphone|earbud|microphone|\bmic\b|casque|webcam|\bcamera\b|speaker|sound\s*bar|audio\s*device|telephony|voip|jabra|plantronics|sennheiser|yealink|hyperx\s*cloud|arctis|kraken|corsair\s*(void|hs)/i;
+export const isGamepad = p => !!p?.connected && !NOT_A_PAD.test(p.id || '') && (p.buttons?.length ?? 0) >= 4;
+export const listPads = () => [...(navigator.getGamepads?.() || [])].filter(isGamepad);
 export class Input {
   constructor({ pause, blur, menu, wake }) {
     this.keys = new Set(); this.touch = {}; this.stick = { x: 0, y: 0 }; this.taps = {}; this.seq = 0; this.padPrevious = {}; this.enabled = false;
@@ -41,17 +45,29 @@ export class Input {
   clear() { this.keys.clear(); this.touch = {}; this.stick = { x: 0, y: 0 }; this.menuDirection = null; this.menuNeedsNeutral = true; if (this.slotStates?.[1]) Object.assign(this.slotStates[1], { menuDirection: null, menuNeedsNeutral: true }); const knob = document.querySelector('#touch-stick i'); if (knob) knob.style.transform = ''; }
   neutral() { return { ...blankInput(), seq: ++this.seq, taps: { ...this.taps } }; }
   resetRun() { this.clear(); this.taps = {}; this.seq = 0; this.padBlocked = true; if (this.slotStates?.[1]) Object.assign(this.slotStates[1], { taps: {}, seq: 0, padBlocked: true, menuNeedsNeutral: true }); }
+  // J1/J2 gardent leur manette tant qu'elle est là. Les index natifs distinguent deux modèles identiques ; si une manette
+  // Bluetooth se rendort et revient sur un autre index, on la retrouve par son id. Hors partie, un emplacement dont la manette
+  // a disparu est libéré pour qu'une autre manette puisse le prendre ; en partie il reste réservé (pause « manette déconnectée »).
+  assignPads(pads) {
+    const slots = this.padSlots ??= [], ids = this.padIds ??= [], sameId = (p, i) => (p.id ?? '') === ids[i];
+    const found = [0, 1].map(i => pads.find(p => p.index === slots[i] && sameId(p, i)));
+    for (const i of [0, 1]) if (!found[i] && slots[i] !== undefined) found[i] = pads.find(p => !found.includes(p) && sameId(p, i));
+    for (const i of [0, 1]) {
+      if (!found[i] && slots[i] !== undefined && !this.enabled) slots[i] = ids[i] = undefined;
+      if (!found[i] && slots[i] === undefined) found[i] = pads.find(p => !found.includes(p));
+      if (found[i]) { slots[i] = found[i].index; ids[i] = found[i].id ?? ''; }
+    }
+    return this.padPads = found;
+  }
+  padConnected(slot) { return !!this.padPads?.[slot]; }
   sample(slot = 0) {
-    this.padSlots ??= [];
     this.slotStates ??= [{}, {}];
-    const pads = [...(navigator.getGamepads?.() || [])].filter(p => p?.connected);
-    // Native indices distinguish identical models and do not shift on disconnect.
-    for (const p of pads) if (this.padSlots.length < 2 && !this.padSlots.includes(p.index)) this.padSlots.push(p.index);
+    const pads = this.assignPads(listPads());
     const fields = ['padPrevious', 'previousEnabled', 'padBlocked', 'menuDirection', 'menuNeedsNeutral', 'menuRepeatAt', 'taps', 'seq'];
     const saved = Object.fromEntries(fields.map(k => [k, this[k]]));
     if (slot) for (const k of fields) this[k] = this.slotStates[slot][k];
     this.padPrevious ??= {}; this.taps ??= {}; this.seq ??= 0;
-    const result = this.sampleDevice(pads.find(p => p.index === this.padSlots[slot]), slot);
+    const result = this.sampleDevice(pads[slot], slot);
     if (slot) { this.slotStates[slot] = Object.fromEntries(fields.map(k => [k, this[k]])); Object.assign(this, saved); }
     return result;
   }

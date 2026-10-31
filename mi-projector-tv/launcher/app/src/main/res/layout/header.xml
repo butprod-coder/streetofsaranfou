@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="380dp"
+    android:clipChildren="false"
+    android:clipToPadding="false">
+
+    <!-- Ambient glow, tinted with a colour sampled from the focused dock app's banner -->
+    <View
+        android:id="@+id/glow"
+        android:layout_width="800dp"
+        android:layout_height="680dp"
+        android:layout_gravity="bottom|start"
+        android:layout_marginStart="-280dp"
+        android:layout_marginBottom="-300dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="34dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/greeting"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/outfit_light"
+                android:textColor="#A1A1A6"
+                android:textSize="20sp" />
+
+            <TextView
+                android:id="@+id/clock"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="-6dp"
+                android:fontFamily="@font/outfit_thin"
+                android:includeFontPadding="false"
+                android:textColor="#FFFFFF"
+                android:textSize="84sp" />
+
+            <TextView
+                android:id="@+id/date"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:fontFamily="@font/outfit_light"
+                android:textColor="#A1A1A6"
+                android:textSize="20sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/pill_inputs"
+            style="@style/Pill"
+            android:drawableStart="@drawable/ic_input"
+            android:text="@string/inputs" />
+
+        <TextView
+            android:id="@+id/pill_network"
+            style="@style/Pill"
+            android:layout_marginStart="12dp"
+            android:drawableStart="@drawable/ic_ethernet"
+            android:text="@string/ethernet" />
+
+        <TextView
+            android:id="@+id/pill_settings"
+            style="@style/Pill"
+            android:layout_width="44dp"
+            android:layout_marginStart="12dp"
+            android:contentDescription="@string/settings"
+            android:drawableStart="@drawable/ic_settings"
+            android:paddingStart="11dp"
+            android:paddingEnd="0dp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/hero"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginStart="10dp"
+        android:layout_marginBottom="6dp"
+        android:fontFamily="@font/outfit_light"
+        android:maxLines="1"
+        android:textColor="#FFFFFF"
+        android:textSize="54sp" />
+</FrameLayout>

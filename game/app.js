@@ -6,7 +6,7 @@ import { nextDistrict } from './campaign-route.js';
 import { FIGHTERS, CHAPTERS, STEP, fighter, clamp, blankInput } from './data.js';
 import { Simulation } from './simulation.js';
 import { Assets } from './assets.js';
-import { Input } from './input.js';
+import { Input, listPads } from './input.js';
 import { Audio } from './audio.js';
 import { Renderer } from './renderer.js';
 import { Network } from './network.js';
@@ -122,10 +122,12 @@ class Game {
     this.select(this.selected);
     const panel = document.createElement('div'); panel.id = 'local-player2'; panel.setAttribute('aria-live', 'polite');
     $('#roster').after(panel); this.renderLocalSelection();
+    for (const event of ['gamepadconnected', 'gamepaddisconnected']) addEventListener(event, () => this.renderLocalSelection());
   }
   renderLocalSelection() {
     const panel = $('#local-player2'); if (!panel) return;
-    panel.textContent = this.localJoined ? `J1 : manette ${this.input.padSlots[0] + 1} · J2 : manette ${this.input.padSlots[1] + 1} · ${fighter(this.selected2).name} · ${this.localReady2 ? 'PRÊT ✓' : 'Stick / croix : choisir · A / ✕ : valider · B / ○ : quitter'}` : 'J2 · Appuie sur Start / Options sur une seconde manette pour rejoindre';
+    const count = listPads().length, detected = `${count} manette${count > 1 ? 's' : ''} détectée${count > 1 ? 's' : ''}`;
+    panel.textContent = this.localJoined ? `J1 : manette ${this.input.padSlots[0] + 1 || '?'} · J2 : manette ${this.input.padSlots[1] + 1 || '?'} ·${fighter(this.selected2).name} · ${this.localReady2 ? 'PRÊT ✓' : 'Stick / croix : choisir · A / ✕ : valider · B / ○ : quitter'}` : `J2 · Appuie sur Start / Options sur une seconde manette pour rejoindre (${detected}${count < 2 ? ' · appuie sur un bouton de chaque manette pour qu’elle apparaisse' : ''})`;
     panel.classList.toggle('joined', !!this.localJoined);
     $$('#roster [data-fighter]').forEach(el => { el.classList.toggle('selected-p2', !!this.localJoined && el.dataset.fighter === this.selected2); el.dataset.localPlayers = [el.dataset.fighter === this.selected ? 'J1' : '', this.localJoined && el.dataset.fighter === this.selected2 ? 'J2' : ''].filter(Boolean).join(' + '); });
   }
@@ -196,7 +198,7 @@ class Game {
     await this.load(this.state.chapter,()=>{this.simulation.pause(false);this.show(null);this.audio.wake();});
   }
   async startSolo(chapter = 0) {
-    if (this.localJoined && (!this.localReady2 || !this.input.padSlots?.every(index => [...navigator.getGamepads()].some(p => p?.connected && p.index === index)))) { this.toast('J2 doit valider son personnage et les deux manettes doivent être connectées.'); return; }
+    if (this.localJoined && (!this.localReady2 || !(this.input.padConnected(0) && this.input.padConnected(1)))) { this.toast('J2 doit valider son personnage et les deux manettes doivent être connectées.'); return; }
     const startingChoice = !this.state ? this.profiles[this.selected]?.talents.slice(0, 1) : [];
     this.network.close(true); this.mode = 'solo'; this.resultShown = false; this.state = null; this.simulation = null;
     this.resetProgression(); this.clearRunSave();
@@ -492,7 +494,7 @@ class Game {
     const dt = Math.min(.075, (now - this.lastFrame) / 1000); this.lastFrame = now;
     const input = this.input.sample();
     const input2 = (this.screen === 'select' && this.mode !== 'online') || this.localJoined && this.mode !== 'online' ? this.input.sample(1) : blankInput();
-    if (this.localJoined && this.input.enabled && this.input.padSlots.some(index => ![...(navigator.getGamepads?.() || [])].some(p => p?.connected && p.index === index))) { this.setPause(true); this.toast('Manette déconnectée : reconnecte-la pour reprendre.'); }
+    if (this.localJoined && this.input.enabled && !(this.input.padConnected(0) && this.input.padConnected(1))) { this.setPause(true); this.toast('Manette déconnectée : reconnecte-la pour reprendre.'); }
     if (now - (this.lastCheckpoint || 0) > 1000) { this.lastCheckpoint = now; this.persistRun(); }
     if (now - (this.lastProgressSave || 0) > 200) { this.lastProgressSave = now; this.syncProgression(); }
     if (this.simulation && this.state && !this.state.paused) {

@@ -1,0 +1,4 @@
+launcher/.gradle/
+launcher/build/
+launcher/app/build/
+launcher/local.properties
